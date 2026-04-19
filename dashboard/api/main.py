@@ -1,5 +1,6 @@
 import asyncio
 import os
+import requests
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
@@ -17,7 +18,7 @@ app = FastAPI(title="Zambeel SQA Dashboard API", version="1.0.0")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["*", "https://sqa-agent.vercel.app"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -35,6 +36,35 @@ REPO_PATHS = {
     "frontend": os.path.expanduser(os.getenv("GITHUB_FRONTEND_REPO", "~/Documents/GitHub/zambeel-fe")),
     "backend":  os.path.expanduser(os.getenv("GITHUB_BACKEND_REPO",  "~/Documents/GitHub/zambeel-api")),
 }
+
+REPO_API_NAMES = {
+    "frontend": os.getenv("GITHUB_FRONTEND_REPO_API", ""),
+    "backend":  os.getenv("GITHUB_BACKEND_REPO_API", ""),
+}
+
+GITHUB_TOKEN = os.getenv("GITHUB_TOKEN", "")
+
+
+def _get_branches_via_api(repo_api_name: str):
+    headers = {"Accept": "application/vnd.github+json"}
+    if GITHUB_TOKEN:
+        headers["Authorization"] = f"Bearer {GITHUB_TOKEN}"
+
+    r = requests.get(
+        f"https://api.github.com/repos/{repo_api_name}/branches",
+        headers=headers, timeout=10,
+    )
+    r.raise_for_status()
+    branches = [b["name"] for b in r.json()]
+
+    r2 = requests.get(
+        f"https://api.github.com/repos/{repo_api_name}",
+        headers=headers, timeout=10,
+    )
+    r2.raise_for_status()
+    current = r2.json().get("default_branch", branches[0] if branches else "main")
+
+    return branches, current
 
 # ── Tool imports (done once at startup) ───────────────────────────────────────
 import tools.jira_tool       as _jira
@@ -200,13 +230,28 @@ async def get_sprints(project_key: str):
 
 @app.get("/github/branches/{repo}")
 async def get_branches(repo: str):
-    repo_path = REPO_PATHS.get(repo.lower())
+    repo_key = repo.lower()
+    repo_path = REPO_PATHS.get(repo_key)
     if not repo_path:
         raise HTTPException(status_code=400, detail="repo must be 'frontend' or 'backend'")
+
+    if Path(repo_path).exists():
+        try:
+            branches = await asyncio.to_thread(_github.list_branches, repo_path)
+            current  = await asyncio.to_thread(_github.get_current_branch, repo_path)
+            return {"repo": repo, "branches": branches, "current": current, "source": "local"}
+        except Exception:
+            pass
+
+    repo_api_name = REPO_API_NAMES.get(repo_key, "")
+    if not repo_api_name:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Local repo not found and GITHUB_{repo.upper()}_REPO_API is not set",
+        )
     try:
-        branches = await asyncio.to_thread(_github.list_branches, repo_path)
-        current  = await asyncio.to_thread(_github.get_current_branch, repo_path)
-        return {"repo": repo, "branches": branches, "current": current}
+        branches, current = await asyncio.to_thread(_get_branches_via_api, repo_api_name)
+        return {"repo": repo, "branches": branches, "current": current, "source": "github_api"}
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
