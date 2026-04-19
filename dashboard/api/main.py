@@ -231,23 +231,11 @@ async def get_sprints(project_key: str):
 @app.get("/github/branches/{repo}")
 async def get_branches(repo: str):
     repo_key = repo.lower()
-    repo_path = REPO_PATHS.get(repo_key)
-    if not repo_path:
-        raise HTTPException(status_code=400, detail="repo must be 'frontend' or 'backend'")
-
-    if Path(repo_path).exists():
-        try:
-            branches = await asyncio.to_thread(_github.list_branches, repo_path)
-            current  = await asyncio.to_thread(_github.get_current_branch, repo_path)
-            return {"repo": repo, "branches": branches, "current": current, "source": "local"}
-        except Exception:
-            pass
-
     repo_api_name = REPO_API_NAMES.get(repo_key, "")
     if not repo_api_name:
         raise HTTPException(
             status_code=400,
-            detail=f"Local repo not found and GITHUB_{repo.upper()}_REPO_API is not set",
+            detail=f"GITHUB_{repo.upper()}_REPO_API env var is not set",
         )
     try:
         branches, current = await asyncio.to_thread(_get_branches_via_api, repo_api_name)
