@@ -112,7 +112,10 @@ class PRReviewBody(BaseModel):
 
 @app.get("/health")
 def health():
-    return {"status": "ok"}
+    import os as _os
+    app_contents = _os.listdir("/app") if _os.path.exists("/app") else None
+    auth_contents = _os.listdir("/app/auth") if _os.path.exists("/app/auth") else None
+    return {"status": "ok", "app_dir": app_contents, "auth_dir": auth_contents}
 
 # ── /tests ────────────────────────────────────────────────────────────────────
 

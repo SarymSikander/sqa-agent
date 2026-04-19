@@ -8,11 +8,11 @@ from playwright.sync_api import sync_playwright
 
 load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), "..", ".env"))
 
-LOCAL_URL      = os.getenv("LOCAL_URL")
-STAGING_URL    = os.getenv("STAGING_URL")
-PRODUCTION_URL = os.getenv("PRODUCTION_URL")
+LOCAL_URL      = os.getenv("LOCAL_URL", "")
+STAGING_URL    = os.getenv("STAGING_URL", "")
+PRODUCTION_URL = os.getenv("PRODUCTION_URL", "")
 
-FRONTEND_REPO_PATH = os.getenv("FRONTEND_REPO_PATH")
+FRONTEND_REPO_PATH = os.getenv("FRONTEND_REPO_PATH", "")
 FRONTEND_DEV_CMD   = os.getenv("FRONTEND_DEV_CMD", "npm run dev")
 
 AUTH_DIR        = os.path.join(os.path.dirname(__file__), "..", "auth")

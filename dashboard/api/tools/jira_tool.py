@@ -7,9 +7,9 @@ from requests.auth import HTTPBasicAuth
 
 load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), "..", ".env"))
 
-JIRA_URL  = os.getenv("JIRA_URL")
-EMAIL     = os.getenv("JIRA_EMAIL")
-API_TOKEN = os.getenv("JIRA_API_TOKEN")
+JIRA_URL  = os.getenv("JIRA_URL", "")
+EMAIL     = os.getenv("JIRA_EMAIL", "")
+API_TOKEN = os.getenv("JIRA_API_TOKEN", "")
 
 _auth         = HTTPBasicAuth(EMAIL, API_TOKEN)
 _headers      = {"Accept": "application/json"}

@@ -4,8 +4,8 @@ from git import Repo
 
 load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), "..", ".env"))
 
-FRONTEND_REPO = os.path.expanduser(os.getenv("GITHUB_FRONTEND_REPO"))
-BACKEND_REPO = os.path.expanduser(os.getenv("GITHUB_BACKEND_REPO"))
+FRONTEND_REPO = os.path.expanduser(os.getenv("GITHUB_FRONTEND_REPO") or "")
+BACKEND_REPO = os.path.expanduser(os.getenv("GITHUB_BACKEND_REPO") or "")
 
 
 def get_current_branch(repo_path):
