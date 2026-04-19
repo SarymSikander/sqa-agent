@@ -1,0 +1,2274 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Zambeel SQA — Dashboard</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+  <style>
+    /* ── Tokens ─────────────────────────────────────────────────────────────── */
+    :root {
+      --bg:           #0F0F1A;
+      --bg2:          #1A1A2E;
+      --card:         #16213E;
+      --card2:        #1E2A45;
+      --border:       rgba(255,255,255,0.08);
+      --border-hover: rgba(255,255,255,0.14);
+      --text:         #F1F0FF;
+      --text2:        #A09DC0;
+      --text3:        #5C5A7A;
+      --g1:           #4F46E5;
+      --g2:           #7C3AED;
+      --g3:           #C026D3;
+      --gradient:     linear-gradient(135deg, #4F46E5, #7C3AED, #C026D3);
+      --gradient-h:   linear-gradient(135deg, #6056FF, #9046FF, #D835E8);
+      --success:      #22C55E;
+      --success-bg:   rgba(34,197,94,0.12);
+      --error:        #EF4444;
+      --error-bg:     rgba(239,68,68,0.12);
+      --warn:         #F59E0B;
+      --warn-bg:      rgba(245,158,11,0.12);
+      --info-bg:      rgba(79,70,229,0.15);
+      --sidebar-w:    220px;
+      --r:            12px;
+      --r-sm:         8px;
+      --r-xs:         6px;
+      --shadow:       0 4px 24px rgba(0,0,0,0.4);
+      --shadow-glow:  0 0 20px rgba(124,58,237,0.35);
+    }
+
+    /* ── Reset ──────────────────────────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; overflow: hidden; }
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      font-size: 14px;
+      line-height: 1.55;
+      background: var(--bg);
+      color: var(--text);
+      display: flex;
+    }
+    a { color: #818CF8; text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    input, select, textarea {
+      font-family: inherit;
+      font-size: 13px;
+      background: rgba(255,255,255,0.05);
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: var(--r-sm);
+      padding: 9px 12px;
+      outline: none;
+      transition: border-color .2s, box-shadow .2s;
+      width: 100%;
+    }
+    input:focus, select:focus, textarea:focus {
+      border-color: var(--g2);
+      box-shadow: 0 0 0 3px rgba(124,58,237,0.18);
+    }
+    select option { background: var(--bg2); color: var(--text); }
+    textarea { resize: vertical; min-height: 90px; }
+    label { display: block; font-size: 12px; font-weight: 500; color: var(--text2); margin-bottom: 5px; letter-spacing: 0.02em; }
+
+    /* ── Scrollbar ───────────────────────────────────────────────────────────── */
+    ::-webkit-scrollbar { width: 5px; height: 5px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.18); }
+
+    /* ── Sidebar ─────────────────────────────────────────────────────────────── */
+    #sidebar {
+      width: var(--sidebar-w);
+      min-width: var(--sidebar-w);
+      height: 100vh;
+      background: var(--bg2);
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      padding: 0 0 20px;
+      overflow: hidden;
+    }
+    .sidebar-logo {
+      padding: 22px 18px 20px;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 10px;
+    }
+    .logo-wordmark {
+      font-size: 18px;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+      background: var(--gradient);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      line-height: 1;
+    }
+    .logo-sub {
+      font-size: 10px;
+      font-weight: 500;
+      color: var(--text3);
+      margin-top: 5px;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+    }
+    .nav-section-label {
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--text3);
+      padding: 10px 18px 4px;
+    }
+    .nav-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 9px 18px 9px 16px;
+      margin: 1px 8px;
+      border-radius: var(--r-xs);
+      cursor: pointer;
+      color: var(--text2);
+      font-size: 13.5px;
+      font-weight: 500;
+      transition: all .18s;
+      user-select: none;
+      border-left: 3px solid transparent;
+      position: relative;
+    }
+    .nav-item:hover { background: rgba(255,255,255,0.04); color: var(--text); }
+    .nav-item.active {
+      background: linear-gradient(90deg, rgba(79,70,229,0.18), rgba(124,58,237,0.06));
+      color: #A78BFA;
+      border-left-color: #7C3AED;
+    }
+    .nav-item .nav-icon { font-size: 15px; width: 18px; text-align: center; flex-shrink: 0; }
+    .sidebar-footer {
+      margin-top: auto;
+      padding: 14px 18px 0;
+      border-top: 1px solid var(--border);
+    }
+    .api-status {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      font-size: 11.5px;
+      color: var(--text3);
+    }
+    .api-dot {
+      width: 7px; height: 7px;
+      border-radius: 50%;
+      background: var(--success);
+      box-shadow: 0 0 8px var(--success);
+      animation: pulse-dot 2s ease-in-out infinite;
+      flex-shrink: 0;
+    }
+    .api-dot.offline { background: var(--error); box-shadow: 0 0 8px var(--error); animation: none; }
+    @keyframes pulse-dot {
+      0%, 100% { opacity: 1; box-shadow: 0 0 6px var(--success); }
+      50% { opacity: 0.7; box-shadow: 0 0 14px var(--success); }
+    }
+
+    /* ── Header ──────────────────────────────────────────────────────────────── */
+    #topbar {
+      height: 54px;
+      background: var(--bg2);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      padding: 0 28px;
+      gap: 12px;
+      flex-shrink: 0;
+    }
+    .breadcrumb {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 13px;
+      color: var(--text2);
+      flex: 1;
+    }
+    .breadcrumb .bc-root { color: var(--text3); }
+    .breadcrumb .bc-sep { color: var(--text3); }
+    .breadcrumb .bc-page { color: var(--text); font-weight: 500; }
+    .agent-badge {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: var(--info-bg);
+      border: 1px solid rgba(124,58,237,0.3);
+      border-radius: 99px;
+      padding: 5px 12px 5px 8px;
+      font-size: 11.5px;
+      font-weight: 600;
+      color: #A78BFA;
+      letter-spacing: 0.01em;
+    }
+    .live-dot {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 11.5px;
+      font-weight: 600;
+      color: var(--success);
+    }
+    .live-dot::before {
+      content: '';
+      width: 7px; height: 7px;
+      border-radius: 50%;
+      background: var(--success);
+      box-shadow: 0 0 0 0 rgba(34,197,94,0.5);
+      animation: live-pulse 1.8s ease-in-out infinite;
+    }
+    @keyframes live-pulse {
+      0% { box-shadow: 0 0 0 0 rgba(34,197,94,0.5); }
+      70% { box-shadow: 0 0 0 6px rgba(34,197,94,0); }
+      100% { box-shadow: 0 0 0 0 rgba(34,197,94,0); }
+    }
+
+    /* ── Main ────────────────────────────────────────────────────────────────── */
+    #app-shell { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+    #main { flex: 1; overflow-y: auto; }
+
+    /* ── Pages ───────────────────────────────────────────────────────────────── */
+    .page { display: none; }
+    .page.active { display: block; }
+    .page-inner { padding: 28px 32px; max-width: 1280px; }
+
+    /* ── Cards ───────────────────────────────────────────────────────────────── */
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--r);
+      padding: 22px;
+      transition: border-color .2s, box-shadow .2s;
+    }
+    .card:hover { border-color: var(--border-hover); }
+    .card-title {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--text2);
+      margin-bottom: 16px;
+    }
+    .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+    .grid-2 { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; }
+
+    /* ── Buttons ─────────────────────────────────────────────────────────────── */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      padding: 9px 18px;
+      border: none;
+      border-radius: var(--r-sm);
+      font-family: inherit;
+      font-size: 13.5px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all .2s;
+      white-space: nowrap;
+      letter-spacing: 0.01em;
+    }
+    .btn-primary {
+      background: var(--gradient);
+      color: #fff;
+      box-shadow: 0 2px 12px rgba(124,58,237,0.3);
+    }
+    .btn-primary:hover {
+      background: var(--gradient-h);
+      box-shadow: 0 4px 22px rgba(124,58,237,0.55);
+      transform: translateY(-1px);
+    }
+    .btn-secondary {
+      background: rgba(255,255,255,0.06);
+      color: var(--text);
+      border: 1px solid var(--border);
+    }
+    .btn-secondary:hover { background: rgba(255,255,255,0.1); border-color: var(--border-hover); }
+    .btn-danger {
+      background: var(--error-bg);
+      color: var(--error);
+      border: 1px solid rgba(239,68,68,0.25);
+    }
+    .btn-danger:hover { background: rgba(239,68,68,0.22); }
+    .btn-success {
+      background: var(--success-bg);
+      color: var(--success);
+      border: 1px solid rgba(34,197,94,0.25);
+    }
+    .btn-lg { padding: 12px 28px; font-size: 15px; border-radius: 10px; }
+    .btn-sm { padding: 5px 12px; font-size: 12px; border-radius: var(--r-xs); }
+    .btn:disabled { opacity: 0.45; cursor: not-allowed; transform: none !important; box-shadow: none !important; }
+    .btn .spin {
+      display: none;
+      width: 13px; height: 13px;
+      border: 2px solid rgba(255,255,255,0.3);
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: spin .65s linear infinite;
+      flex-shrink: 0;
+    }
+    .btn.loading .spin  { display: block; }
+    .btn.loading .label { opacity: 0.7; }
+
+    /* ── Pill selector ───────────────────────────────────────────────────────── */
+    .pill-group { display: flex; gap: 6px; flex-wrap: wrap; }
+    .pill {
+      padding: 6px 16px;
+      border-radius: 99px;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      border: 1px solid var(--border);
+      color: var(--text2);
+      background: transparent;
+      font-family: inherit;
+      transition: all .18s;
+    }
+    .pill:hover { border-color: var(--border-hover); color: var(--text); }
+    .pill.active {
+      background: var(--gradient);
+      border-color: transparent;
+      color: #fff;
+      box-shadow: 0 2px 10px rgba(124,58,237,0.4);
+    }
+
+    /* ── Tabs ─────────────────────────────────────────────────────────────────── */
+    .tabs {
+      display: flex;
+      gap: 0;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 24px;
+    }
+    .tab {
+      padding: 10px 20px;
+      font-size: 13.5px;
+      font-weight: 500;
+      cursor: pointer;
+      color: var(--text2);
+      border-bottom: 2px solid transparent;
+      margin-bottom: -1px;
+      transition: color .18s, border-color .18s;
+    }
+    .tab:hover { color: var(--text); }
+    .tab.active { color: #A78BFA; border-bottom-color: #7C3AED; }
+
+    /* ── Badges ──────────────────────────────────────────────────────────────── */
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 3px 10px;
+      border-radius: 99px;
+      font-size: 11.5px;
+      font-weight: 700;
+      letter-spacing: 0.03em;
+    }
+    .badge-pass    { background: var(--success-bg); color: var(--success); border: 1px solid rgba(34,197,94,0.2); }
+    .badge-fail    { background: var(--error-bg);   color: var(--error);   border: 1px solid rgba(239,68,68,0.2); }
+    .badge-warn    { background: var(--warn-bg);    color: var(--warn);    border: 1px solid rgba(245,158,11,0.2); }
+    .badge-info    { background: var(--info-bg);    color: #A78BFA;        border: 1px solid rgba(124,58,237,0.25); }
+    .badge-neutral { background: rgba(255,255,255,0.06); color: var(--text2); border: 1px solid var(--border); }
+    .dot { width: 5px; height: 5px; border-radius: 50%; background: currentColor; display: inline-block; flex-shrink: 0; }
+
+    /* ── Tables ──────────────────────────────────────────────────────────────── */
+    .tbl-wrap { border: 1px solid var(--border); border-radius: var(--r); overflow: hidden; }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    thead th {
+      background: rgba(255,255,255,0.03);
+      text-align: left;
+      font-size: 10.5px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--text3);
+      padding: 11px 16px;
+      border-bottom: 1px solid var(--border);
+    }
+    tbody tr { border-bottom: 1px solid var(--border); transition: background .12s; }
+    tbody tr:last-child { border-bottom: none; }
+    tbody tr:nth-child(even) { background: rgba(255,255,255,0.015); }
+    tbody tr:hover { background: rgba(124,58,237,0.07); }
+    tbody td { padding: 11px 16px; color: var(--text); vertical-align: middle; }
+    .td-mono { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #A78BFA; }
+    .td-muted { color: var(--text2); }
+    .empty-row td { text-align: center; color: var(--text3); padding: 40px; font-size: 13px; }
+
+    /* ── Skeleton ────────────────────────────────────────────────────────────── */
+    .skeleton {
+      background: linear-gradient(90deg, rgba(255,255,255,0.05) 25%, rgba(255,255,255,0.09) 50%, rgba(255,255,255,0.05) 75%);
+      background-size: 200% 100%;
+      animation: shimmer 1.6s infinite;
+      border-radius: 6px;
+    }
+    @keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+    .skel-line { height: 14px; margin-bottom: 10px; }
+    .skel-line:last-child { margin-bottom: 0; width: 70%; }
+
+    /* ── Stats row ───────────────────────────────────────────────────────────── */
+    .stats-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 24px; }
+    .stat-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--r);
+      padding: 18px 20px;
+      transition: border-color .2s;
+    }
+    .stat-card:hover { border-color: var(--border-hover); }
+    .stat-label { font-size: 11px; font-weight: 600; color: var(--text3); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 8px; }
+    .stat-value { font-size: 26px; font-weight: 700; color: var(--text); letter-spacing: -0.5px; }
+    .stat-sub { font-size: 11px; color: var(--text3); margin-top: 4px; }
+
+    /* ── Env cards (Overview) ────────────────────────────────────────────────── */
+    .env-card { display: flex; flex-direction: column; gap: 16px; }
+    .env-card-top { display: flex; justify-content: space-between; align-items: flex-start; }
+    .env-name { font-size: 17px; font-weight: 700; letter-spacing: -0.2px; }
+    .env-url { font-size: 11px; color: var(--text3); font-family: 'JetBrains Mono', monospace; margin-top: 3px; }
+    .env-card .btn { width: 100%; justify-content: center; }
+
+    /* ── Activity feed ───────────────────────────────────────────────────────── */
+    .activity-list { display: flex; flex-direction: column; }
+    .activity-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 11px 0;
+      border-bottom: 1px solid var(--border);
+    }
+    .activity-item:last-child { border-bottom: none; }
+    .activity-thumb {
+      width: 54px; height: 38px;
+      object-fit: cover;
+      border-radius: var(--r-xs);
+      border: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+    .activity-info { flex: 1; min-width: 0; }
+    .activity-label { font-size: 13px; font-weight: 600; }
+    .activity-time  { font-size: 11px; color: var(--text3); display: block; margin-top: 2px; }
+
+    /* ── Hero (Overview) ─────────────────────────────────────────────────────── */
+    .hero {
+      margin-bottom: 28px;
+      padding-bottom: 24px;
+      border-bottom: 1px solid var(--border);
+    }
+    .hero-title {
+      font-size: 30px;
+      font-weight: 800;
+      letter-spacing: -0.8px;
+      line-height: 1.15;
+      background: var(--gradient);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .hero-sub { font-size: 15px; color: var(--text2); margin-top: 8px; }
+
+    /* ── Two-col layout ──────────────────────────────────────────────────────── */
+    .split { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+
+    /* ── Forms ───────────────────────────────────────────────────────────────── */
+    .form-row { display: grid; gap: 12px; margin-bottom: 14px; }
+    .form-row-2 { grid-template-columns: 1fr 1fr; }
+    .form-row-3 { grid-template-columns: 1fr 1fr 1fr; }
+    .form-actions { display: flex; gap: 8px; margin-top: 6px; }
+
+    /* ── Control bar ─────────────────────────────────────────────────────────── */
+    .ctrl-bar {
+      display: flex;
+      align-items: flex-end;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-bottom: 20px;
+    }
+    .ctrl-group { display: flex; flex-direction: column; gap: 5px; min-width: 140px; }
+
+    /* ── Section title ───────────────────────────────────────────────────────── */
+    .section-title {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text);
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .section-title .count {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--text3);
+      background: rgba(255,255,255,0.07);
+      padding: 2px 8px;
+      border-radius: 99px;
+    }
+
+    /* ── Screenshots grid ────────────────────────────────────────────────────── */
+    .screenshots-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+      gap: 12px;
+    }
+    .screenshot-card {
+      border: 1px solid var(--border);
+      border-radius: var(--r-sm);
+      overflow: hidden;
+      cursor: pointer;
+      transition: border-color .18s, transform .18s, box-shadow .18s;
+    }
+    .screenshot-card:hover {
+      border-color: var(--g2);
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(124,58,237,0.2);
+    }
+    .screenshot-card img { width: 100%; height: 110px; object-fit: cover; display: block; }
+    .screenshot-card .sc-label { padding: 7px 10px; background: var(--card2); }
+    .screenshot-card .sc-meta { font-size: 12px; color: var(--text2); font-weight: 500; }
+    .screenshot-card .sc-name { font-family: 'JetBrains Mono', monospace; font-size: 10px; color: var(--text3); margin-top: 2px; }
+
+    /* ── PR cards ────────────────────────────────────────────────────────────── */
+    .pr-card {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 14px 0;
+      border-bottom: 1px solid var(--border);
+    }
+    .pr-card:last-child { border-bottom: none; }
+    .pr-avatar {
+      width: 32px; height: 32px;
+      border-radius: 50%;
+      background: var(--gradient);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 13px;
+      font-weight: 700;
+      color: #fff;
+      flex-shrink: 0;
+    }
+    .pr-info { flex: 1; min-width: 0; }
+    .pr-title { font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .pr-meta { font-size: 11px; color: var(--text3); margin-top: 2px; }
+    .pr-branch {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10.5px;
+      background: rgba(255,255,255,0.07);
+      border: 1px solid var(--border);
+      padding: 2px 8px;
+      border-radius: 99px;
+      color: var(--text2);
+      white-space: nowrap;
+    }
+
+    /* ── Report cards ────────────────────────────────────────────────────────── */
+    .report-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--r);
+      padding: 18px;
+      transition: border-color .2s;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+    .report-card:hover { border-color: var(--border-hover); }
+    .report-icon {
+      width: 40px; height: 40px;
+      border-radius: var(--r-sm);
+      background: var(--info-bg);
+      border: 1px solid rgba(124,58,237,0.2);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+      flex-shrink: 0;
+    }
+    .report-info { flex: 1; min-width: 0; }
+    .report-name { font-size: 13px; font-weight: 600; font-family: 'JetBrains Mono', monospace; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .report-meta { font-size: 11px; color: var(--text3); margin-top: 3px; }
+    .reports-grid { display: flex; flex-direction: column; gap: 10px; }
+
+    /* ── Report viewer modal ──────────────────────────────────────────────────── */
+    .report-viewer {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--r);
+      padding: 24px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+      line-height: 1.75;
+      white-space: pre-wrap;
+      color: var(--text2);
+      max-height: 520px;
+      overflow-y: auto;
+    }
+
+    /* ── PR review output ────────────────────────────────────────────────────── */
+    .review-output {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--r);
+      padding: 24px;
+      line-height: 1.7;
+      max-height: 600px;
+      overflow-y: auto;
+    }
+    .review-output h1 { font-size: 17px; margin-bottom: 14px; color: var(--text); font-weight: 700; }
+    .review-output h2 {
+      font-size: 14px; margin: 20px 0 10px; color: var(--text); font-weight: 700;
+      padding: 8px 14px; border-radius: var(--r-xs);
+      background: rgba(255,255,255,0.04); border-left: 3px solid var(--g2);
+    }
+    .review-output h3 { font-size: 13px; margin: 14px 0 6px; color: #A78BFA; }
+    .review-output p  { color: var(--text2); margin: 7px 0; }
+    .review-output li { color: var(--text2); margin: 5px 0 5px 22px; }
+    .review-output hr { border: none; border-top: 1px solid var(--border); margin: 18px 0; }
+    .review-output code { font-family: 'JetBrains Mono', monospace; font-size: 12px; background: rgba(255,255,255,0.08); padding: 2px 6px; border-radius: 4px; color: #A78BFA; }
+    .review-output strong { color: var(--text); font-weight: 600; }
+
+    /* ── Branch badges ───────────────────────────────────────────────────────── */
+    .branch-list { display: flex; flex-wrap: wrap; gap: 6px; }
+    .branch-badge {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11.5px;
+      background: rgba(255,255,255,0.05);
+      border: 1px solid var(--border);
+      padding: 4px 10px;
+      border-radius: 99px;
+      cursor: pointer;
+      transition: all .18s;
+      color: var(--text2);
+    }
+    .branch-badge:hover  { border-color: var(--g2); background: rgba(124,58,237,0.12); color: #A78BFA; }
+    .branch-badge.active { border-color: var(--g2); background: rgba(124,58,237,0.2); color: #A78BFA; font-weight: 600; }
+
+    /* ── DB layout ───────────────────────────────────────────────────────────── */
+    .db-layout { display: grid; grid-template-columns: 210px 1fr; gap: 16px; align-items: start; }
+    .table-list-panel {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--r);
+      overflow: hidden;
+      max-height: 340px;
+      overflow-y: auto;
+    }
+    .table-list-item {
+      padding: 9px 14px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+      cursor: pointer;
+      border-bottom: 1px solid var(--border);
+      transition: all .12s;
+      color: var(--text2);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .table-list-item:last-child { border-bottom: none; }
+    .table-list-item:hover  { background: rgba(255,255,255,0.04); color: var(--text); }
+    .table-list-item.active { background: rgba(124,58,237,0.15); color: #A78BFA; }
+    .table-list-item .tbl-badge {
+      font-size: 10px;
+      background: rgba(255,255,255,0.07);
+      padding: 1px 6px;
+      border-radius: 99px;
+      color: var(--text3);
+    }
+    .db-query-area { display: flex; flex-direction: column; gap: 12px; }
+    .db-query-area textarea {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12.5px;
+      min-height: 110px;
+      background: rgba(0,0,0,0.25);
+      line-height: 1.6;
+    }
+
+    /* ── Collapsible ─────────────────────────────────────────────────────────── */
+    .collapsible-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      cursor: pointer;
+      user-select: none;
+    }
+    .collapsible-header .chevron { transition: transform .2s; color: var(--text3); font-size: 14px; }
+    .collapsible-header.open .chevron { transform: rotate(180deg); }
+    .collapsible-body { display: none; margin-top: 18px; }
+    .collapsible-body.open { display: block; }
+
+    /* ── Notice ──────────────────────────────────────────────────────────────── */
+    .notice {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      background: var(--info-bg);
+      border: 1px solid rgba(124,58,237,0.25);
+      border-radius: var(--r-sm);
+      padding: 11px 15px;
+      font-size: 12.5px;
+      color: #A78BFA;
+      margin-bottom: 18px;
+    }
+    .notice.warn { background: var(--warn-bg); border-color: rgba(245,158,11,0.25); color: #FCD34D; }
+
+    /* ── Toast ───────────────────────────────────────────────────────────────── */
+    #toast-container {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      z-index: 9999;
+      pointer-events: none;
+    }
+    .toast {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 13px 16px;
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: var(--r-sm);
+      min-width: 300px;
+      max-width: 420px;
+      box-shadow: 0 10px 32px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.05);
+      animation: toastIn .25s cubic-bezier(0.16, 1, 0.3, 1);
+      font-size: 13px;
+      pointer-events: all;
+    }
+    .toast.success { border-color: rgba(34,197,94,0.3); }
+    .toast.error   { border-color: rgba(239,68,68,0.3); }
+    .toast.warn    { border-color: rgba(245,158,11,0.3); }
+    .toast-icon    { font-size: 15px; flex-shrink: 0; }
+    .toast-msg     { flex: 1; color: var(--text); line-height: 1.4; }
+    .toast-close   { cursor: pointer; color: var(--text3); font-size: 16px; line-height: 1; flex-shrink: 0; }
+    .toast-close:hover { color: var(--text); }
+    @keyframes toastIn {
+      from { transform: translateX(20px); opacity: 0; }
+      to   { transform: translateX(0);    opacity: 1; }
+    }
+
+    /* ── Modal ───────────────────────────────────────────────────────────────── */
+    .modal-overlay {
+      display: none;
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,0.75);
+      backdrop-filter: blur(4px);
+      z-index: 1000;
+      align-items: center;
+      justify-content: center;
+    }
+    .modal-overlay.open { display: flex; }
+    .modal-box {
+      background: var(--bg2);
+      border: 1px solid var(--border-hover);
+      border-radius: var(--r);
+      padding: 26px;
+      width: min(820px, 92vw);
+      max-height: 88vh;
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+      box-shadow: 0 24px 64px rgba(0,0,0,0.6);
+      animation: modalIn .22s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    @keyframes modalIn { from { transform: scale(0.96); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+    .modal-header { display: flex; justify-content: space-between; align-items: center; }
+    .modal-title  { font-size: 15px; font-weight: 700; }
+    .modal-close  { cursor: pointer; color: var(--text3); font-size: 20px; line-height: 1; transition: color .15s; }
+    .modal-close:hover { color: var(--text); }
+    .modal-body   { overflow-y: auto; }
+
+    /* ── Current branch display ──────────────────────────────────────────────── */
+    .branch-current {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+      background: var(--info-bg);
+      border: 1px solid rgba(124,58,237,0.2);
+      padding: 5px 12px;
+      border-radius: 99px;
+      color: #A78BFA;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    /* ── Repo header ─────────────────────────────────────────────────────────── */
+    .repo-header { margin-bottom: 18px; }
+    .repo-name { font-size: 16px; font-weight: 700; letter-spacing: -0.2px; }
+    .repo-sub  { font-size: 12px; color: var(--text3); margin-top: 4px; }
+
+    /* ── Util ────────────────────────────────────────────────────────────────── */
+    .mt8  { margin-top: 8px; }
+    .mt16 { margin-top: 16px; }
+    .mt24 { margin-top: 24px; }
+    .mb8  { margin-bottom: 8px; }
+    .mb16 { margin-bottom: 16px; }
+    .mb24 { margin-bottom: 24px; }
+    .flex { display: flex; }
+    .flex-between { display: flex; justify-content: space-between; align-items: center; }
+    .flex-gap8  { gap: 8px; }
+    .flex-gap12 { gap: 12px; }
+    .text-muted { color: var(--text2); }
+    .text-xs    { font-size: 11px; }
+    .text-mono  { font-family: 'JetBrains Mono', monospace; font-size: 12px; }
+    .w100 { width: 100%; }
+    .hidden { display: none !important; }
+
+    /* ── Animations ──────────────────────────────────────────────────────────── */
+    @keyframes spin    { to { transform: rotate(360deg); } }
+    @keyframes fadeIn  { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+    .fade-in { animation: fadeIn .25s ease; }
+
+    /* ── Divider ─────────────────────────────────────────────────────────────── */
+    .divider { height: 1px; background: var(--border); margin: 20px 0; }
+    .code-pill {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      background: rgba(255,255,255,0.07);
+      border: 1px solid var(--border);
+      padding: 3px 8px;
+      border-radius: var(--r-xs);
+      color: var(--text2);
+    }
+
+    /* ── Generate report buttons row ─────────────────────────────────────────── */
+    .gen-row { display: flex; gap: 10px; margin-bottom: 24px; flex-wrap: wrap; }
+    .gen-btn-wrap { display: flex; flex-direction: column; gap: 6px; }
+    .gen-env-label { font-size: 11px; font-weight: 600; color: var(--text3); text-align: center; text-transform: uppercase; letter-spacing: 0.06em; }
+
+    /* ── Top gradient bar ────────────────────────────────────────────────────── */
+    #top-gradient-bar {
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      height: 3px;
+      background: linear-gradient(90deg, #4F46E5, #7C3AED, #C026D3, #7C3AED, #4F46E5);
+      background-size: 300% 100%;
+      z-index: 99999;
+      animation: bar-shift 5s ease infinite;
+    }
+    @keyframes bar-shift {
+      0%   { background-position: 0% 50%; }
+      50%  { background-position: 100% 50%; }
+      100% { background-position: 0% 50%; }
+    }
+
+    /* ── Hero animated gradient background ───────────────────────────────────── */
+    .hero { position: relative; overflow: hidden; }
+    .hero::before {
+      content: '';
+      position: absolute;
+      inset: -60%;
+      background:
+        radial-gradient(ellipse at 20% 60%, rgba(79,70,229,0.18) 0%, transparent 55%),
+        radial-gradient(ellipse at 75% 40%, rgba(192,38,211,0.14) 0%, transparent 55%),
+        radial-gradient(ellipse at 50% 80%, rgba(124,58,237,0.1) 0%, transparent 50%);
+      animation: hero-drift 10s ease-in-out infinite;
+      pointer-events: none;
+    }
+    @keyframes hero-drift {
+      0%,100% { transform: scale(1) translate(0,0); }
+      33%     { transform: scale(1.08) translate(2%,-3%); }
+      66%     { transform: scale(0.96) translate(-3%,2%); }
+    }
+    .hero-title, .hero-sub { position: relative; z-index: 1; }
+
+    /* ── Env card pass/fail borders ──────────────────────────────────────────── */
+    .env-card-pass {
+      border-color: rgba(34,197,94,0.45) !important;
+      box-shadow: 0 0 0 1px rgba(34,197,94,0.12), 0 4px 24px rgba(34,197,94,0.12) !important;
+    }
+    .env-card-fail {
+      border-color: rgba(239,68,68,0.45) !important;
+      box-shadow: 0 0 0 1px rgba(239,68,68,0.12), 0 4px 24px rgba(239,68,68,0.12) !important;
+    }
+
+    /* ── Lightbox ────────────────────────────────────────────────────────────── */
+    #lightbox {
+      display: none;
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,0.92);
+      backdrop-filter: blur(10px);
+      z-index: 10000;
+      align-items: center;
+      justify-content: center;
+      cursor: zoom-out;
+      animation: fadeIn .18s ease;
+    }
+    #lightbox.open { display: flex; }
+    #lightbox img {
+      max-width: 90vw;
+      max-height: 88vh;
+      border-radius: var(--r);
+      box-shadow: 0 32px 96px rgba(0,0,0,0.9);
+      animation: modalIn .22s cubic-bezier(0.16,1,0.3,1);
+      cursor: default;
+    }
+    #lightbox-close {
+      position: absolute;
+      top: 20px; right: 26px;
+      font-size: 26px;
+      color: rgba(255,255,255,0.65);
+      cursor: pointer;
+      line-height: 1;
+      transition: color .15s;
+    }
+    #lightbox-close:hover { color: #fff; }
+    #lightbox-label {
+      position: absolute;
+      bottom: 20px; left: 50%;
+      transform: translateX(-50%);
+      font-size: 11px;
+      font-family: 'JetBrains Mono', monospace;
+      color: rgba(255,255,255,0.45);
+      white-space: nowrap;
+    }
+
+    /* ── Animated dots ───────────────────────────────────────────────────────── */
+    .animated-dots::after {
+      content: '';
+      animation: dots-cycle 1.4s steps(4,end) infinite;
+    }
+    @keyframes dots-cycle {
+      0%   { content: ''; }
+      25%  { content: '.'; }
+      50%  { content: '..'; }
+      75%  { content: '...'; }
+      100% { content: ''; }
+    }
+
+    /* ── Last updated ─────────────────────────────────────────────────────────── */
+    .last-updated-badge {
+      font-size: 11px;
+      color: var(--text3);
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      white-space: nowrap;
+    }
+    .last-updated-badge .lu-dot {
+      width: 5px; height: 5px;
+      border-radius: 50%;
+      background: var(--text3);
+      flex-shrink: 0;
+    }
+
+    /* ── Activity item clickable ─────────────────────────────────────────────── */
+    .activity-item { cursor: pointer; border-radius: var(--r-xs); transition: background .14s; }
+    .activity-item:hover { background: rgba(124,58,237,0.08); }
+    .activity-thumb { cursor: zoom-in; }
+  </style>
+</head>
+<body>
+
+<!-- ── Top gradient bar ──────────────────────────────────────────────────────── -->
+<div id="top-gradient-bar"></div>
+
+<!-- ── Sidebar ──────────────────────────────────────────────────────────────── -->
+<aside id="sidebar">
+  <div class="sidebar-logo">
+    <div class="logo-wordmark"><span style="margin-right:5px">⚡</span>Zambeel</div>
+    <div class="logo-sub">SQA Intelligence</div>
+  </div>
+
+  <nav>
+    <div class="nav-section-label">Workspace</div>
+    <div class="nav-item active" data-page="overview">
+      <span class="nav-icon">🏠</span> Overview
+    </div>
+    <div class="nav-item" data-page="tests">
+      <span class="nav-icon">🧪</span> Tests
+    </div>
+
+    <div class="nav-section-label" style="margin-top:8px">Tools</div>
+    <div class="nav-item" data-page="jira">
+      <span class="nav-icon">🎯</span> Jira
+    </div>
+    <div class="nav-item" data-page="github">
+      <span class="nav-icon">🌿</span> GitHub
+    </div>
+    <div class="nav-item" data-page="database">
+      <span class="nav-icon">🗄️</span> Database
+    </div>
+
+    <div class="nav-section-label" style="margin-top:8px">Insights</div>
+    <div class="nav-item" data-page="reports">
+      <span class="nav-icon">📊</span> Reports
+    </div>
+    <div class="nav-item" data-page="pr-review">
+      <span class="nav-icon">🔍</span> PR Review
+    </div>
+  </nav>
+
+  <div class="sidebar-footer">
+    <div class="api-status">
+      <div class="api-dot" id="api-dot"></div>
+      <span id="api-status-text">Connecting…</span>
+    </div>
+  </div>
+</aside>
+
+<!-- ── App shell ──────────────────────────────────────────────────────────────── -->
+<div id="app-shell">
+
+  <!-- ── Top bar ──────────────────────────────────────────────────────────────── -->
+  <header id="topbar">
+    <div class="breadcrumb">
+      <span class="bc-root">Zambeel</span>
+      <span class="bc-sep">/</span>
+      <span class="bc-page" id="bc-page">Overview</span>
+    </div>
+    <div class="agent-badge">
+      <span>⚡</span> SQA Agent v1.0
+    </div>
+    <div class="last-updated-badge" id="last-updated-badge">
+      <span class="lu-dot"></span>
+      Updated <span id="last-updated-time">—</span>
+    </div>
+    <div class="live-dot">Live</div>
+  </header>
+
+  <!-- ── Pages ────────────────────────────────────────────────────────────────── -->
+  <main id="main">
+
+    <!-- ══ Overview ════════════════════════════════════════════════════════════ -->
+    <section id="page-overview" class="page active">
+      <div class="page-inner">
+        <div class="hero">
+          <div class="hero-title">Zambeel SQA Agent</div>
+          <div class="hero-sub">Automated quality assurance across Local, Staging &amp; Production environments.</div>
+        </div>
+
+        <div class="stats-row mb24" id="ov-stats">
+          <div class="stat-card">
+            <div class="stat-label">Tests Run Today</div>
+            <div class="stat-value" id="stat-tests-today">—</div>
+            <div class="stat-sub">all environments</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Pass Rate</div>
+            <div class="stat-value" id="stat-pass-rate">—</div>
+            <div class="stat-sub">last 30 runs</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Open Jira Tickets</div>
+            <div class="stat-value" id="stat-jira-open">—</div>
+            <div class="stat-sub">OMS + ZSP</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Active Sprints</div>
+            <div class="stat-value" id="stat-sprints">—</div>
+            <div class="stat-sub">current cycle</div>
+          </div>
+        </div>
+
+        <div class="grid-3 mb24" id="env-cards">
+          <!-- Local -->
+          <div class="card env-card">
+            <div class="env-card-top">
+              <div>
+                <div class="env-name">Local</div>
+                <div class="env-url">localhost:5173</div>
+              </div>
+              <span id="ov-badge-local" class="badge badge-neutral">Unknown</span>
+            </div>
+            <div class="text-xs text-muted">Last run <span id="ov-last-local">—</span></div>
+            <button class="btn btn-primary" id="ov-run-local" onclick="ovRunEnv('local')">
+              <div class="spin"></div><span class="label">▶ Run All Tests</span>
+            </button>
+          </div>
+          <!-- Staging -->
+          <div class="card env-card">
+            <div class="env-card-top">
+              <div>
+                <div class="env-name">Staging</div>
+                <div class="env-url">staging.myzambeel.com</div>
+              </div>
+              <span id="ov-badge-staging" class="badge badge-neutral">Unknown</span>
+            </div>
+            <div class="text-xs text-muted">Last run <span id="ov-last-staging">—</span></div>
+            <button class="btn btn-primary" id="ov-run-staging" onclick="ovRunEnv('staging')">
+              <div class="spin"></div><span class="label">▶ Run All Tests</span>
+            </button>
+          </div>
+          <!-- Production -->
+          <div class="card env-card">
+            <div class="env-card-top">
+              <div>
+                <div class="env-name">Production</div>
+                <div class="env-url">portal.myzambeel.com</div>
+              </div>
+              <span id="ov-badge-production" class="badge badge-neutral">Unknown</span>
+            </div>
+            <div class="text-xs text-muted">Last run <span id="ov-last-production">—</span></div>
+            <button class="btn btn-primary" id="ov-run-production" onclick="ovRunEnv('production')">
+              <div class="spin"></div><span class="label">▶ Run All Tests</span>
+            </button>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-title">Live Activity Feed</div>
+          <div class="activity-list" id="activity-feed">
+            <div class="skel-line skeleton" style="height:48px;margin-bottom:8px;border-radius:8px"></div>
+            <div class="skel-line skeleton" style="height:48px;margin-bottom:8px;border-radius:8px"></div>
+            <div class="skel-line skeleton" style="height:48px;border-radius:8px"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ══ Tests ════════════════════════════════════════════════════════════════ -->
+    <section id="page-tests" class="page">
+      <div class="page-inner">
+        <div class="notice warn">⚡ Local tests spin up the Vue dev server — allow 1–2 min. Staging and Production hit live URLs directly.</div>
+
+        <div class="card mb24">
+          <div class="card-title">Configure Test Run</div>
+          <div style="display:flex;flex-wrap:wrap;align-items:flex-end;gap:20px">
+            <div>
+              <label>Environment</label>
+              <div class="tabs" style="border:none;margin:0;gap:4px;display:flex">
+                <button class="pill active" id="tenv-local"      onclick="setTestEnv('local',this)">Local</button>
+                <button class="pill"        id="tenv-staging"    onclick="setTestEnv('staging',this)">Staging</button>
+                <button class="pill"        id="tenv-production" onclick="setTestEnv('production',this)">Production</button>
+              </div>
+            </div>
+            <div>
+              <label>Portal</label>
+              <div style="display:flex;gap:4px">
+                <button class="pill active" id="tportal-all"    onclick="setTestPortal('',this)">All</button>
+                <button class="pill"        id="tportal-seller" onclick="setTestPortal('seller',this)">Seller</button>
+                <button class="pill"        id="tportal-admin"  onclick="setTestPortal('admin',this)">Admin</button>
+                <button class="pill"        id="tportal-agency" onclick="setTestPortal('agency',this)">Agency</button>
+              </div>
+            </div>
+            <div style="margin-left:auto">
+              <button class="btn btn-primary btn-lg" id="test-run-btn" onclick="testsRun()">
+                <div class="spin"></div><span class="label">▶  Run Tests</span>
+              </button>
+            </div>
+          </div>
+          <!-- progress bar (hidden until running) -->
+          <div id="test-progress-wrap" class="hidden" style="margin-top:18px">
+            <div style="height:4px;background:rgba(255,255,255,0.07);border-radius:99px;overflow:hidden">
+              <div id="test-progress-bar" style="height:100%;width:0;background:var(--gradient);transition:width .4s;border-radius:99px"></div>
+            </div>
+            <div style="font-size:12px;color:var(--text3);margin-top:6px" id="test-progress-label">Running…</div>
+          </div>
+        </div>
+
+        <div class="flex-between mb16">
+          <div class="section-title" style="margin:0">Results <span class="count" id="test-count">0</span></div>
+          <button class="btn btn-secondary btn-sm" onclick="exportResults()">⬇ Export CSV</button>
+        </div>
+        <div class="tbl-wrap mb24">
+          <table>
+            <thead><tr><th>Portal</th><th>Environment</th><th>Status</th><th>Message</th><th>Timestamp</th></tr></thead>
+            <tbody id="tests-tbody">
+              <tr class="empty-row"><td colspan="5">No results yet — run a test above.</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="flex-between mb12">
+          <div class="section-title" style="margin:0">Screenshots</div>
+        </div>
+        <div class="screenshots-grid" id="screenshots-grid">
+          <div style="color:var(--text3);font-size:13px">Screenshots appear here after tests run.</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ══ Jira ══════════════════════════════════════════════════════════════════ -->
+    <section id="page-jira" class="page">
+      <div class="page-inner">
+        <div class="split" style="align-items:start">
+
+          <!-- Create ticket form -->
+          <div class="card">
+            <div class="card-title">Create Ticket</div>
+            <div class="form-row form-row-2">
+              <div>
+                <label>Project</label>
+                <select id="j-project">
+                  <option value="OMS">OMS — Order Management</option>
+                  <option value="ZSP">ZSP — Seller Portal</option>
+                </select>
+              </div>
+              <div>
+                <label>Issue Type</label>
+                <select id="j-type">
+                  <option value="Bug">🐛 Bug</option>
+                  <option value="Task">✅ Task</option>
+                  <option value="Story">📖 Story</option>
+                  <option value="Epic">⚡ Epic</option>
+                </select>
+              </div>
+            </div>
+            <div class="form-row">
+              <div>
+                <label>Summary</label>
+                <input id="j-summary" placeholder="Brief description of the issue…" />
+              </div>
+            </div>
+            <div class="form-row">
+              <div>
+                <label>Description</label>
+                <textarea id="j-description" placeholder="Detailed description, steps to reproduce, etc. (optional)"></textarea>
+              </div>
+            </div>
+            <button class="btn btn-primary w100" id="jira-create-btn" onclick="jiraCreate()" style="justify-content:center">
+              <div class="spin"></div><span class="label">Create Ticket</span>
+            </button>
+          </div>
+
+          <!-- Tickets list -->
+          <div>
+            <div class="flex-between mb16">
+              <div style="display:flex;gap:8px;align-items:flex-end">
+                <div class="ctrl-group">
+                  <label>Project</label>
+                  <select id="j-list-project" style="min-width:130px">
+                    <option value="OMS">OMS</option>
+                    <option value="ZSP">ZSP</option>
+                  </select>
+                </div>
+                <button class="btn btn-secondary" id="jira-load-btn" onclick="jiraLoad()">
+                  <div class="spin"></div><span class="label">Load</span>
+                </button>
+              </div>
+              <input placeholder="Search tickets…" id="jira-search" oninput="jiraFilter()" style="max-width:180px" />
+            </div>
+            <div class="tbl-wrap">
+              <table>
+                <thead><tr><th>Key</th><th>Summary</th><th>Type</th><th>Status</th><th>Assignee</th><th>Actions</th></tr></thead>
+                <tbody id="jira-tbody">
+                  <tr class="empty-row"><td colspan="6">Select a project and click Load.</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ══ GitHub ════════════════════════════════════════════════════════════════ -->
+    <section id="page-github" class="page">
+      <div class="page-inner">
+        <div class="grid-2" id="github-grid">
+          <!-- Frontend -->
+          <div class="card">
+            <div class="flex-between mb16">
+              <div class="repo-header" style="margin:0">
+                <div class="repo-name">🖥 Frontend</div>
+                <div class="repo-sub">zambeel-fe · Vue / Vite</div>
+              </div>
+              <button class="btn btn-secondary btn-sm" id="gh-load-fe-btn" onclick="ghLoad('frontend')">
+                <div class="spin"></div><span class="label">Refresh</span>
+              </button>
+            </div>
+            <div style="margin-bottom:14px">
+              <label>Current Branch</label>
+              <div id="gh-current-frontend" class="branch-current">⎇ Loading…</div>
+            </div>
+            <label>All Branches <span class="text-xs text-muted">(click to select)</span></label>
+            <div class="branch-list mt8" id="gh-branches-frontend"></div>
+            <div class="divider"></div>
+            <button class="btn btn-primary btn-sm" id="gh-switch-fe-btn" onclick="ghSwitch('frontend')">
+              <div class="spin"></div><span class="label">Switch to Selected</span>
+            </button>
+          </div>
+          <!-- Backend -->
+          <div class="card">
+            <div class="flex-between mb16">
+              <div class="repo-header" style="margin:0">
+                <div class="repo-name">⚙️ Backend</div>
+                <div class="repo-sub">zambeel-api · Node / Express</div>
+              </div>
+              <button class="btn btn-secondary btn-sm" id="gh-load-be-btn" onclick="ghLoad('backend')">
+                <div class="spin"></div><span class="label">Refresh</span>
+              </button>
+            </div>
+            <div style="margin-bottom:14px">
+              <label>Current Branch</label>
+              <div id="gh-current-backend" class="branch-current">⎇ Loading…</div>
+            </div>
+            <label>All Branches <span class="text-xs text-muted">(click to select)</span></label>
+            <div class="branch-list mt8" id="gh-branches-backend"></div>
+            <div class="divider"></div>
+            <button class="btn btn-primary btn-sm" id="gh-switch-be-btn" onclick="ghSwitch('backend')">
+              <div class="spin"></div><span class="label">Switch to Selected</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ══ Database ══════════════════════════════════════════════════════════════ -->
+    <section id="page-database" class="page">
+      <div class="page-inner">
+        <div class="flex-between mb20">
+          <div class="pill-group">
+            <button class="pill active" id="dbenv-local"      onclick="setDbEnv('local',this)">Local</button>
+            <button class="pill"        id="dbenv-staging"    onclick="setDbEnv('staging',this)">Staging</button>
+            <button class="pill"        id="dbenv-production" onclick="setDbEnv('production',this)">Production</button>
+          </div>
+          <button class="btn btn-secondary btn-sm" onclick="dbLoadTables()">Reload Tables</button>
+        </div>
+
+        <div class="db-layout mb16">
+          <div>
+            <div class="section-title mb8">Tables</div>
+            <div class="table-list-panel" id="db-table-list">
+              <div class="table-list-item text-muted">Loading tables…</div>
+            </div>
+          </div>
+          <div class="db-query-area">
+            <div class="section-title">SQL Query Editor</div>
+            <textarea id="db-sql" placeholder="SELECT * FROM orders LIMIT 25;" spellcheck="false"></textarea>
+            <div>
+              <button class="btn btn-primary" id="db-run-btn" onclick="dbRunQuery()">
+                <div class="spin"></div><span class="label">▶ Run Query</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div class="flex-between mb12">
+          <div class="section-title" style="margin:0">Results <span class="count" id="db-count">0</span></div>
+        </div>
+        <div class="tbl-wrap" id="db-results-wrap">
+          <table><thead><tr><th>Run a query to see results</th></tr></thead><tbody></tbody></table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ══ Reports ════════════════════════════════════════════════════════════════ -->
+    <section id="page-reports" class="page">
+      <div class="page-inner">
+        <div class="card mb24">
+          <div class="card-title">Generate Health Report</div>
+          <div class="notice warn" style="margin-bottom:14px">⏱ Reports run all three Playwright tests + DB checks. Allow 5+ minutes for Local.</div>
+          <div class="gen-row">
+            <div class="gen-btn-wrap">
+              <div class="gen-env-label">Local</div>
+              <button class="btn btn-secondary" id="rpt-gen-local-btn" onclick="reportsGenerate('local')">
+                <div class="spin"></div><span class="label">🏠 Generate</span>
+              </button>
+            </div>
+            <div class="gen-btn-wrap">
+              <div class="gen-env-label">Staging</div>
+              <button class="btn btn-secondary" id="rpt-gen-staging-btn" onclick="reportsGenerate('staging')">
+                <div class="spin"></div><span class="label">🌐 Generate</span>
+              </button>
+            </div>
+            <div class="gen-btn-wrap">
+              <div class="gen-env-label">Production</div>
+              <button class="btn btn-secondary" id="rpt-gen-production-btn" onclick="reportsGenerate('production')">
+                <div class="spin"></div><span class="label">🚀 Generate</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div class="flex-between mb16">
+          <div class="section-title" style="margin:0">Saved Reports</div>
+          <button class="btn btn-secondary btn-sm" onclick="reportsLoad()">Refresh</button>
+        </div>
+        <div class="reports-grid" id="reports-list">
+          <div style="color:var(--text3);font-size:13px;padding:20px 0">No reports generated yet.</div>
+        </div>
+
+        <!-- Report viewer -->
+        <div id="report-viewer-wrap" class="hidden mt24">
+          <div class="flex-between mb12">
+            <div class="section-title" style="margin:0" id="report-viewer-title">Report</div>
+            <button class="btn btn-secondary btn-sm" onclick="document.getElementById('report-viewer-wrap').classList.add('hidden')">✕ Close</button>
+          </div>
+          <div class="report-viewer" id="report-viewer-content"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ══ PR Review ══════════════════════════════════════════════════════════════ -->
+    <section id="page-pr-review" class="page">
+      <div class="page-inner">
+        <div class="notice">🤖 AI reviews run 3 passes (Code Quality · Security · Dependencies) via Claude Opus 4.7 and post a comment on the PR. Takes ~1–2 min.</div>
+
+        <div class="grid-2 mb24" id="pr-grid">
+          <!-- Frontend -->
+          <div class="card">
+            <div class="flex-between mb16">
+              <div>
+                <div class="card-title" style="margin:0">Frontend PRs</div>
+                <div class="text-xs text-muted mt8">zambeel-fe</div>
+              </div>
+              <button class="btn btn-secondary btn-sm" id="pr-load-fe-btn" onclick="prLoad('frontend')">
+                <div class="spin"></div><span class="label">Load PRs</span>
+              </button>
+            </div>
+            <div id="pr-list-frontend">
+              <div style="color:var(--text3);font-size:13px">Click Load PRs to fetch open pull requests.</div>
+            </div>
+          </div>
+          <!-- Backend -->
+          <div class="card">
+            <div class="flex-between mb16">
+              <div>
+                <div class="card-title" style="margin:0">Backend PRs</div>
+                <div class="text-xs text-muted mt8">zambeel-api</div>
+              </div>
+              <button class="btn btn-secondary btn-sm" id="pr-load-be-btn" onclick="prLoad('backend')">
+                <div class="spin"></div><span class="label">Load PRs</span>
+              </button>
+            </div>
+            <div id="pr-list-backend">
+              <div style="color:var(--text3);font-size:13px">Click Load PRs to fetch open pull requests.</div>
+            </div>
+          </div>
+        </div>
+
+        <div id="pr-review-wrap" class="hidden">
+          <div class="flex-between mb12">
+            <div class="section-title" style="margin:0" id="pr-review-title">Review Output</div>
+            <button class="btn btn-secondary btn-sm" onclick="document.getElementById('pr-review-wrap').classList.add('hidden')">✕ Close</button>
+          </div>
+          <div class="review-output" id="pr-review-content"></div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+</div><!-- /#app-shell -->
+
+<!-- ── Toasts ────────────────────────────────────────────────────────────────── -->
+<div id="toast-container"></div>
+
+<!-- ── Lightbox ───────────────────────────────────────────────────────────────── -->
+<div id="lightbox" onclick="closeLightbox()">
+  <span id="lightbox-close" onclick="closeLightbox()">✕</span>
+  <img id="lightbox-img" src="" alt="" onclick="event.stopPropagation()" />
+  <div id="lightbox-label"></div>
+</div>
+
+<!-- ── Modal ─────────────────────────────────────────────────────────────────── -->
+<div id="modal" class="modal-overlay" onclick="if(event.target===this)closeModal()">
+  <div class="modal-box">
+    <div class="modal-header">
+      <div class="modal-title" id="modal-title"></div>
+      <div class="modal-close" onclick="closeModal()">✕</div>
+    </div>
+    <div class="modal-body" id="modal-body"></div>
+  </div>
+</div>
+
+<script>
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// Config
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+const API_BASE = 'http://localhost:8000';
+
+// ── State ─────────────────────────────────────────────────────────────────────
+const state = {
+  ghSelected:   { frontend: null, backend: null },
+  testEnv:      'local',
+  testPortal:   '',
+  dbEnv:        'local',
+  testResults:  [],
+  jiraRows:     [],
+};
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// Toast
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+function toast(msg, type = 'info', dur = 3000) {
+  const icons = { success: '✅', error: '❌', warn: '⚠️', info: 'ℹ️' };
+  const el = document.createElement('div');
+  el.className = `toast ${type}`;
+  el.innerHTML = `<span class="toast-icon">${icons[type]||'ℹ️'}</span><span class="toast-msg">${msg}</span><span class="toast-close" onclick="this.parentElement.remove()">✕</span>`;
+  document.getElementById('toast-container').appendChild(el);
+  setTimeout(() => el.remove(), dur);
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// API
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+async function api(path, opts = {}) {
+  const res = await fetch(API_BASE + path, {
+    headers: { 'Content-Type': 'application/json', ...(opts.headers || {}) },
+    ...opts,
+  });
+  if (!res.ok) {
+    let detail = `HTTP ${res.status}`;
+    try { detail = (await res.json()).detail || detail; } catch {}
+    throw new Error(detail);
+  }
+  return res.json();
+}
+
+// ── Button loading ────────────────────────────────────────────────────────────
+function btnLoad(id, on) {
+  const b = typeof id === 'string' ? document.getElementById(id) : id;
+  if (!b) return;
+  b.disabled = on;
+  b.classList.toggle('loading', on);
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// Router
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+const PAGE_LABELS = {
+  overview: 'Overview', tests: 'Tests', jira: 'Jira',
+  github: 'GitHub', database: 'Database', reports: 'Reports', 'pr-review': 'PR Review',
+};
+
+function navigate(page) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  const pg  = document.getElementById(`page-${page}`);
+  const nav = document.querySelector(`[data-page="${page}"]`);
+  if (pg)  pg.classList.add('active');
+  if (nav) nav.classList.add('active');
+  document.getElementById('bc-page').textContent = PAGE_LABELS[page] || page;
+  onPageEnter(page);
+}
+
+function onPageEnter(page) {
+  if (page === 'overview')  loadOverview();
+  if (page === 'tests')     loadScreenshots();
+  if (page === 'github')    { ghLoad('frontend'); ghLoad('backend'); }
+  if (page === 'reports')   reportsLoad();
+  if (page === 'database')  dbLoadTables();
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// Modal
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+function openModal(title, bodyHtml) {
+  document.getElementById('modal-title').textContent = title;
+  document.getElementById('modal-body').innerHTML = bodyHtml;
+  document.getElementById('modal').classList.add('open');
+}
+function closeModal() { document.getElementById('modal').classList.remove('open'); }
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// Collapsible
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+function toggleCollapse(id) {
+  document.getElementById(`${id}-header`).classList.toggle('open');
+  document.getElementById(`${id}-body`).classList.toggle('open');
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// Helpers
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+function fmtDate(iso) {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  return d.toLocaleDateString() + ' ' + d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+}
+function fmtBytes(b) {
+  if (b < 1024) return b + ' B';
+  if (b < 1048576) return (b/1024).toFixed(1) + ' KB';
+  return (b/1048576).toFixed(1) + ' MB';
+}
+function badge(status) {
+  if (!status) return '<span class="badge badge-neutral">—</span>';
+  const s = status.toUpperCase();
+  if (s === 'PASS') return `<span class="badge badge-pass"><span class="dot"></span> PASS</span>`;
+  if (s === 'FAIL') return `<span class="badge badge-fail"><span class="dot"></span> FAIL</span>`;
+  if (s === 'RUNNING') return `<span class="badge badge-warn"><span class="dot"></span> RUNNING</span>`;
+  return `<span class="badge badge-neutral">${status}</span>`;
+}
+function jiraBadge(status) {
+  if (!status) return '<span class="badge badge-neutral">—</span>';
+  const s = status.toLowerCase();
+  if (s.includes('done') || s.includes('closed') || s.includes('resolved')) return `<span class="badge badge-pass">${status}</span>`;
+  if (s.includes('progress')) return `<span class="badge badge-info">${status}</span>`;
+  if (s.includes('todo') || s.includes('open') || s.includes('backlog')) return `<span class="badge badge-neutral">${status}</span>`;
+  return `<span class="badge badge-warn">${status}</span>`;
+}
+function esc(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+function renderMd(md) {
+  let h = esc(md)
+    .replace(/^# (.+)$/gm, '<h1>$1</h1>')
+    .replace(/^## (.+)$/gm, '<h2>$1</h2>')
+    .replace(/^### (.+)$/gm, '<h3>$1</h3>')
+    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+    .replace(/`([^`\n]+)`/g, '<code>$1</code>')
+    .replace(/^---+$/gm, '<hr>')
+    .replace(/^[-*] (.+)$/gm, '<li>$1</li>')
+    .replace(/\n\n/g, '</p><p>')
+    .replace(/\n/g, '<br>');
+  return `<p>${h}</p>`;
+}
+
+// ── Lightbox ──────────────────────────────────────────────────────────────────
+function openLightbox(src, label) {
+  const lb = document.getElementById('lightbox');
+  document.getElementById('lightbox-img').src = src;
+  document.getElementById('lightbox-label').textContent = label || '';
+  lb.classList.add('open');
+  document.addEventListener('keydown', _lbKeyHandler);
+}
+function closeLightbox() {
+  document.getElementById('lightbox').classList.remove('open');
+  document.getElementById('lightbox-img').src = '';
+  document.removeEventListener('keydown', _lbKeyHandler);
+}
+function _lbKeyHandler(e) { if (e.key === 'Escape') closeLightbox(); }
+
+// ── LocalStorage test result persistence ──────────────────────────────────────
+function saveTestResults(results) {
+  try {
+    const existing = JSON.parse(localStorage.getItem('sqa_results') || '[]');
+    const merged   = [...results, ...existing].slice(0, 120);
+    localStorage.setItem('sqa_results', JSON.stringify(merged));
+    // per-env summary for the overview badges
+    const byEnv = {};
+    for (const r of results) {
+      if (!byEnv[r.env]) byEnv[r.env] = { total: 0, pass: 0, time: r.timestamp };
+      byEnv[r.env].total++;
+      if (r.status === 'PASS') byEnv[r.env].pass++;
+    }
+    for (const [env, stats] of Object.entries(byEnv)) {
+      localStorage.setItem(`sqa_env_${env}`, JSON.stringify(stats));
+    }
+  } catch {}
+}
+function loadEnvStatus(env) {
+  try { return JSON.parse(localStorage.getItem(`sqa_env_${env}`) || 'null'); } catch { return null; }
+}
+function calcPassRate() {
+  try {
+    const results = JSON.parse(localStorage.getItem('sqa_results') || '[]');
+    if (!results.length) return null;
+    const last30 = results.slice(0, 30);
+    return Math.round((last30.filter(r => r.status === 'PASS').length / last30.length) * 100);
+  } catch { return null; }
+}
+
+// ── Last Updated timestamp ────────────────────────────────────────────────────
+function markLastUpdated() {
+  const el = document.getElementById('last-updated-time');
+  if (el) el.textContent = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// ── Overview ──────────────────────────────────────────────────────────────────
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+async function loadOverview() {
+  markLastUpdated();
+
+  // ── Restore last known env status from localStorage ───────────────────────
+  for (const env of ['local', 'staging', 'production']) {
+    const stored = loadEnvStatus(env);
+    if (stored) {
+      const isPass  = stored.pass === stored.total;
+      const badgeEl = document.getElementById(`ov-badge-${env}`);
+      const cardEl  = document.getElementById(`ov-run-${env}`)?.closest('.card');
+      badgeEl.className = isPass ? 'badge badge-pass' : 'badge badge-fail';
+      badgeEl.innerHTML = `<span class="dot"></span> ${stored.pass}/${stored.total} PASS`;
+      document.getElementById(`ov-last-${env}`).textContent = fmtDate(stored.time);
+      if (cardEl) {
+        cardEl.classList.remove('env-card-pass', 'env-card-fail');
+        cardEl.classList.add(isPass ? 'env-card-pass' : 'env-card-fail');
+      }
+    }
+  }
+
+  // ── Activity feed + pass rate + env status from screenshots ─────────────
+  try {
+    const data = await api('/tests/screenshots');
+    const items = data.screenshots.slice(0, 6);
+    const feed  = document.getElementById('activity-feed');
+    if (!items.length) {
+      feed.innerHTML = '<div style="color:var(--text3);font-size:13px;padding:20px 0">No test runs yet — go to Tests to run your first test.</div>';
+    } else {
+      feed.innerHTML = items.map(s => {
+        const parts  = s.filename.replace('.png','').split('_');
+        const portal = parts[0] || '?';
+        const env    = parts[1] || '?';
+        const imgSrc = `${API_BASE}${s.url}`;
+        return `<div class="activity-item fade-in" onclick="openLightbox('${imgSrc.replace(/'/g,"\\'")}','${esc(s.filename)}')">
+          <img class="activity-thumb" src="${imgSrc}" onerror="this.style.display='none'" />
+          <div class="activity-info">
+            <div class="activity-label">${esc(portal)} / ${esc(env)}</div>
+            <span class="activity-time">${fmtDate(s.modified)}</span>
+          </div>
+          <span class="code-pill">${esc(s.filename)}</span>
+        </div>`;
+      }).join('');
+    }
+    document.getElementById('stat-tests-today').textContent = data.screenshots.length;
+
+    // Pass rate: count PASS/FAIL embedded in filenames (new format: portal_env_PASS_ts.png)
+    const allShots = data.screenshots;
+    const statusShots = allShots.filter(s => /_PASS_|_FAIL_/.test(s.filename));
+    if (statusShots.length > 0) {
+      const passed = statusShots.filter(s => /_PASS_/.test(s.filename)).length;
+      document.getElementById('stat-pass-rate').textContent =
+        Math.round(passed / statusShots.length * 100) + '%';
+    } else {
+      const rate = calcPassRate();
+      document.getElementById('stat-pass-rate').textContent = rate !== null ? rate + '%' : '—';
+    }
+
+    // Env cards: infer status from latest new-format screenshots for Unknown badges
+    const byEnv = {};
+    for (const s of allShots) {
+      const p = s.filename.replace('.png', '').split('_');
+      if (p.length >= 5 && (p[2] === 'PASS' || p[2] === 'FAIL')) {
+        const env = p[1];
+        if (!byEnv[env]) byEnv[env] = [];
+        byEnv[env].push({ status: p[2], modified: s.modified });
+      }
+    }
+    for (const [env, entries] of Object.entries(byEnv)) {
+      const badgeEl = document.getElementById(`ov-badge-${env}`);
+      if (!badgeEl || !badgeEl.classList.contains('badge-neutral')) continue;
+      const recent = entries.slice(0, 3);
+      const passCount = recent.filter(e => e.status === 'PASS').length;
+      const total = recent.length;
+      const isPass = passCount === total;
+      badgeEl.className = isPass ? 'badge badge-pass' : 'badge badge-fail';
+      badgeEl.innerHTML = `<span class="dot"></span> ${passCount}/${total} PASS`;
+      document.getElementById(`ov-last-${env}`).textContent = fmtDate(entries[0].modified);
+      const cardEl = document.getElementById(`ov-run-${env}`)?.closest('.card');
+      if (cardEl) {
+        cardEl.classList.remove('env-card-pass', 'env-card-fail');
+        cardEl.classList.add(isPass ? 'env-card-pass' : 'env-card-fail');
+      }
+    }
+  } catch(e) { console.error(e); }
+
+  // ── Jira open tickets ─────────────────────────────────────────────────────
+  try {
+    let openCount = 0;
+    const [omsResult, zspResult] = await Promise.allSettled([
+      api('/jira/tickets/OMS'),
+      api('/jira/tickets/ZSP'),
+    ]);
+    for (const res of [omsResult, zspResult]) {
+      if (res.status === 'fulfilled' && Array.isArray(res.value?.tickets)) {
+        openCount += res.value.tickets.filter(t => {
+          const s = (t.status || '').toLowerCase();
+          return !s.includes('done') && !s.includes('closed') && !s.includes('resolved');
+        }).length;
+      }
+    }
+    document.getElementById('stat-jira-open').textContent = openCount;
+  } catch {}
+
+  // ── Sprints ───────────────────────────────────────────────────────────────
+  try {
+    const spr = await api('/jira/sprints/OMS');
+    document.getElementById('stat-sprints').textContent = spr.sprints.length;
+  } catch {}
+}
+
+async function ovRunEnv(env) {
+  const btn     = document.getElementById(`ov-run-${env}`);
+  const cardEl  = btn?.closest('.card');
+  const badgeEl = document.getElementById(`ov-badge-${env}`);
+  btnLoad(btn, true);
+  badgeEl.className = 'badge badge-warn';
+  badgeEl.innerHTML = '<span class="dot"></span> Running';
+  if (cardEl) cardEl.classList.remove('env-card-pass', 'env-card-fail');
+
+  // Show portal-by-portal progress on the button label
+  const portals = ['Seller', 'Admin', 'Agency'];
+  let pIdx = 0;
+  btn.querySelector('.label').innerHTML = `Testing ${portals[0]}<span class="animated-dots"></span>`;
+  const portalTick = setInterval(() => {
+    pIdx = Math.min(pIdx + 1, portals.length - 1);
+    btn.querySelector('.label').innerHTML = `Testing ${portals[pIdx]}<span class="animated-dots"></span>`;
+  }, 22000);
+
+  try {
+    const data   = await api('/tests/run', { method:'POST', body: JSON.stringify({ env }) });
+    clearInterval(portalTick);
+    const passed = data.results.filter(r => r.status === 'PASS').length;
+    const all    = data.results.length;
+    const isPass = passed === all;
+    badgeEl.className = isPass ? 'badge badge-pass' : 'badge badge-fail';
+    badgeEl.innerHTML = `<span class="dot"></span> ${passed}/${all} PASS`;
+    document.getElementById(`ov-last-${env}`).textContent = fmtDate(new Date().toISOString());
+    if (cardEl) cardEl.classList.add(isPass ? 'env-card-pass' : 'env-card-fail');
+    saveTestResults(data.results);
+    toast(`${env}: ${passed}/${all} tests passed`, isPass ? 'success' : 'error');
+    loadOverview();
+  } catch(e) {
+    clearInterval(portalTick);
+    badgeEl.className = 'badge badge-fail';
+    badgeEl.innerHTML = '<span class="dot"></span> Error';
+    if (cardEl) cardEl.classList.add('env-card-fail');
+    toast(e.message, 'error');
+  } finally {
+    btnLoad(btn, false);
+    btn.querySelector('.label').textContent = '▶ Run All Tests';
+  }
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// ── Tests ─────────────────────────────────────────────────────────────────────
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+function setTestEnv(env, el) {
+  state.testEnv = env;
+  document.querySelectorAll('[id^="tenv-"]').forEach(b => b.classList.remove('active'));
+  el.classList.add('active');
+}
+function setTestPortal(portal, el) {
+  state.testPortal = portal;
+  document.querySelectorAll('[id^="tportal-"]').forEach(b => b.classList.remove('active'));
+  el.classList.add('active');
+}
+
+async function testsRun() {
+  const env    = state.testEnv;
+  const portal = state.testPortal || undefined;
+  const portals = portal ? [portal] : ['seller','admin','agency'];
+  btnLoad('test-run-btn', true);
+
+  const progressWrap = document.getElementById('test-progress-wrap');
+  const progressBar  = document.getElementById('test-progress-bar');
+  const progressLabel = document.getElementById('test-progress-label');
+  progressWrap.classList.remove('hidden');
+  progressBar.style.width = '0%';
+  progressLabel.textContent = `Running ${portals.length} test(s) on ${env}…`;
+
+  let pct = 5;
+  const ticker = setInterval(() => {
+    pct = Math.min(pct + (90 - pct) * 0.05, 88);
+    progressBar.style.width = pct + '%';
+  }, 500);
+
+  // Real-time portal-by-portal progress indicator
+  let portalIdx = 0;
+  const portalLabels = portals.map(p => p.charAt(0).toUpperCase() + p.slice(1));
+  const updatePortalLabel = () => {
+    if (portalIdx < portalLabels.length) {
+      progressLabel.innerHTML = `Testing <strong>${portalLabels[portalIdx]}</strong><span class="animated-dots"></span>`;
+      portalIdx++;
+    }
+  };
+  updatePortalLabel();
+  const portalTick = setInterval(updatePortalLabel, 22000);
+
+  try {
+    const data = await api('/tests/run', { method:'POST', body: JSON.stringify({ env, portal }) });
+    clearInterval(ticker);
+    clearInterval(portalTick);
+    progressBar.style.width = '100%';
+    progressLabel.textContent = 'Done.';
+    setTimeout(() => progressWrap.classList.add('hidden'), 1500);
+
+    state.testResults = data.results;
+    saveTestResults(data.results);
+    document.getElementById('test-count').textContent = data.results.length;
+    document.getElementById('tests-tbody').innerHTML = data.results.map(r => `
+      <tr class="fade-in">
+        <td class="td-mono">${esc(r.portal)}</td>
+        <td>${esc(r.env)}</td>
+        <td>${badge(r.status)}</td>
+        <td class="td-muted" style="max-width:380px;word-break:break-word;font-size:12px">${esc(r.message)}</td>
+        <td class="td-muted text-xs">${fmtDate(r.timestamp)}</td>
+      </tr>
+    `).join('');
+    const passed = data.results.filter(r => r.status === 'PASS').length;
+    toast(`${passed}/${data.results.length} tests passed`, passed === data.results.length ? 'success' : 'error');
+    loadScreenshots();
+  } catch(e) {
+    clearInterval(ticker);
+    clearInterval(portalTick);
+    progressWrap.classList.add('hidden');
+    toast(e.message, 'error');
+  } finally { btnLoad('test-run-btn', false); }
+}
+
+function exportResults() {
+  if (!state.testResults.length) { toast('No results to export', 'warn'); return; }
+  const header = 'portal,env,status,message,timestamp';
+  const rows = state.testResults.map(r =>
+    [r.portal, r.env, r.status, `"${(r.message||'').replace(/"/g,'""')}"`, r.timestamp].join(',')
+  );
+  const csv = [header, ...rows].join('\n');
+  const a = document.createElement('a');
+  a.href = 'data:text/csv,' + encodeURIComponent(csv);
+  a.download = `sqa-results-${Date.now()}.csv`;
+  a.click();
+}
+
+async function loadScreenshots() {
+  try {
+    const data = await api('/tests/screenshots');
+    const grid = document.getElementById('screenshots-grid');
+    if (!data.screenshots.length) {
+      grid.innerHTML = '<div style="color:var(--text3);font-size:13px">No screenshots yet.</div>';
+      return;
+    }
+    grid.innerHTML = data.screenshots.slice(0, 24).map(s => {
+      const parts  = s.filename.replace('.png','').split('_');
+      const label  = `${parts[0]||'?'} / ${parts[1]||'?'}`;
+      const imgSrc = `${API_BASE}${s.url}`;
+      return `<div class="screenshot-card fade-in"
+          onclick="openLightbox('${imgSrc.replace(/'/g,"\\'")}','${esc(s.filename)}')">
+        <img src="${imgSrc}" loading="lazy" onerror="this.style.display='none'" />
+        <div class="sc-label">
+          <div class="sc-meta">${esc(label)}</div>
+          <div class="sc-name">${fmtDate(s.modified)}</div>
+        </div>
+      </div>`;
+    }).join('');
+  } catch(e) { console.error(e); }
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// ── Jira ──────────────────────────────────────────────────────────────────────
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+async function jiraCreate() {
+  const project     = document.getElementById('j-project').value;
+  const summary     = document.getElementById('j-summary').value.trim();
+  const issue_type  = document.getElementById('j-type').value;
+  const description = document.getElementById('j-description').value.trim() || null;
+  if (!summary) { toast('Summary is required', 'warn'); return; }
+  btnLoad('jira-create-btn', true);
+  try {
+    const data = await api('/jira/tickets', {
+      method: 'POST',
+      body: JSON.stringify({ project_key: project, summary, issue_type, description }),
+    });
+    toast(`Created <a href="${data.url}" target="_blank">${data.key}</a>`, 'success', 6000);
+    document.getElementById('j-summary').value = '';
+    document.getElementById('j-description').value = '';
+    document.getElementById('j-list-project').value = project;
+    jiraLoad();
+  } catch(e) { toast(e.message, 'error'); }
+  finally { btnLoad('jira-create-btn', false); }
+}
+
+async function jiraLoad() {
+  const project = document.getElementById('j-list-project').value;
+  btnLoad('jira-load-btn', true);
+  try {
+    const data = await api(`/jira/tickets/${project}`);
+    state.jiraRows = data.tickets;
+    renderJiraTable(state.jiraRows);
+  } catch(e) { toast(e.message, 'error'); }
+  finally { btnLoad('jira-load-btn', false); }
+}
+
+function jiraFilter() {
+  const q = document.getElementById('jira-search').value.toLowerCase();
+  const filtered = q ? state.jiraRows.filter(t =>
+    (t.key||'').toLowerCase().includes(q) ||
+    (t.summary||'').toLowerCase().includes(q)
+  ) : state.jiraRows;
+  renderJiraTable(filtered);
+}
+
+function renderJiraTable(rows) {
+  document.getElementById('jira-tbody').innerHTML = rows.length
+    ? rows.map(t => `
+      <tr class="fade-in">
+        <td><a href="${esc(t.url)}" target="_blank" class="td-mono">${esc(t.key)}</a></td>
+        <td style="max-width:280px">${esc(t.summary||'—')}</td>
+        <td><span class="badge badge-neutral" style="font-size:10.5px">${esc(t.issue_type||'—')}</span></td>
+        <td>${jiraBadge(t.status)}</td>
+        <td class="td-muted">${esc(t.assignee||'Unassigned')}</td>
+        <td>
+          <div style="display:flex;gap:4px">
+            <button class="btn btn-sm btn-danger" onclick="jiraClose('${esc(t.key)}')">Close</button>
+            <button class="btn btn-sm btn-secondary" onclick="jiraComment('${esc(t.key)}')">💬</button>
+          </div>
+        </td>
+      </tr>
+    `).join('')
+    : '<tr class="empty-row"><td colspan="6">No tickets found.</td></tr>';
+}
+
+async function jiraClose(key) {
+  const comment = prompt(`Close ${key} — optional comment:`);
+  if (comment === null) return;
+  try {
+    await api(`/jira/tickets/${key}/close`, { method:'POST', body: JSON.stringify({ comment: comment || null }) });
+    toast(`${key} closed`, 'success');
+    jiraLoad();
+  } catch(e) { toast(e.message, 'error'); }
+}
+
+async function jiraComment(key) {
+  const comment = prompt(`Add comment to ${key}:`);
+  if (!comment) return;
+  try {
+    await api(`/jira/tickets/${key}/comment`, { method:'POST', body: JSON.stringify({ comment }) });
+    toast(`Comment added to ${key}`, 'success');
+  } catch(e) { toast(e.message, 'error'); }
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// ── GitHub ────────────────────────────────────────────────────────────────────
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+async function ghLoad(repo) {
+  const btnId = `gh-load-${repo === 'frontend' ? 'fe' : 'be'}-btn`;
+  btnLoad(btnId, true);
+  state.ghSelected[repo] = null;
+  const curEl  = document.getElementById(`gh-current-${repo}`);
+  const listEl = document.getElementById(`gh-branches-${repo}`);
+  curEl.innerHTML = '⎇ Loading…';
+  listEl.innerHTML = '<div class="skel-line skeleton" style="height:28px;width:200px"></div>';
+  try {
+    const data = await api(`/github/branches/${repo}`);
+    curEl.innerHTML = `⎇ ${esc(data.current)}`;
+    state.ghSelected[repo] = data.current;
+    listEl.innerHTML = data.branches.map(b => `
+      <span class="branch-badge ${b === data.current ? 'active' : ''}"
+            onclick="ghSelect('${repo}', '${esc(b)}', this)">${esc(b)}</span>
+    `).join('');
+  } catch(e) {
+    curEl.innerHTML = '⎇ Error';
+    listEl.innerHTML = `<span style="color:var(--error);font-size:12px">${esc(e.message)}</span>`;
+    toast(e.message, 'error');
+  } finally { btnLoad(btnId, false); }
+}
+
+function ghSelect(repo, branch, el) {
+  state.ghSelected[repo] = branch;
+  document.querySelectorAll(`#gh-branches-${repo} .branch-badge`).forEach(b => b.classList.remove('active'));
+  el.classList.add('active');
+}
+
+async function ghSwitch(repo) {
+  const branch = state.ghSelected[repo];
+  if (!branch) { toast('Select a branch first', 'warn'); return; }
+  const btnId = `gh-switch-${repo === 'frontend' ? 'fe' : 'be'}-btn`;
+  btnLoad(btnId, true);
+  try {
+    await api('/github/switch', { method:'POST', body: JSON.stringify({ repo, branch }) });
+    toast(`Switched ${repo} → ${branch}`, 'success');
+    document.getElementById(`gh-current-${repo}`).innerHTML = `⎇ ${esc(branch)}`;
+  } catch(e) { toast(e.message, 'error'); }
+  finally { btnLoad(btnId, false); }
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// ── Database ──────────────────────────────────────────────────────────────────
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+function setDbEnv(env, el) {
+  state.dbEnv = env;
+  document.querySelectorAll('[id^="dbenv-"]').forEach(b => b.classList.remove('active'));
+  el.classList.add('active');
+  dbLoadTables();
+}
+
+async function dbLoadTables() {
+  const env   = state.dbEnv;
+  const panel = document.getElementById('db-table-list');
+  panel.innerHTML = '<div class="table-list-item text-muted">Loading…</div>';
+  try {
+    const data = await api(`/db/tables/${env}`);
+    panel.innerHTML = data.tables.length
+      ? data.tables.map(t => `
+        <div class="table-list-item" onclick="dbSelectTable('${esc(t)}', this)">
+          <span>${esc(t)}</span>
+        </div>
+      `).join('')
+      : '<div class="table-list-item text-muted">No tables found</div>';
+  } catch(e) {
+    panel.innerHTML = `<div class="table-list-item text-muted">${esc(e.message)}</div>`;
+  }
+}
+
+function dbSelectTable(name, el) {
+  document.querySelectorAll('#db-table-list .table-list-item').forEach(i => i.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('db-sql').value = `SELECT * FROM \`${name}\` LIMIT 25;`;
+}
+
+async function dbRunQuery() {
+  const env = state.dbEnv;
+  const sql = document.getElementById('db-sql').value.trim();
+  if (!sql) { toast('Enter a SQL query', 'warn'); return; }
+  btnLoad('db-run-btn', true);
+  try {
+    const data = await api('/db/query', { method:'POST', body: JSON.stringify({ env, sql }) });
+    document.getElementById('db-count').textContent = data.count;
+    const wrap = document.getElementById('db-results-wrap');
+    if (!data.results.length) {
+      wrap.innerHTML = '<div style="padding:24px;color:var(--text3);font-size:13px">Query returned 0 rows.</div>';
+      toast('0 rows returned', 'info');
+      return;
+    }
+    const cols = Object.keys(data.results[0]);
+    wrap.innerHTML = `<table class="fade-in">
+      <thead><tr>${cols.map(c => `<th>${esc(c)}</th>`).join('')}</tr></thead>
+      <tbody>${data.results.map(row =>
+        `<tr>${cols.map(c => `<td class="td-mono">${esc(row[c] ?? 'NULL')}</td>`).join('')}</tr>`
+      ).join('')}</tbody>
+    </table>`;
+    toast(`${data.count} row${data.count !== 1 ? 's' : ''} returned`, 'success');
+  } catch(e) { toast(e.message, 'error'); }
+  finally { btnLoad('db-run-btn', false); }
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// ── Reports ───────────────────────────────────────────────────────────────────
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+async function reportsGenerate(env) {
+  const btnId = `rpt-gen-${env}-btn`;
+  btnLoad(btnId, true);
+  toast(`Generating ${env} report — this takes a few minutes…`, 'info', 10000);
+  try {
+    const data = await api('/reports/generate', { method:'POST', body: JSON.stringify({ env }) });
+    toast(`Report ready: ${data.filename}`, 'success');
+    reportsLoad();
+    reportsView(data.filename, data.content);
+  } catch(e) { toast(e.message, 'error'); }
+  finally { btnLoad(btnId, false); }
+}
+
+async function reportsLoad() {
+  try {
+    const data = await api('/reports/list');
+    const list = document.getElementById('reports-list');
+    if (!data.reports.length) {
+      list.innerHTML = '<div style="color:var(--text3);font-size:13px;padding:16px 0">No reports generated yet.</div>';
+      return;
+    }
+    list.innerHTML = data.reports.map(r => {
+      const envMatch = r.filename.match(/health_([^_]+)_/);
+      const envName  = envMatch ? envMatch[1] : 'unknown';
+      return `<div class="report-card fade-in">
+        <div class="report-icon">📋</div>
+        <div class="report-info">
+          <div class="report-name">${esc(r.filename)}</div>
+          <div class="report-meta">${esc(envName)} · ${fmtDate(r.modified)} · ${fmtBytes(r.size)}</div>
+        </div>
+        <button class="btn btn-secondary btn-sm" onclick="reportsLoadView('${esc(r.filename)}')">View</button>
+        <a class="btn btn-secondary btn-sm" href="${API_BASE}/reports/${encodeURIComponent(r.filename)}" download>⬇</a>
+      </div>`;
+    }).join('');
+  } catch(e) { console.error(e); }
+}
+
+async function reportsLoadView(filename) {
+  try {
+    const data = await api(`/reports/${filename}`);
+    reportsView(filename, data.content);
+  } catch(e) { toast(e.message, 'error'); }
+}
+
+function reportsView(filename, content) {
+  document.getElementById('report-viewer-title').textContent = filename;
+  document.getElementById('report-viewer-content').textContent = content;
+  const wrap = document.getElementById('report-viewer-wrap');
+  wrap.classList.remove('hidden');
+  wrap.scrollIntoView({ behavior:'smooth' });
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// ── PR Review ─────────────────────────────────────────────────────────────────
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+async function prLoad(repo) {
+  const btnId = `pr-load-${repo === 'frontend' ? 'fe' : 'be'}-btn`;
+  btnLoad(btnId, true);
+  const listEl = document.getElementById(`pr-list-${repo}`);
+  listEl.innerHTML = '<div class="skel-line skeleton" style="height:52px;margin-bottom:8px;border-radius:8px"></div><div class="skel-line skeleton" style="height:52px;border-radius:8px"></div>';
+  try {
+    const data = await api(`/pr/open/${repo}`);
+    if (!data.prs.length) {
+      listEl.innerHTML = '<div style="color:var(--text3);font-size:13px;padding:10px 0">No open PRs.</div>';
+      return;
+    }
+    listEl.innerHTML = data.prs.map(pr => {
+      const initials = (pr.author||'?').slice(0,2).toUpperCase();
+      return `<div class="pr-card fade-in">
+        <div class="pr-avatar">${esc(initials)}</div>
+        <div class="pr-info">
+          <div class="pr-title">
+            <a href="${esc(pr.url)}" target="_blank">#${pr.number}</a>&nbsp;
+            ${esc(pr.title)}
+          </div>
+          <div class="pr-meta">@${esc(pr.author)}</div>
+        </div>
+        <button class="btn btn-sm btn-secondary" id="pr-review-btn-${repo}-${pr.number}"
+          onclick="prReview('${repo}', ${pr.number}, '${esc(pr.title)}')">
+          <div class="spin"></div><span class="label">🤖 Review</span>
+        </button>
+      </div>`;
+    }).join('');
+  } catch(e) {
+    listEl.innerHTML = `<div style="color:var(--error);font-size:13px">${esc(e.message)}</div>`;
+    toast(e.message, 'error');
+  } finally { btnLoad(btnId, false); }
+}
+
+async function prReview(repo, prNumber, title) {
+  const btnId = `pr-review-btn-${repo}-${prNumber}`;
+  const btn   = document.getElementById(btnId);
+  if (btn) { btnLoad(btn, true); }
+  toast(`Reviewing PR #${prNumber} — running 3 Claude passes…`, 'info', 12000);
+
+  const wrap    = document.getElementById('pr-review-wrap');
+  const content = document.getElementById('pr-review-content');
+  document.getElementById('pr-review-title').textContent = `🤖 AI Review: #${prNumber} — ${title}`;
+  content.innerHTML = '<div style="color:var(--text3);font-size:13px;padding:16px 0">Analyzing code — this takes 1–2 minutes…<br><br>'
+    + '<div class="skel-line skeleton" style="height:12px;margin-bottom:8px;width:80%"></div>'
+    + '<div class="skel-line skeleton" style="height:12px;margin-bottom:8px;width:60%"></div>'
+    + '<div class="skel-line skeleton" style="height:12px;width:70%"></div></div>';
+  wrap.classList.remove('hidden');
+  wrap.scrollIntoView({ behavior:'smooth' });
+
+  try {
+    const data = await api('/pr/review', {
+      method: 'POST',
+      body: JSON.stringify({ repo, pr_number: prNumber }),
+    });
+    content.innerHTML = renderMd(data.review);
+    toast(`Review posted to GitHub PR #${prNumber}`, 'success');
+  } catch(e) {
+    content.innerHTML = `<div style="color:var(--error)">${esc(e.message)}</div>`;
+    toast(e.message, 'error');
+  } finally {
+    if (btn) btnLoad(btn, false);
+  }
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// ── Init ──────────────────────────────────────────────────────────────────────
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+document.addEventListener('DOMContentLoaded', () => {
+  // Nav clicks
+  document.querySelectorAll('.nav-item[data-page]').forEach(el => {
+    el.addEventListener('click', () => navigate(el.dataset.page));
+  });
+
+  // API health check
+  api('/health').then(() => {
+    document.getElementById('api-dot').classList.remove('offline');
+    document.getElementById('api-status-text').textContent = 'API Connected';
+  }).catch(() => {
+    document.getElementById('api-dot').classList.add('offline');
+    document.getElementById('api-status-text').textContent = 'API Offline';
+  });
+
+  // Initial page
+  loadOverview();
+
+  // Auto-refresh every 30 seconds (only when on overview)
+  setInterval(() => {
+    if (document.getElementById('page-overview').classList.contains('active')) {
+      loadOverview();
+    }
+  }, 30000);
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,7 @@
+venv/
+auth/
+.env
+screenshots/
+reports/
+logs/
+__pycache__/

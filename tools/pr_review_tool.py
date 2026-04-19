@@ -1,0 +1,188 @@
+import os
+from datetime import datetime
+
+import anthropic
+import requests
+from dotenv import load_dotenv
+
+load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), "..", ".env"))
+
+GITHUB_TOKEN = os.getenv("GITHUB_TOKEN")
+GITHUB_FRONTEND_REPO_API = os.getenv("GITHUB_FRONTEND_REPO_API", "productbox-development/zambeel-fe")
+GITHUB_BACKEND_REPO_API = os.getenv("GITHUB_BACKEND_REPO_API", "productbox-development/zambeel-api")
+
+REPOS = {
+    "frontend": GITHUB_FRONTEND_REPO_API,
+    "backend": GITHUB_BACKEND_REPO_API,
+}
+
+GH_API = "https://api.github.com"
+GH_HEADERS = {
+    "Authorization": f"Bearer {GITHUB_TOKEN}",
+    "Accept": "application/vnd.github+json",
+    "X-GitHub-Api-Version": "2022-11-28",
+}
+
+_client = anthropic.Anthropic()
+
+_REVIEW_PASSES = [
+    {
+        "name": "Code Quality",
+        "focus": (
+            "code quality, readability, maintainability, naming conventions, "
+            "structural complexity, dead code, and language best practices"
+        ),
+    },
+    {
+        "name": "Security",
+        "focus": (
+            "security vulnerabilities including injection attacks, authentication/authorization "
+            "issues, exposed secrets or credentials, unsafe operations, missing input validation, "
+            "and OWASP Top 10 risks"
+        ),
+    },
+    {
+        "name": "Dependencies",
+        "focus": (
+            "dependency changes, version pinning, known vulnerabilities in added packages, "
+            "unused imports, and compatibility or breaking-change risks"
+        ),
+    },
+]
+
+
+def _resolve_repo(repo: str) -> str:
+    key = repo.lower()
+    if key not in REPOS:
+        raise ValueError(f"repo must be 'frontend' or 'backend', got {repo!r}")
+    return REPOS[key]
+
+
+def get_open_prs(repo: str) -> list[dict]:
+    """Return open PRs for 'frontend' or 'backend' with number, title, author, url."""
+    full_repo = _resolve_repo(repo)
+    resp = requests.get(
+        f"{GH_API}/repos/{full_repo}/pulls",
+        headers=GH_HEADERS,
+        params={"state": "open", "per_page": 30},
+    )
+    resp.raise_for_status()
+    return [
+        {
+            "number": pr["number"],
+            "title": pr["title"],
+            "author": pr["user"]["login"],
+            "url": pr["html_url"],
+        }
+        for pr in resp.json()
+    ]
+
+
+def get_pr_diff(repo: str, pr_number: int) -> str:
+    """Fetch the raw unified diff for a PR."""
+    full_repo = _resolve_repo(repo)
+    diff_headers = {**GH_HEADERS, "Accept": "application/vnd.github.v3.diff"}
+    resp = requests.get(f"{GH_API}/repos/{full_repo}/pulls/{pr_number}", headers=diff_headers)
+    resp.raise_for_status()
+    return resp.text
+
+
+def _run_review_pass(diff: str, pr_title: str, pass_info: dict) -> str:
+    """Send one focused review pass to Claude and return the text response."""
+    with _client.messages.stream(
+        model="claude-opus-4-7",
+        max_tokens=4096,
+        thinking={"type": "adaptive"},
+        system=[
+            {
+                "type": "text",
+                "text": (
+                    "You are a senior software engineer performing a focused code review. "
+                    "Be concise, actionable, and specific. Use markdown. "
+                    "Group findings by severity: 🔴 Critical, 🟡 Warning, 🟢 Suggestion. "
+                    "If nothing noteworthy in your focus area, say so in one sentence."
+                ),
+                "cache_control": {"type": "ephemeral"},
+            }
+        ],
+        messages=[
+            {
+                "role": "user",
+                "content": [
+                    {
+                        "type": "text",
+                        "text": f"PR: **{pr_title}**\n\n```diff\n{diff}\n```",
+                        "cache_control": {"type": "ephemeral"},
+                    },
+                    {
+                        "type": "text",
+                        "text": (
+                            f"Review this PR diff focusing **only** on: {pass_info['focus']}. "
+                            "Do not repeat findings from other review areas."
+                        ),
+                    },
+                ],
+            }
+        ],
+    ) as stream:
+        final = stream.get_final_message()
+
+    return next(
+        (block.text for block in final.content if block.type == "text"),
+        "(no output)",
+    )
+
+
+def review_pr(repo: str, pr_number: int) -> str:
+    """
+    Fetch diff, run 3 Claude review passes (quality/security/deps),
+    post the combined markdown review as a PR comment, and return the review text.
+    """
+    full_repo = _resolve_repo(repo)
+
+    # Fetch PR metadata
+    resp = requests.get(f"{GH_API}/repos/{full_repo}/pulls/{pr_number}", headers=GH_HEADERS)
+    resp.raise_for_status()
+    pr_data = resp.json()
+    pr_title = pr_data["title"]
+    pr_author = pr_data["user"]["login"]
+    pr_url = pr_data["html_url"]
+
+    diff = get_pr_diff(repo, pr_number)
+
+    sections = []
+    for pass_info in _REVIEW_PASSES:
+        print(f"  [{pass_info['name']}] reviewing...")
+        result = _run_review_pass(diff, pr_title, pass_info)
+        sections.append(f"## {pass_info['name']}\n\n{result}")
+
+    timestamp = datetime.utcnow().strftime("%Y-%m-%d %H:%M UTC")
+    review = (
+        f"# 🤖 Automated PR Review\n\n"
+        f"**PR:** [{pr_title}]({pr_url})  \n"
+        f"**Author:** @{pr_author}  \n"
+        f"**Reviewed at:** {timestamp}\n\n"
+        + "\n\n---\n\n".join(sections)
+        + "\n\n---\n*Review generated by SQA Agent · claude-opus-4-7*"
+    )
+
+    # Post comment on the PR
+    comment_resp = requests.post(
+        f"{GH_API}/repos/{full_repo}/issues/{pr_number}/comments",
+        headers=GH_HEADERS,
+        json={"body": review},
+    )
+    comment_resp.raise_for_status()
+    print(f"  Review posted: {comment_resp.json()['html_url']}")
+
+    return review
+
+
+def review_latest_pr(repo: str) -> str:
+    """Get the most recent open PR and run a full review on it."""
+    prs = get_open_prs(repo)
+    if not prs:
+        return f"No open PRs found for {repo}."
+    latest = prs[0]
+    print(f"Reviewing latest PR #{latest['number']}: {latest['title']}")
+    return review_pr(repo, latest["number"])
