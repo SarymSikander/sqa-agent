@@ -1,16 +1,12 @@
 import asyncio
 import os
-import sys
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
 from dotenv import load_dotenv
 
-# ── Project root on sys.path so `tools.*` imports resolve ─────────────────────
-ROOT = Path(__file__).resolve().parent.parent.parent
-sys.path.insert(0, str(ROOT))
-load_dotenv(dotenv_path=str(ROOT / ".env"))
+load_dotenv()
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -27,8 +23,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-SCREENSHOTS_DIR = ROOT / "screenshots"
-REPORTS_DIR = ROOT / "reports"
+_HERE = Path(__file__).resolve().parent
+SCREENSHOTS_DIR = _HERE / "screenshots"
+REPORTS_DIR = _HERE / "reports"
 SCREENSHOTS_DIR.mkdir(exist_ok=True)
 REPORTS_DIR.mkdir(exist_ok=True)
 
