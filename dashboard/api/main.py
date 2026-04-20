@@ -1,18 +1,24 @@
 import asyncio
+import json
 import os
+import time
 import requests
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
+import anthropic as _anthropic
 from dotenv import load_dotenv
 
 load_dotenv()
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
+
+_ai_client = _anthropic.Anthropic()
 
 app = FastAPI(title="Zambeel SQA Dashboard API", version="1.0.0")
 
@@ -107,6 +113,12 @@ class DBQueryBody(BaseModel):
 class PRReviewBody(BaseModel):
     repo: str
     pr_number: int
+
+class RunQABody(BaseModel):
+    env: str
+    frontend_branch: str
+    backend_branch: str
+    portal: Optional[str] = None
 
 # ── /debug/files ──────────────────────────────────────────────────────────────
 
@@ -294,6 +306,225 @@ async def get_ticket_detail(issue_key: str):
             for c in (comments or [])
         ],
     }
+
+@app.post("/jira/tickets/{issue_key}/run-qa")
+async def run_qa_endpoint(issue_key: str, body: RunQABody):
+
+    async def generate():
+        t0 = time.time()
+
+        def evt(data: dict) -> str:
+            return f"data: {json.dumps(data)}\n\n"
+
+        # ── helpers ────────────────────────────────────────────────────────────
+        branches_switched = False
+        test_results: list = []
+        test_cases:   list = []
+        all_pass      = False
+        new_status    = ""
+        elapsed       = 0.0
+
+        # ── Stage: fetch ticket ────────────────────────────────────────────────
+        yield evt({"stage": "analysing_ticket", "status": "running"})
+        try:
+            ticket   = await asyncio.to_thread(_jira.get_ticket, issue_key)
+            comments = await asyncio.to_thread(_jira.get_comments, issue_key)
+            fields   = ticket.get("fields", {})
+            summary  = fields.get("summary", "")
+            desc_raw = fields.get("description")
+            description = _adf_to_text(desc_raw) if isinstance(desc_raw, (dict, list)) else (desc_raw or "")
+            assignee    = (fields.get("assignee") or {}).get("displayName", "")
+            comment_texts = [
+                f"{(c.get('author') or {}).get('displayName','?')}: "
+                + (_adf_to_text(c["body"]) if isinstance(c.get("body"), (dict, list)) else (c.get("body") or ""))
+                for c in (comments or [])
+            ]
+        except Exception as e:
+            yield evt({"stage": "analysing_ticket", "status": "error", "message": str(e)})
+            yield evt({"stage": "done", "error": str(e)})
+            return
+        yield evt({"stage": "analysing_ticket", "status": "done"})
+
+        # ── Stage: switch branches (local only) ────────────────────────────────
+        if body.env == "local":
+            yield evt({"stage": "switching_branches", "status": "running"})
+            fe_path = REPO_PATHS.get("frontend", "")
+            be_path = REPO_PATHS.get("backend", "")
+            try:
+                await asyncio.to_thread(_github.switch_branch, fe_path, body.frontend_branch)
+            except Exception as e:
+                yield evt({"stage": "switching_branches", "status": "error",
+                           "message": f"Frontend branch '{body.frontend_branch}' not found: {e}"})
+                yield evt({"stage": "done", "error": str(e)})
+                return
+            try:
+                await asyncio.to_thread(_github.switch_branch, be_path, body.backend_branch)
+            except Exception as e:
+                # revert frontend
+                try:
+                    await asyncio.to_thread(_github.switch_branch, fe_path, "main")
+                except Exception:
+                    pass
+                yield evt({"stage": "switching_branches", "status": "error",
+                           "message": f"Backend branch '{body.backend_branch}' not found: {e}"})
+                yield evt({"stage": "done", "error": str(e)})
+                return
+            branches_switched = True
+            yield evt({"stage": "switching_branches", "status": "done"})
+
+        # ── Stage: generate test cases ─────────────────────────────────────────
+        yield evt({"stage": "generating_test_cases", "status": "running"})
+        yield f": keepalive\n\n"
+        portal_ctx = body.portal if body.portal else "all three portals (Seller, Admin, Agency)"
+        prompt = (
+            f"You are a QA engineer for Zambeel, an e-commerce dropshipping platform with three portals:\n"
+            f"- Seller Portal: sellers manage products, orders, inventory, and storefronts\n"
+            f"- Admin Portal: platform admins manage orders, users, commissions, and settings\n"
+            f"- Agency Portal: agencies manage multiple seller accounts under their umbrella\n\n"
+            f"Jira Ticket: {issue_key}\n"
+            f"Summary: {summary}\n"
+            f"Description: {description[:1500] or 'No description'}\n"
+            f"Recent Comments:\n{chr(10).join(comment_texts[:5]) or 'None'}\n\n"
+            f"Portal(s) under test: {portal_ctx}\n"
+            f"Environment: {body.env}\n\n"
+            f"Generate 5-8 specific, actionable Playwright test cases for this ticket. "
+            f"Return ONLY a raw JSON array (no markdown, no code fences). "
+            f"Each element must have: test_name (string), description (string), "
+            f"steps (array of strings), expected_result (string)."
+        )
+        try:
+            msg = await asyncio.to_thread(
+                _ai_client.messages.create,
+                model="claude-opus-4-7",
+                max_tokens=2048,
+                messages=[{"role": "user", "content": prompt}],
+            )
+            raw = msg.content[0].text.strip()
+            if raw.startswith("```"):
+                parts = raw.split("```")
+                raw = parts[1].lstrip("json").strip() if len(parts) > 1 else raw
+            test_cases = json.loads(raw)
+            if not isinstance(test_cases, list):
+                test_cases = []
+        except Exception as e:
+            test_cases = []
+        # save as Jira comment regardless of parse success
+        if test_cases:
+            try:
+                lines = [f"🤖 *AI-Generated QA Test Cases — {issue_key}* ({body.env.upper()} | fe:`{body.frontend_branch}` be:`{body.backend_branch}`)"]
+                for i, tc in enumerate(test_cases, 1):
+                    lines.append(f"\n*{i}. {tc.get('test_name','Test')}*\n_{tc.get('description','')}_")
+                    for s in (tc.get("steps") or []):
+                        lines.append(f"• {s}")
+                    lines.append(f"✅ Expected: {tc.get('expected_result','')}")
+                await asyncio.to_thread(_jira.add_comment, issue_key, "\n".join(lines))
+            except Exception:
+                pass
+        yield evt({"stage": "generating_test_cases", "status": "done", "count": len(test_cases)})
+
+        # ── Stage: run Playwright tests ────────────────────────────────────────
+        yield evt({"stage": "running_tests", "status": "running"})
+        portals = [body.portal] if (body.portal and body.portal != "all") else ["seller", "admin", "agency"]
+        for portal in portals:
+            yield f": keepalive\n\n"
+            try:
+                status, res = await asyncio.to_thread(_playwright.run_tests, portal, body.env)
+                test_results.append({
+                    "portal": portal, "status": status,
+                    "message": res.get("message", "") if isinstance(res, dict) else str(res),
+                    "url": res.get("url") if isinstance(res, dict) else None,
+                    "console_errors": res.get("console_errors", []) if isinstance(res, dict) else [],
+                })
+            except Exception as e:
+                test_results.append({"portal": portal, "status": "ERROR", "message": str(e), "url": None, "console_errors": []})
+            yield evt({"stage": "running_tests", "status": "progress",
+                       "portal": portal, "result": test_results[-1]["status"]})
+        all_pass = bool(test_results) and all(r["status"] == "PASS" for r in test_results)
+        yield evt({"stage": "running_tests", "status": "done", "all_pass": all_pass})
+
+        # ── Stage: update Jira ────────────────────────────────────────────────
+        yield evt({"stage": "updating_jira", "status": "running"})
+        try:
+            new_status = "Ready for Review" if all_pass else "Dev In Progress"
+            await asyncio.to_thread(_jira.update_ticket_status, issue_key, new_status)
+            if all_pass:
+                comment_lines = [f"✅ *QA Passed* — {body.env.upper()} | fe:`{body.frontend_branch}` be:`{body.backend_branch}`"]
+                for r in test_results:
+                    comment_lines.append(f"• {r['portal']}: PASS — {r.get('url') or ''}")
+                if assignee:
+                    comment_lines.append(f"\n@{assignee} All tests passing — moving to Ready for Review.")
+            else:
+                comment_lines = [f"❌ *QA Failed* — {body.env.upper()} | fe:`{body.frontend_branch}` be:`{body.backend_branch}`"]
+                for r in test_results:
+                    icon = "✅" if r["status"] == "PASS" else "❌"
+                    comment_lines.append(f"• {r['portal']}: {icon} {r['status']} — {str(r.get('message',''))[:200]}")
+                    for err in (r.get("console_errors") or [])[:3]:
+                        comment_lines.append(f"  Console: {str(err)[:120]}")
+                if assignee:
+                    comment_lines.append(f"\n@{assignee} Tests failing — moving back to Dev In Progress.")
+            await asyncio.to_thread(_jira.add_comment, issue_key, "\n".join(comment_lines))
+        except Exception as e:
+            yield evt({"stage": "updating_jira", "status": "error", "message": str(e)})
+        else:
+            yield evt({"stage": "updating_jira", "status": "done", "new_status": new_status})
+
+        # ── Restore branches ──────────────────────────────────────────────────
+        if body.env == "local" and branches_switched:
+            fe_path = REPO_PATHS.get("frontend", "")
+            be_path = REPO_PATHS.get("backend", "")
+            for path in [fe_path, be_path]:
+                try:
+                    await asyncio.to_thread(_github.switch_branch, path, "main")
+                except Exception:
+                    pass
+
+        # ── Stage: Slack report ───────────────────────────────────────────────
+        yield evt({"stage": "sending_slack", "status": "running"})
+        elapsed = round(time.time() - t0, 1)
+        try:
+            tc_summary = "\n".join(f"• {tc.get('test_name','')}" for tc in test_cases) or "No test cases generated"
+            results_summary = "\n".join(
+                f"• {r['portal'].upper()}: {'✅ PASS' if r['status']=='PASS' else '❌ FAIL'} {r.get('url') or ''}"
+                for r in test_results
+            ) or "No tests run"
+            slack_msg = (
+                f"🤖 *QA Run Complete* — <https://zambeel.atlassian.net/browse/{issue_key}|{issue_key}>\n"
+                f"*{summary}*\n\n"
+                f"*Environment:* `{body.env.upper()}`\n"
+                f"*Frontend Branch:* `{body.frontend_branch}`\n"
+                f"*Backend Branch:* `{body.backend_branch}`\n\n"
+                f"*AI-Generated Test Cases:*\n{tc_summary}\n\n"
+                f"*Playwright Results:*\n{results_summary}\n\n"
+                f"*Jira Status → * {'Ready for Review ✅' if all_pass else 'Dev In Progress ❌'}\n"
+                f"*Time:* {elapsed}s"
+            )
+            await asyncio.to_thread(_slack.send_message, slack_msg)
+        except Exception as e:
+            yield evt({"stage": "sending_slack", "status": "error", "message": str(e)})
+        else:
+            yield evt({"stage": "sending_slack", "status": "done"})
+
+        # ── Final result ──────────────────────────────────────────────────────
+        yield evt({
+            "stage": "done",
+            "result": {
+                "issue_key":       issue_key,
+                "env":             body.env,
+                "frontend_branch": body.frontend_branch,
+                "backend_branch":  body.backend_branch,
+                "test_cases":      test_cases,
+                "test_results":    test_results,
+                "all_pass":        all_pass,
+                "new_status":      new_status,
+                "elapsed_seconds": elapsed,
+            },
+        })
+
+    return StreamingResponse(
+        generate(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no", "Connection": "keep-alive"},
+    )
 
 @app.get("/jira/sprints/{project_key}")
 async def get_sprints(project_key: str):
