@@ -36,6 +36,13 @@ REPORTS_DIR = _HERE / "reports"
 SCREENSHOTS_DIR.mkdir(exist_ok=True)
 REPORTS_DIR.mkdir(exist_ok=True)
 
+# Load app context for Claude prompts (template Sarim fills in)
+_APP_CONTEXT_PATH = Path(__file__).resolve().parent.parent.parent / "app_context.md"
+try:
+    APP_CONTEXT = _APP_CONTEXT_PATH.read_text()
+except Exception:
+    APP_CONTEXT = ""
+
 app.mount("/screenshots", StaticFiles(directory=str(SCREENSHOTS_DIR)), name="screenshots")
 
 REPO_PATHS = {
@@ -307,6 +314,88 @@ async def get_ticket_detail(issue_key: str):
         ],
     }
 
+def _build_qa_report(*, issue_key, summary, env, frontend_branch, backend_branch,
+                     test_cases, test_results, all_pass, new_status, elapsed):
+    ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    lines = [
+        f"# QA Report — {issue_key}",
+        f"**{summary}**",
+        f"",
+        f"| Field | Value |",
+        f"|-------|-------|",
+        f"| Ticket | [{issue_key}](https://zambeel.atlassian.net/browse/{issue_key}) |",
+        f"| Environment | `{env.upper()}` |",
+        f"| Frontend Branch | `{frontend_branch}` |",
+        f"| Backend Branch | `{backend_branch}` |",
+        f"| Result | {'✅ All Passed' if all_pass else '❌ Some Failed'} |",
+        f"| Jira Status | {new_status} |",
+        f"| Elapsed | {elapsed}s |",
+        f"| Generated | {ts} |",
+        f"",
+        f"---",
+        f"",
+        f"## Portal Test Results",
+        f"",
+    ]
+    for r in test_results:
+        icon = "✅" if r["status"] == "PASS" else "❌"
+        lines += [
+            f"### {icon} {r['portal'].capitalize()} — {r['status']}",
+            f"- **URL:** {r.get('url') or '—'}",
+            f"- **Load time:** {r.get('load_time_ms', 0)}ms",
+            f"- **Console errors:** {len(r.get('console_errors') or [])}",
+        ]
+        for err in (r.get("console_errors") or [])[:3]:
+            lines.append(f"  - `{err[:150]}`")
+        evidence = r.get("feature_evidence") or []
+        if evidence:
+            lines.append(f"- **Feature evidence:**")
+            for e in evidence:
+                mark = "✓" if e.get("found") else "✗"
+                lines.append(f"  - {mark} {e['description']} — `{e['selector']}` — {e.get('detail','')}")
+        shots = r.get("screenshots") or []
+        if shots:
+            lines.append(f"- **Step screenshots:**")
+            for s in shots:
+                lines.append(f"  - `{s['filename']}` — {s['label']}")
+        nav = r.get("nav_elements_found") or []
+        if nav:
+            lines.append(f"- **Nav elements found:** {', '.join(f'`{s}`' for s in nav)}")
+        log = r.get("execution_log") or []
+        if log:
+            lines += ["", "<details><summary>Execution log</summary>", ""]
+            lines.append("| Step | Result | Detail |")
+            lines.append("|------|--------|--------|")
+            for entry in log:
+                detail = (entry.get("detail") or "").replace("|", "\\|")[:120]
+                lines.append(f"| {entry['step'][:80]} | {entry['result']} | {detail} |")
+            lines += ["", "</details>", ""]
+        lines.append("")
+
+    if test_cases:
+        lines += [
+            "---",
+            "",
+            f"## AI-Generated Test Cases ({len(test_cases)} total)",
+            "",
+        ]
+        for i, tc in enumerate(test_cases, 1):
+            lines += [
+                f"### {i}. {tc.get('test_name', 'Test')}",
+                f"_{tc.get('description', '')}_",
+                f"",
+            ]
+            for s in (tc.get("steps") or []):
+                lines.append(f"- {s}")
+            lines.append(f"")
+            lines.append(f"**Expected:** {tc.get('expected_result', '')}")
+            if tc.get("evidence_selector"):
+                lines.append(f"**Evidence selector:** `{tc['evidence_selector']}`")
+            lines.append("")
+
+    return "\n".join(lines)
+
+
 @app.post("/jira/tickets/{issue_key}/run-qa")
 async def run_qa_endpoint(issue_key: str, body: RunQABody):
 
@@ -389,11 +478,13 @@ async def run_qa_endpoint(issue_key: str, body: RunQABody):
         yield evt({"stage": "generating_test_cases", "status": "running"})
         yield f": keepalive\n\n"
         portal_ctx = body.portal if body.portal else "all three portals (Seller, Admin, Agency)"
+        app_ctx_section = f"\n\n## App Context\n{APP_CONTEXT[:3000]}" if APP_CONTEXT else ""
         prompt = (
             f"You are a QA engineer for Zambeel, an e-commerce dropshipping platform with three portals:\n"
             f"- Seller Portal: sellers manage products, orders, inventory, and storefronts\n"
             f"- Admin Portal: platform admins manage orders, users, commissions, and settings\n"
-            f"- Agency Portal: agencies manage multiple seller accounts under their umbrella\n\n"
+            f"- Agency Portal: agencies manage multiple seller accounts under their umbrella\n"
+            f"{app_ctx_section}\n\n"
             f"Jira Ticket: {issue_key}\n"
             f"Summary: {summary}\n"
             f"Description: {description[:1500] or 'No description'}\n"
@@ -401,9 +492,12 @@ async def run_qa_endpoint(issue_key: str, body: RunQABody):
             f"Portal(s) under test: {portal_ctx}\n"
             f"Environment: {body.env}\n\n"
             f"Generate 5-8 specific, actionable Playwright test cases for this ticket. "
+            f"For each test case, also include an 'evidence_selector' field: the exact CSS selector "
+            f"or UI element that proves the feature was tested (e.g. 'input[min=\"0\"]' for a zero "
+            f"commission test, or 'Found input field with min=0 attribute'). "
             f"Return ONLY a raw JSON array (no markdown, no code fences). "
             f"Each element must have: test_name (string), description (string), "
-            f"steps (array of strings), expected_result (string)."
+            f"steps (array of strings), expected_result (string), evidence_selector (string)."
         )
         try:
             msg = await asyncio.to_thread(
@@ -442,14 +536,32 @@ async def run_qa_endpoint(issue_key: str, body: RunQABody):
             yield f": keepalive\n\n"
             try:
                 status, res = await asyncio.to_thread(_playwright.run_tests, portal, run_env)
+                r = res if isinstance(res, dict) else {}
+                screenshots_for_portal = r.get("screenshots", [])
                 test_results.append({
-                    "portal": portal, "status": status,
-                    "message": res.get("message", "") if isinstance(res, dict) else str(res),
-                    "url": res.get("url") if isinstance(res, dict) else None,
-                    "console_errors": res.get("console_errors", []) if isinstance(res, dict) else [],
+                    "portal":           portal,
+                    "status":           status,
+                    "message":          r.get("message", "") or str(res),
+                    "url":              r.get("url"),
+                    "console_errors":   r.get("console_errors", []),
+                    "load_time_ms":     r.get("load_time_ms", 0),
+                    "nav_elements_found": r.get("nav_elements_found", []),
+                    "screenshots":      [
+                        {**s, "url": f"/screenshots/{s['filename']}"}
+                        for s in screenshots_for_portal
+                        if s.get("filename")
+                    ],
+                    "execution_log":    r.get("execution_log", []),
+                    "feature_evidence": r.get("feature_evidence", []),
                 })
             except Exception as e:
-                test_results.append({"portal": portal, "status": "ERROR", "message": str(e), "url": None, "console_errors": []})
+                test_results.append({
+                    "portal": portal, "status": "ERROR", "message": str(e),
+                    "url": None, "console_errors": [], "load_time_ms": 0,
+                    "nav_elements_found": [], "screenshots": [],
+                    "execution_log": [{"step": "Run test", "result": "fail", "detail": str(e)}],
+                    "feature_evidence": [],
+                })
             yield evt({"stage": "running_tests", "status": "progress",
                        "portal": portal, "result": test_results[-1]["status"]})
         all_pass = bool(test_results) and all(r["status"] == "PASS" for r in test_results)
@@ -469,16 +581,39 @@ async def run_qa_endpoint(issue_key: str, body: RunQABody):
                 if all_pass:
                     comment_lines = [f"✅ *QA Passed* — {body.env.upper()} | fe:`{body.frontend_branch}` be:`{body.backend_branch}`"]
                     for r in test_results:
-                        comment_lines.append(f"• {r['portal']}: PASS — {r.get('url') or ''}")
+                        comment_lines.append(f"• {r['portal'].upper()}: PASS — {r.get('url') or ''} | load: {r.get('load_time_ms',0)}ms")
+                        evidence = r.get("feature_evidence") or []
+                        found_ev = [e for e in evidence if e.get("found")]
+                        if found_ev:
+                            comment_lines.append(f"  Evidence: " + "; ".join(
+                                f"{e['description']} ({e.get('detail','found')})"
+                                for e in found_ev[:4]
+                            ))
+                        shots = r.get("screenshots") or []
+                        if shots:
+                            comment_lines.append("  Screenshots: " + ", ".join(
+                                s["filename"] for s in shots
+                            ))
                     if assignee:
                         comment_lines.append(f"\n@{assignee} All tests passing — moving to Ready for Review.")
                 else:
                     comment_lines = [f"❌ *QA Failed* — {body.env.upper()} | fe:`{body.frontend_branch}` be:`{body.backend_branch}`"]
                     for r in test_results:
                         icon = "✅" if r["status"] == "PASS" else "❌"
-                        comment_lines.append(f"• {r['portal']}: {icon} {r['status']} — {str(r.get('message',''))[:200]}")
+                        comment_lines.append(f"• {r['portal'].upper()}: {icon} {r['status']} — {str(r.get('message',''))[:200]}")
                         for err in (r.get("console_errors") or [])[:3]:
-                            comment_lines.append(f"  Console: {str(err)[:120]}")
+                            comment_lines.append(f"  Console error: {str(err)[:120]}")
+                        evidence = r.get("feature_evidence") or []
+                        found_ev = [e for e in evidence if e.get("found")]
+                        if found_ev:
+                            comment_lines.append(f"  Elements found: " + "; ".join(
+                                f"{e['description']}" for e in found_ev[:4]
+                            ))
+                        shots = r.get("screenshots") or []
+                        if shots:
+                            comment_lines.append("  Screenshots: " + ", ".join(
+                                s["filename"] for s in shots
+                            ))
                     if assignee:
                         comment_lines.append(f"\n@{assignee} Tests failing — moving back to Dev In Progress.")
                 await asyncio.to_thread(_jira.add_comment, issue_key, "\n".join(comment_lines))
@@ -523,6 +658,20 @@ async def run_qa_endpoint(issue_key: str, body: RunQABody):
         else:
             yield evt({"stage": "sending_slack", "status": "done"})
 
+        # ── Generate markdown QA report ───────────────────────────────────────
+        report_markdown = _build_qa_report(
+            issue_key=issue_key, summary=summary, env=body.env,
+            frontend_branch=body.frontend_branch, backend_branch=body.backend_branch,
+            test_cases=test_cases, test_results=test_results,
+            all_pass=all_pass, new_status=new_status, elapsed=elapsed,
+        )
+        try:
+            report_ts   = datetime.now().strftime("%Y%m%d_%H%M%S")
+            report_file = REPORTS_DIR / f"qa_{issue_key}_{report_ts}.md"
+            report_file.write_text(report_markdown)
+        except Exception:
+            pass
+
         # ── Final result ──────────────────────────────────────────────────────
         yield evt({
             "stage": "done",
@@ -536,6 +685,7 @@ async def run_qa_endpoint(issue_key: str, body: RunQABody):
                 "all_pass":        all_pass,
                 "new_status":      new_status,
                 "elapsed_seconds": elapsed,
+                "report_markdown": report_markdown,
             },
         })
 

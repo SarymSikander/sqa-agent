@@ -1227,6 +1227,91 @@
       transition: opacity .15s;
     }
     .qa-setup-run-btn:hover { opacity: .9; }
+
+    /* ── QA Evidence / Metrics ──────────────────────────────────────────────── */
+    .qa-metrics-row {
+      display: flex; gap: 0;
+      border: 1px solid var(--border); border-radius: var(--r-sm);
+      overflow: hidden; margin-bottom: 14px;
+    }
+    .qa-metric {
+      flex: 1; display: flex; flex-direction: column; align-items: center;
+      padding: 8px 4px;
+      border-right: 1px solid var(--border);
+      background: var(--card);
+    }
+    .qa-metric:last-child { border-right: none; }
+    .qa-metric-val { font-size: 15px; font-weight: 700; color: var(--text); line-height: 1.2; }
+    .qa-metric-lbl { font-size: 10px; color: var(--text3); margin-top: 2px; text-align: center; }
+
+    /* Step screenshots strip */
+    .qa-shot-strip {
+      display: flex; gap: 8px; overflow-x: auto; padding: 6px 0;
+      scrollbar-width: thin;
+    }
+    .qa-shot-item { flex-shrink: 0; text-align: center; }
+    .qa-shot-thumb {
+      width: 100px; height: 64px; object-fit: cover;
+      border-radius: var(--r-xs); border: 1px solid var(--border);
+      display: block; background: var(--bg2);
+      transition: transform .15s;
+    }
+    .qa-shot-thumb:hover { transform: scale(1.05); }
+    .qa-shot-label {
+      font-size: 10px; color: var(--text3); margin-top: 4px;
+      max-width: 100px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+
+    /* Feature evidence */
+    .qa-ev-list { display: flex; flex-direction: column; gap: 3px; margin-bottom: 6px; }
+    .qa-ev-row {
+      display: grid; grid-template-columns: 16px 1fr auto;
+      gap: 6px; align-items: baseline;
+      font-size: 11.5px;
+    }
+    .qa-ev-desc { color: var(--text2); font-weight: 500; }
+    .qa-ev-detail {
+      font-family: 'JetBrains Mono', monospace; font-size: 10px;
+      color: var(--text3); max-width: 160px; overflow: hidden;
+      text-overflow: ellipsis; white-space: nowrap;
+    }
+
+    /* Execution log (collapsible) */
+    .qa-log-details { margin-top: 4px; }
+    .qa-log-summary {
+      font-size: 11.5px; color: var(--text3); cursor: pointer;
+      padding: 4px 0; list-style: none; user-select: none;
+    }
+    .qa-log-summary:hover { color: var(--text2); }
+    .qa-log-table {
+      margin-top: 6px;
+      border: 1px solid var(--border); border-radius: var(--r-xs);
+      overflow: hidden; font-size: 11px;
+    }
+    .qa-log-row {
+      display: grid; grid-template-columns: 60px 1fr auto;
+      gap: 8px; padding: 5px 8px; border-bottom: 1px solid var(--border);
+      align-items: baseline;
+    }
+    .qa-log-row:last-child { border-bottom: none; }
+    .qa-log-row.qa-log-pass   { background: rgba(16,185,129,.04); }
+    .qa-log-row.qa-log-found  { background: rgba(16,185,129,.04); }
+    .qa-log-row.qa-log-fail   { background: rgba(239,68,68,.04); }
+    .qa-log-row.qa-log-warn   { background: rgba(245,158,11,.04); }
+    .qa-log-status {
+      font-weight: 700; font-size: 10px; text-transform: uppercase;
+      color: var(--text3);
+    }
+    .qa-log-row.qa-log-pass   .qa-log-status,
+    .qa-log-row.qa-log-found  .qa-log-status { color: var(--success); }
+    .qa-log-row.qa-log-fail   .qa-log-status { color: var(--error); }
+    .qa-log-row.qa-log-warn   .qa-log-status { color: #d97706; }
+    .qa-log-step  { color: var(--text2); }
+    .qa-log-detail {
+      font-family: 'JetBrains Mono', monospace; font-size: 10px;
+      color: var(--text3); max-width: 160px; overflow: hidden;
+      text-overflow: ellipsis; white-space: nowrap;
+    }
   </style>
 </head>
 <body>
@@ -1677,22 +1762,24 @@
         </div>
       </div>
 
-      <div class="rqa-field">
-        <label>Frontend Branch</label>
-        <input id="rqa-fe-input" type="text" placeholder="e.g. OMS-215" />
-        <label class="rqa-checkbox-row">
-          <input type="checkbox" id="rqa-fe-same" checked onchange="rqaFeSameToggle()">
-          Same as ticket number
-        </label>
-      </div>
+      <div id="rqa-branch-section">
+        <div class="rqa-field">
+          <label>Frontend Branch</label>
+          <input id="rqa-fe-input" type="text" placeholder="e.g. OMS-215" />
+          <label class="rqa-checkbox-row">
+            <input type="checkbox" id="rqa-fe-same" checked onchange="rqaFeSameToggle()">
+            Same as ticket number
+          </label>
+        </div>
 
-      <div class="rqa-field">
-        <label>Backend Branch</label>
-        <input id="rqa-be-input" type="text" value="main" />
-        <label class="rqa-checkbox-row">
-          <input type="checkbox" id="rqa-be-main" checked onchange="rqaBeMainToggle()">
-          Keep on main
-        </label>
+        <div class="rqa-field">
+          <label>Backend Branch</label>
+          <input id="rqa-be-input" type="text" value="main" />
+          <label class="rqa-checkbox-row">
+            <input type="checkbox" id="rqa-be-main" checked onchange="rqaBeMainToggle()">
+            Keep on main
+          </label>
+        </div>
       </div>
 
       <div class="rqa-field">
@@ -2592,6 +2679,7 @@ function openRunQAModal() {
   document.getElementById('rqa-be-input').value    = 'main';
   document.getElementById('rqa-be-input').disabled = true;
   document.getElementById('rqa-portal').value      = '';
+  rqaEnvChanged(); // hide branch section for staging (default)
   document.getElementById('run-qa-modal').classList.add('open');
 }
 
@@ -2602,8 +2690,10 @@ function closeRunQAModal() {
 
 function rqaEnvChanged() {
   const isLocal = document.querySelector('input[name="rqa-env"]:checked').value === 'local';
-  const warn = document.getElementById('rqa-local-warning');
-  if (warn) { warn.style.display = isLocal ? 'flex' : 'none'; }
+  const warn    = document.getElementById('rqa-local-warning');
+  const branch  = document.getElementById('rqa-branch-section');
+  if (warn)   { warn.style.display   = isLocal ? 'flex' : 'none'; }
+  if (branch) { branch.style.display = isLocal ? ''     : 'none'; }
 }
 
 function rqaFeSameToggle() {
@@ -2659,14 +2749,20 @@ function _setQAStage(id, status, subText) {
 }
 
 async function confirmRunQA() {
-  const env            = document.querySelector('input[name="rqa-env"]:checked').value;
-  const frontend_branch = document.getElementById('rqa-fe-input').value.trim();
-  const backend_branch  = document.getElementById('rqa-be-input').value.trim();
+  const env    = document.querySelector('input[name="rqa-env"]:checked').value;
+  const isLocal = env === 'local';
+  // For staging the branch section is hidden — use sensible defaults
+  const frontend_branch = isLocal
+    ? document.getElementById('rqa-fe-input').value.trim()
+    : (_rqaCurrentKey || 'main');
+  const backend_branch  = isLocal
+    ? document.getElementById('rqa-be-input').value.trim()
+    : 'main';
   const portal          = document.getElementById('rqa-portal').value;
   const key             = _rqaCurrentKey;
-  if (!key)             { toast('No ticket selected', 'error'); return; }
-  if (!frontend_branch) { toast('Enter a frontend branch', 'warn'); return; }
-  if (!backend_branch)  { toast('Enter a backend branch', 'warn'); return; }
+  if (!key) { toast('No ticket selected', 'error'); return; }
+  if (isLocal && !frontend_branch) { toast('Enter a frontend branch', 'warn'); return; }
+  if (isLocal && !backend_branch)  { toast('Enter a backend branch',  'warn'); return; }
 
   btnLoad('rqa-confirm-btn', true);
   closeRunQAModal();
@@ -2876,39 +2972,126 @@ function _showQAFinalResult(result, error) {
     return;
   }
   if (!result) return;
-  const { test_cases = [], test_results = [], all_pass, new_status, elapsed_seconds } = result;
+  const { test_cases = [], test_results = [], all_pass, new_status, elapsed_seconds, report_markdown = '' } = result;
 
   const statusBadge = all_pass
     ? '<span class="badge badge-pass"><span class="dot"></span> All Passed</span>'
     : '<span class="badge badge-fail"><span class="dot"></span> Some Failed</span>';
 
-  const resultRows = test_results.map(r => `
-    <div class="qa-result-row">
-      <span style="font-size:15px">${r.status === 'PASS' ? '✅' : '❌'}</span>
-      <span style="font-weight:600;text-transform:capitalize">${esc(r.portal)}</span>
-      <span class="text-muted" style="font-size:11.5px;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(r.url || r.message || '')}</span>
-    </div>`).join('');
+  // aggregate metrics across all portals
+  let totalSteps = 0, totalFound = 0, totalNotFound = 0, totalErrors = 0, maxLoad = 0;
+  test_results.forEach(r => {
+    totalSteps    += (r.execution_log    || []).length;
+    totalErrors   += (r.console_errors  || []).length;
+    totalFound    += (r.feature_evidence || []).filter(e => e.found).length;
+    totalNotFound += (r.feature_evidence || []).filter(e => !e.found).length;
+    if ((r.load_time_ms || 0) > maxLoad) maxLoad = r.load_time_ms;
+  });
 
+  const metricsRow = `
+    <div class="qa-metrics-row">
+      <div class="qa-metric"><span class="qa-metric-val">${totalSteps}</span><span class="qa-metric-lbl">steps</span></div>
+      <div class="qa-metric"><span class="qa-metric-val" style="color:var(--success)">${totalFound}</span><span class="qa-metric-lbl">found</span></div>
+      <div class="qa-metric"><span class="qa-metric-val" style="color:var(--text3)">${totalNotFound}</span><span class="qa-metric-lbl">not found</span></div>
+      <div class="qa-metric"><span class="qa-metric-val" style="color:${totalErrors > 0 ? 'var(--error)' : 'var(--text3)'}">${totalErrors}</span><span class="qa-metric-lbl">console errs</span></div>
+      <div class="qa-metric"><span class="qa-metric-val">${maxLoad}ms</span><span class="qa-metric-lbl">page load</span></div>
+    </div>`;
+
+  // per-portal expanded rows
+  const portalSections = test_results.map(r => {
+    const icon = r.status === 'PASS' ? '✅' : '❌';
+
+    // step screenshots strip
+    const shots = (r.screenshots || []);
+    const shotStrip = shots.length ? `
+      <div class="qa-shot-strip">
+        ${shots.map(s => `
+          <div class="qa-shot-item">
+            <a href="${esc(API_BASE + s.url)}" target="_blank" title="${esc(s.label)}">
+              <img src="${esc(API_BASE + s.url)}" alt="${esc(s.label)}" class="qa-shot-thumb" loading="lazy" />
+            </a>
+            <div class="qa-shot-label">${esc(s.label)}</div>
+          </div>`).join('')}
+      </div>` : '';
+
+    // feature evidence
+    const evidence = (r.feature_evidence || []);
+    const evRows = evidence.length ? `
+      <div class="qa-ev-list">
+        ${evidence.map(e => `
+          <div class="qa-ev-row">
+            <span style="color:${e.found ? 'var(--success)' : 'var(--text3)'}">
+              ${e.found ? '✓' : '—'}
+            </span>
+            <span class="qa-ev-desc">${esc(e.description)}</span>
+            <span class="qa-ev-detail">${esc(e.detail || '')}</span>
+          </div>`).join('')}
+      </div>` : '';
+
+    // collapsible execution log
+    const log = (r.execution_log || []);
+    const logHTML = log.length ? `
+      <details class="qa-log-details">
+        <summary class="qa-log-summary">Execution log (${log.length} steps)</summary>
+        <div class="qa-log-table">
+          ${log.map(entry => `
+            <div class="qa-log-row qa-log-${entry.result}">
+              <span class="qa-log-status">${entry.result}</span>
+              <span class="qa-log-step">${esc(entry.step)}</span>
+              ${entry.detail ? `<span class="qa-log-detail">${esc(entry.detail)}</span>` : ''}
+            </div>`).join('')}
+        </div>
+      </details>` : '';
+
+    return `
+      <div class="qa-result-row" style="flex-direction:column;align-items:stretch;padding:12px 14px;gap:8px">
+        <div style="display:flex;align-items:center;gap:10px">
+          <span style="font-size:15px">${icon}</span>
+          <span style="font-weight:600;text-transform:capitalize;flex:1">${esc(r.portal)}</span>
+          <span style="font-size:11px;color:var(--text3)">${r.load_time_ms || 0}ms</span>
+          ${r.status !== 'PASS' ? `<span style="font-size:11.5px;color:var(--error);max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(r.message||'')}">${esc(r.message||'')}</span>` : `<span style="font-size:11px;color:var(--text3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:180px">${esc(r.url||'')}</span>`}
+        </div>
+        ${shotStrip}
+        ${evRows ? `<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text3);margin-top:2px">Feature Evidence</div>${evRows}` : ''}
+        ${logHTML}
+      </div>`;
+  }).join('');
+
+  // test cases (up to 4)
   const tcRows = test_cases.slice(0, 4).map(tc => `
     <div class="qa-tc-item">
       <div class="qa-tc-name">${esc(tc.test_name || '')}</div>
       <div class="qa-tc-desc">${esc(tc.description || '')}</div>
+      ${tc.evidence_selector ? `<div style="font-size:10.5px;color:var(--text3);margin-top:4px;font-family:monospace">Evidence: ${esc(tc.evidence_selector)}</div>` : ''}
     </div>`).join('');
+
+  // full report button handler — stash the markdown and show in modal
+  window._qaReportMarkdown = report_markdown;
 
   area.innerHTML = `
     <div style="margin-top:20px">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
         ${statusBadge}
         <span style="font-size:11px;color:var(--text3)">${elapsed_seconds}s · Jira → ${esc(new_status || '')}</span>
       </div>
-      ${resultRows ? `<div class="qa-results-block"><div class="qa-results-header">Portal Results</div>${resultRows}</div>` : ''}
-      ${tcRows ? `<div class="panel-label" style="margin:14px 0 8px">Generated Test Cases</div><div class="qa-tc-list">${tcRows}${test_cases.length > 4 ? `<div style="color:var(--text3);font-size:12px;text-align:center">+${test_cases.length-4} more in Jira comments</div>` : ''}</div>` : ''}
-      <button class="btn btn-secondary btn-sm w100" style="justify-content:center;margin-top:14px" onclick="openJiraPanel('${esc(result.issue_key)}')">
-        ↻ Refresh Ticket
-      </button>
+      ${metricsRow}
+      ${portalSections ? `<div class="qa-results-block" style="margin-top:14px"><div class="qa-results-header">Portal Results</div>${portalSections}</div>` : ''}
+      ${tcRows ? `<div class="panel-label" style="margin:14px 0 8px">Generated Test Cases</div><div class="qa-tc-list">${tcRows}${test_cases.length > 4 ? `<div style="color:var(--text3);font-size:12px;text-align:center;margin-top:6px">+${test_cases.length-4} more in Jira comments</div>` : ''}</div>` : ''}
+      <div style="display:flex;gap:8px;margin-top:14px">
+        <button class="btn btn-secondary btn-sm" style="justify-content:center;flex:1" onclick="openJiraPanel('${esc(result.issue_key)}')">↻ Refresh Ticket</button>
+        ${report_markdown ? `<button class="btn btn-secondary btn-sm" style="justify-content:center;flex:1" onclick="_showQAReport()">📄 View Full Report</button>` : ''}
+      </div>
     </div>`;
   area.classList.remove('hidden');
   toast(all_pass ? `QA passed — ${result.issue_key} moved to Ready for Review` : `QA complete — some tests failed`, all_pass ? 'success' : 'warn', 6000);
+}
+
+function _showQAReport() {
+  const md = window._qaReportMarkdown || '';
+  document.getElementById('modal-title').textContent = 'QA Report';
+  document.getElementById('modal-body').innerHTML =
+    `<pre style="white-space:pre-wrap;font-size:12px;line-height:1.6;max-height:70vh;overflow-y:auto;font-family:'JetBrains Mono',monospace;color:var(--text2)">${esc(md)}</pre>`;
+  document.getElementById('modal').classList.add('open');
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
