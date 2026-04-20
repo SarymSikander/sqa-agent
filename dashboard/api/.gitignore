@@ -3,6 +3,5 @@ __pycache__/
 *.pyo
 .env
 .claude/
-auth/
 screenshots/
 reports/
