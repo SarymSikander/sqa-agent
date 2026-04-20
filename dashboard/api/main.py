@@ -346,31 +346,39 @@ async def run_qa_endpoint(issue_key: str, body: RunQABody):
         yield evt({"stage": "analysing_ticket", "status": "done"})
 
         # ── Stage: switch branches (local only) ────────────────────────────────
+        run_env = body.env  # may be overridden to 'staging' if repos unavailable
         if body.env == "local":
             yield evt({"stage": "switching_branches", "status": "running"})
             fe_path = REPO_PATHS.get("frontend", "")
             be_path = REPO_PATHS.get("backend", "")
-            try:
-                await asyncio.to_thread(_github.switch_branch, fe_path, body.frontend_branch)
-            except Exception as e:
-                yield evt({"stage": "switching_branches", "status": "error",
-                           "message": f"Frontend branch '{body.frontend_branch}' not found: {e}"})
-                yield evt({"stage": "done", "error": str(e)})
-                return
-            try:
-                await asyncio.to_thread(_github.switch_branch, be_path, body.backend_branch)
-            except Exception as e:
-                # revert frontend
+            repos_available = fe_path and os.path.isdir(fe_path) and be_path and os.path.isdir(be_path)
+            if not repos_available:
+                run_env = "staging"
+                yield evt({
+                    "stage": "switching_branches", "status": "skipped",
+                    "message": "Branch switching skipped — local repos not available on cloud server. Running tests on staging instead.",
+                })
+            else:
                 try:
-                    await asyncio.to_thread(_github.switch_branch, fe_path, "main")
-                except Exception:
-                    pass
-                yield evt({"stage": "switching_branches", "status": "error",
-                           "message": f"Backend branch '{body.backend_branch}' not found: {e}"})
-                yield evt({"stage": "done", "error": str(e)})
-                return
-            branches_switched = True
-            yield evt({"stage": "switching_branches", "status": "done"})
+                    await asyncio.to_thread(_github.switch_branch, fe_path, body.frontend_branch)
+                except Exception as e:
+                    yield evt({"stage": "switching_branches", "status": "error",
+                               "message": f"Frontend branch '{body.frontend_branch}' not found: {e}"})
+                    yield evt({"stage": "done", "error": str(e)})
+                    return
+                try:
+                    await asyncio.to_thread(_github.switch_branch, be_path, body.backend_branch)
+                except Exception as e:
+                    try:
+                        await asyncio.to_thread(_github.switch_branch, fe_path, "main")
+                    except Exception:
+                        pass
+                    yield evt({"stage": "switching_branches", "status": "error",
+                               "message": f"Backend branch '{body.backend_branch}' not found: {e}"})
+                    yield evt({"stage": "done", "error": str(e)})
+                    return
+                branches_switched = True
+                yield evt({"stage": "switching_branches", "status": "done"})
 
         # ── Stage: generate test cases ─────────────────────────────────────────
         yield evt({"stage": "generating_test_cases", "status": "running"})
@@ -428,7 +436,7 @@ async def run_qa_endpoint(issue_key: str, body: RunQABody):
         for portal in portals:
             yield f": keepalive\n\n"
             try:
-                status, res = await asyncio.to_thread(_playwright.run_tests, portal, body.env)
+                status, res = await asyncio.to_thread(_playwright.run_tests, portal, run_env)
                 test_results.append({
                     "portal": portal, "status": status,
                     "message": res.get("message", "") if isinstance(res, dict) else str(res),
@@ -490,7 +498,7 @@ async def run_qa_endpoint(issue_key: str, body: RunQABody):
             slack_msg = (
                 f"🤖 *QA Run Complete* — <https://zambeel.atlassian.net/browse/{issue_key}|{issue_key}>\n"
                 f"*{summary}*\n\n"
-                f"*Environment:* `{body.env.upper()}`\n"
+                f"*Environment:* `{run_env.upper()}`{' *(local repos unavailable, ran on staging)*' if run_env != body.env else ''}\n"
                 f"*Frontend Branch:* `{body.frontend_branch}`\n"
                 f"*Backend Branch:* `{body.backend_branch}`\n\n"
                 f"*AI-Generated Test Cases:*\n{tc_summary}\n\n"
