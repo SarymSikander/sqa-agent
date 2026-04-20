@@ -16,7 +16,8 @@
       "Bash(wait)",
       "Bash(pkill -f \"uvicorn main:app\")",
       "Bash(git init *)",
-      "Bash(git *)"
+      "Bash(git *)",
+      "Bash(grep -v \"^$\")"
     ]
   }
 }
