@@ -124,6 +124,14 @@ def debug_files():
         }
     return result
 
+# ── /debug/auth ───────────────────────────────────────────────────────────────
+
+@app.get("/debug/auth")
+def debug_auth():
+    if os.path.exists("/app/auth"):
+        return {"source": "/app/auth", "files": os.listdir("/app/auth")}
+    return {"source": "/app", "files": os.listdir("/app")}
+
 # ── /health ───────────────────────────────────────────────────────────────────
 
 @app.get("/health")
