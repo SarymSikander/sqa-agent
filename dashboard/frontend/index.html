@@ -2683,9 +2683,11 @@ async function confirmRunQA() {
   btnLoad('jira-run-qa-btn', false);
 }
 
-async function _runQAStream(key, env, fe, be, portal) {
+async function _runQAStream(key, env, fe, be, portal, apiBase) {
+  const base = apiBase || API_BASE;
+  console.log('[RunQA] stream start', { key, env, fe, be, portal, base });
   try {
-    const resp = await fetch(`${API_BASE}/jira/tickets/${key}/run-qa`, {
+    const resp = await fetch(`${base}/jira/tickets/${key}/run-qa`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ env, frontend_branch: fe, backend_branch: be, portal }),
@@ -2721,13 +2723,19 @@ async function _runQAStream(key, env, fe, be, portal) {
 }
 
 async function runQALocal() {
-  if (!_rqaLocalSetupData) return;
+  if (!_rqaLocalSetupData) {
+    console.warn('[RunQA] _rqaLocalSetupData is null — cannot run local QA');
+    toast('Setup data missing — please reopen the ticket and run QA again', 'error');
+    return;
+  }
   const { issue_key, frontend_branch, backend_branch, portal } = _rqaLocalSetupData;
+  console.log('[RunQA] runQALocal called', { issue_key, frontend_branch, backend_branch, portal });
   Object.keys(_qaPortalProgress).forEach(k => delete _qaPortalProgress[k]);
   document.getElementById('jira-panel-body').innerHTML = _buildProgressHTML('local', issue_key);
   document.getElementById('jira-panel-summary').textContent = 'QA Running…';
   btnLoad('jira-run-qa-btn', true);
-  await _runQAStream(issue_key, 'local', frontend_branch, backend_branch, portal);
+  // Use local agent running at localhost:8000 — HuggingFace can't reach local repos
+  await _runQAStream(issue_key, 'local', frontend_branch, backend_branch, portal, 'http://localhost:8000');
   btnLoad('jira-run-qa-btn', false);
 }
 
@@ -2753,7 +2761,7 @@ async function checkQAServer(url, statusId) {
 function _showLocalSetupChecklist(data) {
   _rqaLocalSetupData = data;
   const { issue_key, frontend_branch, backend_branch, portal } = data;
-  const beCmd = `cd ~/Documents/GitHub/zambeel-api && git checkout ${backend_branch} && npm run dev`;
+  const beCmd = `cd ~/Documents/GitHub/zambeel-api && git checkout ${backend_branch} && npm run server`;
   const feCmd = `cd ~/Documents/GitHub/zambeel-fe && git checkout ${frontend_branch} && npm run dev`;
 
   document.getElementById('jira-panel-body').innerHTML = `
