@@ -42,6 +42,7 @@ def generate_health_report(env):
     passed  = [p for p, (s, _) in test_results.items() if s == "PASS"]
     failed  = [p for p, (s, _) in test_results.items() if s == "FAIL"]
     overall = "PASS" if not failed else "FAIL"
+    health_pct = int(len(passed) / len(PORTALS) * 100)
 
     # ------------------------------------------------------------------
     # 2. DB health (skip gracefully if credentials are missing)
@@ -76,24 +77,47 @@ def generate_health_report(env):
         f"",
         f"**Generated:** {ts_label}  ",
         f"**Environment:** {env}  ",
-        f"**Overall Status:** {'✅ PASS' if overall == 'PASS' else '❌ FAIL'}",
+        f"**Overall Status:** {'✅ PASS' if overall == 'PASS' else '❌ FAIL'}  ",
+        f"**Health Score:** {health_pct}%  ",
+        f"**Summary:** {len(passed)}/{len(PORTALS)} portals passed"
+        + (f" — Failed: {', '.join(failed)}" if failed else ""),
         f"",
         f"---",
         f"",
         f"## Playwright Login Tests",
         f"",
-        f"| Portal | Status | Detail |",
-        f"|--------|--------|--------|",
+        f"| Portal | Status | URL | Console Errors | Nav Check | Load Time |",
+        f"|--------|--------|-----|---------------|-----------|-----------|",
     ]
+
     for portal in PORTALS:
-        status, msg = test_results[portal]
+        status, result = test_results[portal]
         icon = "✅" if status == "PASS" else "❌"
-        lines.append(f"| {portal} | {icon} {status} | {msg} |")
+        url = result.get("url") or "—"
+        err_count = len(result.get("console_errors", []))
+        err_cell = f"⚠️ {err_count}" if err_count else "✅ 0"
+        nav_found = result.get("nav_elements_found", [])
+        nav_cell = f"✅ {len(nav_found)} elements" if nav_found else ("—" if status == "FAIL" else "⚠️ none")
+        load_ms = result.get("load_time_ms", 0)
+        load_cell = f"{load_ms:,}ms" if load_ms else "—"
+        lines.append(f"| {portal} | {icon} {status} | `{url}` | {err_cell} | {nav_cell} | {load_cell} |")
+
+    # Console error detail section
+    any_errors = any(len(r.get("console_errors", [])) > 0 for _, r in test_results.values())
+    if any_errors:
+        lines += ["", "### Console Errors Detail", ""]
+        for portal in PORTALS:
+            _, result = test_results[portal]
+            errs = result.get("console_errors", [])
+            if errs:
+                lines.append(f"**{portal}:**")
+                for err in errs[:5]:
+                    lines.append(f"- `{err}`")
+                if len(errs) > 5:
+                    lines.append(f"- _…and {len(errs) - 5} more_")
+                lines.append("")
 
     lines += [
-        f"",
-        f"**Summary:** {len(passed)}/{len(PORTALS)} passed"
-        + (f" — Failed: {', '.join(failed)}" if failed else ""),
         f"",
         f"---",
         f"",

@@ -140,12 +140,16 @@ async def run_tests(body: RunTestsBody):
     portals = [body.portal] if body.portal else ["seller", "admin", "agency"]
     results = []
     for portal in portals:
-        status, message = await asyncio.to_thread(_playwright.run_tests, portal, body.env)
+        status, result = await asyncio.to_thread(_playwright.run_tests, portal, body.env)
         results.append({
             "portal": portal,
             "env": body.env,
             "status": status,
-            "message": message,
+            "message": result.get("message", "") if isinstance(result, dict) else str(result),
+            "url": result.get("url") if isinstance(result, dict) else None,
+            "console_errors": result.get("console_errors", []) if isinstance(result, dict) else [],
+            "nav_elements_found": result.get("nav_elements_found", []) if isinstance(result, dict) else [],
+            "load_time_ms": result.get("load_time_ms") if isinstance(result, dict) else None,
             "timestamp": datetime.now().isoformat(),
         })
     return {"results": results}

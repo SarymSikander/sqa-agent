@@ -642,46 +642,6 @@
     .branch-badge:hover  { border-color: var(--g2); background: rgba(124,58,237,0.12); color: #A78BFA; }
     .branch-badge.active { border-color: var(--g2); background: rgba(124,58,237,0.2); color: #A78BFA; font-weight: 600; }
 
-    /* ── DB layout ───────────────────────────────────────────────────────────── */
-    .db-layout { display: grid; grid-template-columns: 210px 1fr; gap: 16px; align-items: start; }
-    .table-list-panel {
-      background: var(--card);
-      border: 1px solid var(--border);
-      border-radius: var(--r);
-      overflow: hidden;
-      max-height: 340px;
-      overflow-y: auto;
-    }
-    .table-list-item {
-      padding: 9px 14px;
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 12px;
-      cursor: pointer;
-      border-bottom: 1px solid var(--border);
-      transition: all .12s;
-      color: var(--text2);
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-    }
-    .table-list-item:last-child { border-bottom: none; }
-    .table-list-item:hover  { background: rgba(0,0,0,0.04); color: var(--text); }
-    .table-list-item.active { background: rgba(124,58,237,0.15); color: #A78BFA; }
-    .table-list-item .tbl-badge {
-      font-size: 10px;
-      background: rgba(0,0,0,0.06);
-      padding: 1px 6px;
-      border-radius: 99px;
-      color: var(--text3);
-    }
-    .db-query-area { display: flex; flex-direction: column; gap: 12px; }
-    .db-query-area textarea {
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 12.5px;
-      min-height: 110px;
-      background: #F9F9FF;
-      line-height: 1.6;
-    }
 
     /* ── Collapsible ─────────────────────────────────────────────────────────── */
     .collapsible-header {
@@ -971,10 +931,6 @@
     <div class="nav-item" data-page="github">
       <span class="nav-icon">🌿</span> GitHub
     </div>
-    <div class="nav-item" data-page="database">
-      <span class="nav-icon">🗄️</span> Database
-    </div>
-
     <div class="nav-section-label" style="margin-top:8px">Insights</div>
     <div class="nav-item" data-page="reports">
       <span class="nav-icon">📊</span> Reports
@@ -1272,44 +1228,6 @@
       </div>
     </section>
 
-    <!-- ══ Database ══════════════════════════════════════════════════════════════ -->
-    <section id="page-database" class="page">
-      <div class="page-inner">
-        <div class="flex-between mb20">
-          <div class="pill-group">
-            <button class="pill active" id="dbenv-staging"    onclick="setDbEnv('staging',this)">Staging</button>
-            <button class="pill"        id="dbenv-production" onclick="setDbEnv('production',this)">Production</button>
-          </div>
-          <button class="btn btn-secondary btn-sm" onclick="dbLoadTables()">Reload Tables</button>
-        </div>
-
-        <div class="db-layout mb16">
-          <div>
-            <div class="section-title mb8">Tables</div>
-            <div class="table-list-panel" id="db-table-list">
-              <div class="table-list-item text-muted">Loading tables…</div>
-            </div>
-          </div>
-          <div class="db-query-area">
-            <div class="section-title">SQL Query Editor</div>
-            <textarea id="db-sql" placeholder="SELECT * FROM orders LIMIT 25;" spellcheck="false"></textarea>
-            <div>
-              <button class="btn btn-primary" id="db-run-btn" onclick="dbRunQuery()">
-                <div class="spin"></div><span class="label">▶ Run Query</span>
-              </button>
-            </div>
-          </div>
-        </div>
-
-        <div class="flex-between mb12">
-          <div class="section-title" style="margin:0">Results <span class="count" id="db-count">0</span></div>
-        </div>
-        <div class="tbl-wrap" id="db-results-wrap">
-          <table><thead><tr><th>Run a query to see results</th></tr></thead><tbody></tbody></table>
-        </div>
-      </div>
-    </section>
-
     <!-- ══ Reports ════════════════════════════════════════════════════════════════ -->
     <section id="page-reports" class="page">
       <div class="page-inner">
@@ -1434,7 +1352,6 @@ const state = {
   ghSelected:   { frontend: null, backend: null },
   testEnv:      'staging',
   testPortal:   '',
-  dbEnv:        'staging',
   testResults:  [],
   jiraRows:     [],
 };
@@ -1480,7 +1397,7 @@ function btnLoad(id, on) {
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 const PAGE_LABELS = {
   overview: 'Overview', tests: 'Tests', jira: 'Jira',
-  github: 'GitHub', database: 'Database', reports: 'Reports', 'pr-review': 'PR Review',
+  github: 'GitHub', reports: 'Reports', 'pr-review': 'PR Review',
 };
 
 function navigate(page) {
@@ -1499,7 +1416,6 @@ function onPageEnter(page) {
   if (page === 'tests')     loadScreenshots();
   if (page === 'github')    { ghLoad('frontend'); ghLoad('backend'); }
   if (page === 'reports')   reportsLoad();
-  if (page === 'database')  dbLoadTables();
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -2012,66 +1928,6 @@ async function ghSwitch(repo) {
     document.getElementById(`gh-current-${repo}`).innerHTML = `⎇ ${esc(branch)}`;
   } catch(e) { toast(e.message, 'error'); }
   finally { btnLoad(btnId, false); }
-}
-
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// ── Database ──────────────────────────────────────────────────────────────────
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-function setDbEnv(env, el) {
-  state.dbEnv = env;
-  document.querySelectorAll('[id^="dbenv-"]').forEach(b => b.classList.remove('active'));
-  el.classList.add('active');
-  dbLoadTables();
-}
-
-async function dbLoadTables() {
-  const env   = state.dbEnv;
-  const panel = document.getElementById('db-table-list');
-  panel.innerHTML = '<div class="table-list-item text-muted">Loading…</div>';
-  try {
-    const data = await api(`/db/tables/${env}`);
-    panel.innerHTML = data.tables.length
-      ? data.tables.map(t => `
-        <div class="table-list-item" onclick="dbSelectTable('${esc(t)}', this)">
-          <span>${esc(t)}</span>
-        </div>
-      `).join('')
-      : '<div class="table-list-item text-muted">No tables found</div>';
-  } catch(e) {
-    panel.innerHTML = `<div class="table-list-item text-muted">${esc(e.message)}</div>`;
-  }
-}
-
-function dbSelectTable(name, el) {
-  document.querySelectorAll('#db-table-list .table-list-item').forEach(i => i.classList.remove('active'));
-  el.classList.add('active');
-  document.getElementById('db-sql').value = `SELECT * FROM \`${name}\` LIMIT 25;`;
-}
-
-async function dbRunQuery() {
-  const env = state.dbEnv;
-  const sql = document.getElementById('db-sql').value.trim();
-  if (!sql) { toast('Enter a SQL query', 'warn'); return; }
-  btnLoad('db-run-btn', true);
-  try {
-    const data = await api('/db/query', { method:'POST', body: JSON.stringify({ env, sql }) });
-    document.getElementById('db-count').textContent = data.count;
-    const wrap = document.getElementById('db-results-wrap');
-    if (!data.results.length) {
-      wrap.innerHTML = '<div style="padding:24px;color:var(--text3);font-size:13px">Query returned 0 rows.</div>';
-      toast('0 rows returned', 'info');
-      return;
-    }
-    const cols = Object.keys(data.results[0]);
-    wrap.innerHTML = `<table class="fade-in">
-      <thead><tr>${cols.map(c => `<th>${esc(c)}</th>`).join('')}</tr></thead>
-      <tbody>${data.results.map(row =>
-        `<tr>${cols.map(c => `<td class="td-mono">${esc(row[c] ?? 'NULL')}</td>`).join('')}</tr>`
-      ).join('')}</tbody>
-    </table>`;
-    toast(`${data.count} row${data.count !== 1 ? 's' : ''} returned`, 'success');
-  } catch(e) { toast(e.message, 'error'); }
-  finally { btnLoad('db-run-btn', false); }
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
