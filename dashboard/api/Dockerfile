@@ -13,6 +13,7 @@ RUN pip install --no-cache-dir -r requirements.txt \
 
 COPY main.py .
 COPY tools/ tools/
+COPY auth/ auth/
 RUN mkdir -p auth screenshots reports
 
 EXPOSE 7860
