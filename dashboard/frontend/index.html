@@ -2426,6 +2426,7 @@ async function prReview(repo, prNumber, title) {
 // ── Jira Detail Panel ─────────────────────────────────────────────────────────
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 let _jiraCurrentKey = null;
+let _rqaCurrentKey  = null;
 
 async function openJiraPanel(key) {
   _jiraCurrentKey = key;
@@ -2519,16 +2520,18 @@ let _rqaEnv = 'staging';
 
 function openRunQAModal() {
   if (!_jiraCurrentKey) return;
-  document.getElementById('rqa-modal-key').textContent = _jiraCurrentKey;
+  _rqaCurrentKey = _jiraCurrentKey;          // save before closing the panel
+  closeJiraPanel();                           // close the panel (nulls _jiraCurrentKey)
+  document.getElementById('rqa-modal-key').textContent = _rqaCurrentKey;
   // reset to defaults
   document.querySelector('input[name="rqa-env"][value="staging"]').checked = true;
-  document.getElementById('rqa-fe-same').checked  = true;
-  document.getElementById('rqa-be-main').checked  = true;
-  document.getElementById('rqa-fe-input').value   = _jiraCurrentKey;
+  document.getElementById('rqa-fe-same').checked   = true;
+  document.getElementById('rqa-be-main').checked   = true;
+  document.getElementById('rqa-fe-input').value    = _rqaCurrentKey;
   document.getElementById('rqa-fe-input').disabled = true;
-  document.getElementById('rqa-be-input').value   = 'main';
+  document.getElementById('rqa-be-input').value    = 'main';
   document.getElementById('rqa-be-input').disabled = true;
-  document.getElementById('rqa-portal').value     = '';
+  document.getElementById('rqa-portal').value      = '';
   document.getElementById('run-qa-modal').classList.add('open');
 }
 
@@ -2540,7 +2543,7 @@ function closeRunQAModal() {
 function rqaFeSameToggle() {
   const cb = document.getElementById('rqa-fe-same');
   const inp = document.getElementById('rqa-fe-input');
-  if (cb.checked) { inp.value = _jiraCurrentKey; inp.disabled = true; }
+  if (cb.checked) { inp.value = _rqaCurrentKey; inp.disabled = true; }
   else { inp.disabled = false; inp.focus(); }
 }
 
@@ -2594,16 +2597,21 @@ async function confirmRunQA() {
   const frontend_branch = document.getElementById('rqa-fe-input').value.trim();
   const backend_branch  = document.getElementById('rqa-be-input').value.trim();
   const portal          = document.getElementById('rqa-portal').value;
-  const key             = _jiraCurrentKey;
+  const key             = _rqaCurrentKey;
+  if (!key)             { toast('No ticket selected', 'error'); return; }
   if (!frontend_branch) { toast('Enter a frontend branch', 'warn'); return; }
   if (!backend_branch)  { toast('Enter a backend branch', 'warn'); return; }
 
   btnLoad('rqa-confirm-btn', true);
   closeRunQAModal();
 
-  // Replace panel body with progress view
+  // Reopen the panel with progress view
   Object.keys(_qaPortalProgress).forEach(k => delete _qaPortalProgress[k]);
+  document.getElementById('jira-panel-key').textContent     = key;
+  document.getElementById('jira-panel-summary').textContent = 'QA Running…';
   document.getElementById('jira-panel-body').innerHTML = _buildProgressHTML(env, key);
+  document.getElementById('jira-panel-overlay').classList.add('open');
+  document.getElementById('jira-panel').classList.add('open');
   btnLoad('jira-run-qa-btn', true);
 
   try {
