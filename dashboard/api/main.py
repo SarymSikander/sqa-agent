@@ -353,11 +353,16 @@ async def run_qa_endpoint(issue_key: str, body: RunQABody):
             be_path = REPO_PATHS.get("backend", "")
             repos_available = fe_path and os.path.isdir(fe_path) and be_path and os.path.isdir(be_path)
             if not repos_available:
-                run_env = "staging"
                 yield evt({
-                    "stage": "switching_branches", "status": "skipped",
-                    "message": "Branch switching skipped — local repos not available on cloud server. Running tests on staging instead.",
+                    "stage": "needs_local_setup",
+                    "status": "needs_local_setup",
+                    "issue_key": issue_key,
+                    "frontend_branch": body.frontend_branch,
+                    "backend_branch": body.backend_branch,
+                    "portal": body.portal or "",
                 })
+                yield evt({"stage": "done", "result": {"needs_local_setup": True}})
+                return
             else:
                 try:
                     await asyncio.to_thread(_github.switch_branch, fe_path, body.frontend_branch)
@@ -452,29 +457,35 @@ async def run_qa_endpoint(issue_key: str, body: RunQABody):
 
         # ── Stage: update Jira ────────────────────────────────────────────────
         yield evt({"stage": "updating_jira", "status": "running"})
-        try:
-            new_status = "Ready for Review" if all_pass else "Dev In Progress"
-            await asyncio.to_thread(_jira.update_ticket_status, issue_key, new_status)
-            if all_pass:
-                comment_lines = [f"✅ *QA Passed* — {body.env.upper()} | fe:`{body.frontend_branch}` be:`{body.backend_branch}`"]
-                for r in test_results:
-                    comment_lines.append(f"• {r['portal']}: PASS — {r.get('url') or ''}")
-                if assignee:
-                    comment_lines.append(f"\n@{assignee} All tests passing — moving to Ready for Review.")
-            else:
-                comment_lines = [f"❌ *QA Failed* — {body.env.upper()} | fe:`{body.frontend_branch}` be:`{body.backend_branch}`"]
-                for r in test_results:
-                    icon = "✅" if r["status"] == "PASS" else "❌"
-                    comment_lines.append(f"• {r['portal']}: {icon} {r['status']} — {str(r.get('message',''))[:200]}")
-                    for err in (r.get("console_errors") or [])[:3]:
-                        comment_lines.append(f"  Console: {str(err)[:120]}")
-                if assignee:
-                    comment_lines.append(f"\n@{assignee} Tests failing — moving back to Dev In Progress.")
-            await asyncio.to_thread(_jira.add_comment, issue_key, "\n".join(comment_lines))
-        except Exception as e:
-            yield evt({"stage": "updating_jira", "status": "error", "message": str(e)})
+        if not test_cases:
+            yield evt({
+                "stage": "updating_jira", "status": "skipped",
+                "message": "QA Incomplete — no feature tests executed. Jira status unchanged.",
+            })
         else:
-            yield evt({"stage": "updating_jira", "status": "done", "new_status": new_status})
+            try:
+                new_status = "Ready for Review" if all_pass else "Dev In Progress"
+                await asyncio.to_thread(_jira.update_ticket_status, issue_key, new_status)
+                if all_pass:
+                    comment_lines = [f"✅ *QA Passed* — {body.env.upper()} | fe:`{body.frontend_branch}` be:`{body.backend_branch}`"]
+                    for r in test_results:
+                        comment_lines.append(f"• {r['portal']}: PASS — {r.get('url') or ''}")
+                    if assignee:
+                        comment_lines.append(f"\n@{assignee} All tests passing — moving to Ready for Review.")
+                else:
+                    comment_lines = [f"❌ *QA Failed* — {body.env.upper()} | fe:`{body.frontend_branch}` be:`{body.backend_branch}`"]
+                    for r in test_results:
+                        icon = "✅" if r["status"] == "PASS" else "❌"
+                        comment_lines.append(f"• {r['portal']}: {icon} {r['status']} — {str(r.get('message',''))[:200]}")
+                        for err in (r.get("console_errors") or [])[:3]:
+                            comment_lines.append(f"  Console: {str(err)[:120]}")
+                    if assignee:
+                        comment_lines.append(f"\n@{assignee} Tests failing — moving back to Dev In Progress.")
+                await asyncio.to_thread(_jira.add_comment, issue_key, "\n".join(comment_lines))
+            except Exception as e:
+                yield evt({"stage": "updating_jira", "status": "error", "message": str(e)})
+            else:
+                yield evt({"stage": "updating_jira", "status": "done", "new_status": new_status})
 
         # ── Restore branches ──────────────────────────────────────────────────
         if body.env == "local" and branches_switched:

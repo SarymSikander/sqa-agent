@@ -1172,6 +1172,61 @@
     }
     .qa-tc-name { font-weight: 600; color: var(--text); margin-bottom: 3px; }
     .qa-tc-desc { color: var(--text2); font-size: 11.5px; }
+    /* Local setup checklist */
+    .qa-setup-header {
+      font-size: 14px; font-weight: 700; color: var(--text);
+      margin-bottom: 16px; display: flex; align-items: center; gap: 8px;
+    }
+    .qa-setup-header span { font-size: 18px; }
+    .qa-setup-step {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--r-sm);
+      padding: 14px;
+      margin-bottom: 10px;
+    }
+    .qa-step-num {
+      display: inline-flex; align-items: center; justify-content: center;
+      width: 20px; height: 20px;
+      background: #5B3DF5; color: #fff;
+      border-radius: 50%; font-size: 11px; font-weight: 700;
+      margin-right: 6px; flex-shrink: 0;
+    }
+    .qa-step-title {
+      font-size: 12.5px; font-weight: 600; color: var(--text);
+      display: flex; align-items: center; margin-bottom: 8px;
+    }
+    .qa-step-cmd-wrap {
+      display: flex; align-items: center; gap: 6px;
+      background: #1e1e2e; border-radius: var(--r-xs);
+      padding: 8px 10px; margin-bottom: 6px;
+    }
+    .qa-step-cmd {
+      font-family: monospace; font-size: 11.5px; color: #e2e8f0;
+      flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .qa-copy-btn {
+      background: rgba(255,255,255,0.12); border: none; color: #e2e8f0;
+      border-radius: 4px; padding: 3px 8px; font-size: 11px; cursor: pointer;
+      flex-shrink: 0; transition: background .15s;
+    }
+    .qa-copy-btn:hover { background: rgba(255,255,255,0.22); }
+    .qa-check-row { display: flex; align-items: center; gap: 8px; margin-top: 6px; }
+    .qa-check-btn {
+      font-size: 11px; padding: 3px 10px; border-radius: 4px;
+      border: 1px solid var(--border); background: var(--bg2); cursor: pointer;
+      color: var(--text2); transition: background .15s;
+    }
+    .qa-check-btn:hover { background: var(--bg); }
+    .qa-check-status { font-size: 11px; color: var(--text3); }
+    .qa-setup-run-btn {
+      width: 100%; margin-top: 16px; padding: 11px;
+      background: linear-gradient(135deg,#5B3DF5,#8B5CF6);
+      color: #fff; border: none; border-radius: var(--r-sm);
+      font-size: 13px; font-weight: 600; cursor: pointer;
+      transition: opacity .15s;
+    }
+    .qa-setup-run-btn:hover { opacity: .9; }
   </style>
 </head>
 <body>
@@ -2521,6 +2576,7 @@ const QA_STAGES = [
 ];
 
 let _rqaEnv = 'staging';
+let _rqaLocalSetupData = null;
 
 function openRunQAModal() {
   if (!_jiraCurrentKey) return;
@@ -2615,7 +2671,6 @@ async function confirmRunQA() {
   btnLoad('rqa-confirm-btn', true);
   closeRunQAModal();
 
-  // Reopen the panel with progress view
   Object.keys(_qaPortalProgress).forEach(k => delete _qaPortalProgress[k]);
   document.getElementById('jira-panel-key').textContent     = key;
   document.getElementById('jira-panel-summary').textContent = 'QA Running…';
@@ -2624,11 +2679,16 @@ async function confirmRunQA() {
   document.getElementById('jira-panel').classList.add('open');
   btnLoad('jira-run-qa-btn', true);
 
+  await _runQAStream(key, env, frontend_branch, backend_branch, portal);
+  btnLoad('jira-run-qa-btn', false);
+}
+
+async function _runQAStream(key, env, fe, be, portal) {
   try {
     const resp = await fetch(`${API_BASE}/jira/tickets/${key}/run-qa`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ env, frontend_branch, backend_branch, portal }),
+      body: JSON.stringify({ env, frontend_branch: fe, backend_branch: be, portal }),
     });
     if (!resp.ok) {
       const err = await resp.json().catch(() => ({ detail: `HTTP ${resp.status}` }));
@@ -2657,9 +2717,92 @@ async function confirmRunQA() {
       area.innerHTML = `<div style="color:var(--error);font-size:13px;margin-top:16px;padding:12px;background:var(--error-bg);border-radius:var(--r-sm)">${esc(e.message)}</div>`;
       area.classList.remove('hidden');
     }
-  } finally {
-    btnLoad('jira-run-qa-btn', false);
   }
+}
+
+async function runQALocal() {
+  if (!_rqaLocalSetupData) return;
+  const { issue_key, frontend_branch, backend_branch, portal } = _rqaLocalSetupData;
+  Object.keys(_qaPortalProgress).forEach(k => delete _qaPortalProgress[k]);
+  document.getElementById('jira-panel-body').innerHTML = _buildProgressHTML('local', issue_key);
+  document.getElementById('jira-panel-summary').textContent = 'QA Running…';
+  btnLoad('jira-run-qa-btn', true);
+  await _runQAStream(issue_key, 'local', frontend_branch, backend_branch, portal);
+  btnLoad('jira-run-qa-btn', false);
+}
+
+function copyQACmd(elemId) {
+  const el = document.getElementById(elemId);
+  if (!el) return;
+  navigator.clipboard.writeText(el.textContent.trim()).then(() => {
+    toast('Copied!', 'success', 1500);
+  }).catch(() => {});
+}
+
+async function checkQAServer(url, statusId) {
+  const el = document.getElementById(statusId);
+  if (el) { el.textContent = 'Checking…'; el.style.color = 'var(--text3)'; }
+  try {
+    await fetch(url, { mode: 'no-cors', signal: AbortSignal.timeout(3000) });
+    if (el) { el.textContent = '✓ Running'; el.style.color = 'var(--success)'; }
+  } catch(e) {
+    if (el) { el.textContent = '✗ Not reachable'; el.style.color = 'var(--error)'; }
+  }
+}
+
+function _showLocalSetupChecklist(data) {
+  _rqaLocalSetupData = data;
+  const { issue_key, frontend_branch, backend_branch, portal } = data;
+  const beCmd = `cd ~/Documents/GitHub/zambeel-api && git checkout ${backend_branch} && npm run dev`;
+  const feCmd = `cd ~/Documents/GitHub/zambeel-fe && git checkout ${frontend_branch} && npm run dev`;
+
+  document.getElementById('jira-panel-body').innerHTML = `
+    <div class="qa-setup-header"><span>⚙️</span> Local Setup Required</div>
+    <div style="font-size:12.5px;color:var(--text2);margin-bottom:16px;line-height:1.5">
+      The QA agent is running on the cloud and can't reach your local repos directly.
+      Complete these steps on your machine, then click <strong>Run QA Now</strong>.
+    </div>
+
+    <div class="qa-setup-step">
+      <div class="qa-step-title"><span class="qa-step-num">1</span>Start the backend server</div>
+      <div class="qa-step-cmd-wrap">
+        <span class="qa-step-cmd" id="qa-cmd-be">${esc(beCmd)}</span>
+        <button class="qa-copy-btn" onclick="copyQACmd('qa-cmd-be')">Copy</button>
+      </div>
+      <div class="qa-check-row">
+        <button class="qa-check-btn" onclick="checkQAServer('http://localhost:3000/health','qa-be-status')">Check</button>
+        <span class="qa-check-status" id="qa-be-status">—</span>
+      </div>
+    </div>
+
+    <div class="qa-setup-step">
+      <div class="qa-step-title"><span class="qa-step-num">2</span>Start the frontend server</div>
+      <div class="qa-step-cmd-wrap">
+        <span class="qa-step-cmd" id="qa-cmd-fe">${esc(feCmd)}</span>
+        <button class="qa-copy-btn" onclick="copyQACmd('qa-cmd-fe')">Copy</button>
+      </div>
+      <div class="qa-check-row">
+        <button class="qa-check-btn" onclick="checkQAServer('http://localhost:5173','qa-fe-status')">Check</button>
+        <span class="qa-check-status" id="qa-fe-status">—</span>
+      </div>
+    </div>
+
+    <div class="qa-setup-step">
+      <div class="qa-step-title"><span class="qa-step-num">3</span>Branches are already set</div>
+      <div style="font-size:12px;color:var(--text2)">
+        Frontend: <code style="background:var(--bg);padding:1px 5px;border-radius:3px">${esc(frontend_branch)}</code>
+        &nbsp;Backend: <code style="background:var(--bg);padding:1px 5px;border-radius:3px">${esc(backend_branch)}</code>
+      </div>
+      <div style="font-size:11.5px;color:var(--text3);margin-top:4px">
+        The steps above already include <code>git checkout</code> for each repo.
+      </div>
+    </div>
+
+    <button class="qa-setup-run-btn" onclick="runQALocal()">
+      ✓ All Ready — Run QA Now
+    </button>
+  `;
+  document.getElementById('jira-panel-summary').textContent = 'Local Setup Required';
 }
 
 const _qaPortalProgress = {};
@@ -2667,12 +2810,16 @@ const _qaPortalProgress = {};
 function _handleQAEvent(ev) {
   const { stage, status, message, portal, result, count, all_pass, new_status } = ev;
 
+  if (stage === 'needs_local_setup') {
+    _showLocalSetupChecklist(ev);
+    return;
+  }
+
   if (stage === 'running_tests' && status === 'progress') {
     if (!_qaPortalProgress[portal]) {
       _qaPortalProgress[portal] = result;
       const existing = document.getElementById(`qas-sub-running_tests`);
       if (existing) {
-        const done = Object.keys(_qaPortalProgress).length;
         existing.textContent = Object.entries(_qaPortalProgress)
           .map(([p,s]) => `${p}: ${s === 'PASS' ? '✓' : '✗'}`).join('  ');
         existing.classList.remove('hidden');
@@ -2682,6 +2829,7 @@ function _handleQAEvent(ev) {
   }
 
   if (stage === 'done') {
+    if (ev.result && ev.result.needs_local_setup) return; // checklist already shown
     _showQAFinalResult(ev.result, ev.error);
     return;
   }
@@ -2689,7 +2837,13 @@ function _handleQAEvent(ev) {
   if (!stage || !status) return;
 
   if (status === 'skipped') {
-    _setQAStage(stage, 'skip', message || 'Skipped');
+    const skipMsg = stage === 'updating_jira'
+      ? (message || 'QA Incomplete — Jira status unchanged')
+      : (message || 'Skipped');
+    _setQAStage(stage, 'skip', skipMsg);
+    if (stage === 'updating_jira') {
+      toast('Jira status unchanged — no feature tests were executed', 'warn', 5000);
+    }
     return;
   }
   if (status === 'running') {
