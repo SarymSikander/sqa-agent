@@ -124,6 +124,26 @@ def debug_files():
         }
     return result
 
+# ── ADF → plain text helper ───────────────────────────────────────────────────
+
+def _adf_to_text(node) -> str:
+    if node is None:
+        return ""
+    if isinstance(node, str):
+        return node
+    if isinstance(node, list):
+        return "\n".join(_adf_to_text(c) for c in node)
+    if isinstance(node, dict):
+        if node.get("type") == "text":
+            return node.get("text", "")
+        parts = [_adf_to_text(c) for c in node.get("content", [])]
+        sep = "\n" if node.get("type") in (
+            "paragraph", "heading", "bulletList", "orderedList",
+            "listItem", "blockquote", "doc",
+        ) else ""
+        return sep.join(p for p in parts if p)
+    return str(node)
+
 # ── /debug/auth ───────────────────────────────────────────────────────────────
 
 @app.get("/debug/auth")
@@ -249,6 +269,32 @@ async def add_comment(issue_key: str, body: AddCommentBody):
     await asyncio.to_thread(_jira.add_comment, issue_key, body.comment)
     return {"success": True, "key": issue_key}
 
+@app.get("/jira/ticket/{issue_key}")
+async def get_ticket_detail(issue_key: str):
+    ticket   = await asyncio.to_thread(_jira.get_ticket, issue_key)
+    comments = await asyncio.to_thread(_jira.get_comments, issue_key)
+    fields   = ticket.get("fields", {})
+    desc_raw = fields.get("description")
+    description = _adf_to_text(desc_raw) if isinstance(desc_raw, (dict, list)) else (desc_raw or "")
+    return {
+        "key":        ticket.get("key"),
+        "summary":    fields.get("summary"),
+        "status":     (fields.get("status") or {}).get("name"),
+        "issue_type": (fields.get("issuetype") or {}).get("name"),
+        "assignee":   (fields.get("assignee") or {}).get("displayName"),
+        "description": description,
+        "created":    fields.get("created"),
+        "url":        f"https://zambeel.atlassian.net/browse/{ticket.get('key')}",
+        "comments": [
+            {
+                "author":  (c.get("author") or {}).get("displayName", "?"),
+                "body":    _adf_to_text(c["body"]) if isinstance(c.get("body"), (dict, list)) else (c.get("body") or ""),
+                "created": c.get("created"),
+            }
+            for c in (comments or [])
+        ],
+    }
+
 @app.get("/jira/sprints/{project_key}")
 async def get_sprints(project_key: str):
     board_id = await asyncio.to_thread(_jira.get_board_id, project_key)
@@ -313,6 +359,38 @@ async def get_open_prs(repo: str):
     try:
         prs = await asyncio.to_thread(_pr.get_open_prs, repo)
         return {"repo": repo, "prs": prs}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@app.get("/pr/detail/{repo}/{pr_number}")
+async def get_pr_detail(repo: str, pr_number: int):
+    repo_key     = repo.lower()
+    repo_api_name = REPO_API_NAMES.get(repo_key, "")
+    if not repo_api_name:
+        raise HTTPException(status_code=400, detail=f"GITHUB_{repo.upper()}_REPO_API env var is not set")
+    headers = {"Accept": "application/vnd.github+json"}
+    if GITHUB_TOKEN:
+        headers["Authorization"] = f"Bearer {GITHUB_TOKEN}"
+    def _fetch():
+        r = requests.get(
+            f"https://api.github.com/repos/{repo_api_name}/pulls/{pr_number}",
+            headers=headers, timeout=10,
+        )
+        r.raise_for_status()
+        pr = r.json()
+        return {
+            "number":        pr["number"],
+            "title":         pr["title"],
+            "author":        pr["user"]["login"],
+            "url":           pr["html_url"],
+            "head":          pr["head"]["ref"],
+            "base":          pr["base"]["ref"],
+            "body":          pr.get("body") or "",
+            "changed_files": pr.get("changed_files", 0),
+            "created_at":    pr.get("created_at"),
+        }
+    try:
+        return await asyncio.to_thread(_fetch)
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 

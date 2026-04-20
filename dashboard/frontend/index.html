@@ -901,6 +901,185 @@
     .activity-item { cursor: pointer; border-radius: var(--r-xs); transition: background .14s; }
     .activity-item:hover { background: rgba(124,58,237,0.08); }
     .activity-thumb { cursor: zoom-in; }
+
+    /* ── Slide Panel ─────────────────────────────────────────────────────────── */
+    .panel-overlay {
+      display: none;
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,0.5);
+      backdrop-filter: blur(3px);
+      z-index: 1100;
+    }
+    .panel-overlay.open { display: block; }
+    .slide-panel {
+      position: fixed;
+      top: 0; right: 0; bottom: 0;
+      width: min(560px, 94vw);
+      background: var(--bg2);
+      border-left: 1px solid var(--border-hover);
+      box-shadow: -12px 0 56px rgba(0,0,0,0.16);
+      z-index: 1200;
+      display: flex;
+      flex-direction: column;
+      transform: translateX(100%);
+      transition: transform .32s cubic-bezier(0.16, 1, 0.3, 1);
+      overflow: hidden;
+    }
+    .slide-panel.open { transform: translateX(0); }
+    .panel-header {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      padding: 20px 24px;
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+      background: var(--card);
+    }
+    .panel-key-badge {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+      font-weight: 600;
+      color: #A78BFA;
+      background: var(--info-bg);
+      border: 1px solid rgba(124,58,237,0.25);
+      padding: 4px 10px;
+      border-radius: 99px;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+    .panel-title {
+      font-size: 14px;
+      font-weight: 700;
+      flex: 1;
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      color: var(--text);
+    }
+    .panel-close {
+      cursor: pointer;
+      color: var(--text3);
+      font-size: 20px;
+      line-height: 1;
+      transition: color .15s;
+      flex-shrink: 0;
+      width: 28px; height: 28px;
+      display: flex; align-items: center; justify-content: center;
+      border-radius: var(--r-xs);
+    }
+    .panel-close:hover { color: var(--text); background: rgba(0,0,0,0.06); }
+    .panel-body {
+      flex: 1;
+      overflow-y: auto;
+      padding: 24px;
+    }
+    .panel-section { margin-bottom: 20px; }
+    .panel-label {
+      font-size: 10.5px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--text3);
+      margin-bottom: 6px;
+    }
+    .panel-value {
+      font-size: 13px;
+      color: var(--text);
+      line-height: 1.6;
+    }
+    .panel-footer {
+      padding: 18px 24px;
+      border-top: 1px solid var(--border);
+      flex-shrink: 0;
+      background: var(--card);
+    }
+    .panel-meta-row {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-bottom: 20px;
+      align-items: center;
+    }
+    .comment-item {
+      padding: 13px 15px;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--r-sm);
+      margin-bottom: 10px;
+    }
+    .comment-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 6px;
+    }
+    .comment-author {
+      font-size: 12px;
+      font-weight: 600;
+      color: #A78BFA;
+    }
+    .comment-date {
+      font-size: 10.5px;
+      color: var(--text3);
+    }
+    .comment-body {
+      font-size: 12.5px;
+      color: var(--text2);
+      line-height: 1.6;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+    .pr-branch-flow {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .pr-branch-tag {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11.5px;
+      background: var(--info-bg);
+      border: 1px solid rgba(124,58,237,0.2);
+      padding: 3px 10px;
+      border-radius: 99px;
+      color: #A78BFA;
+    }
+    .pr-arrow { color: var(--text3); font-size: 13px; }
+    .pr-body-text {
+      font-size: 12.5px;
+      color: var(--text2);
+      line-height: 1.65;
+      white-space: pre-wrap;
+      word-break: break-word;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--r-sm);
+      padding: 14px;
+      max-height: 220px;
+      overflow-y: auto;
+    }
+    .pr-review-panel-output {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--r);
+      padding: 18px;
+      line-height: 1.7;
+      margin-top: 16px;
+      font-size: 13px;
+    }
+    .pr-review-panel-output h1 { font-size: 15px; margin-bottom: 12px; font-weight: 700; }
+    .pr-review-panel-output h2 { font-size: 13px; margin: 16px 0 8px; font-weight: 700; padding: 6px 12px; background: rgba(0,0,0,0.04); border-left: 3px solid var(--g2); border-radius: var(--r-xs); }
+    .pr-review-panel-output h3 { font-size: 12.5px; margin: 12px 0 5px; color: #A78BFA; }
+    .pr-review-panel-output p  { color: var(--text2); margin: 6px 0; }
+    .pr-review-panel-output li { color: var(--text2); margin: 4px 0 4px 20px; }
+    .pr-review-panel-output code { font-family: 'JetBrains Mono', monospace; font-size: 11.5px; background: rgba(0,0,0,0.06); padding: 2px 5px; border-radius: 3px; color: #6D28D9; }
+    .pr-review-panel-output strong { color: var(--text); font-weight: 600; }
+    /* Jira rows clickable */
+    #jira-tbody tr { cursor: pointer; }
+    /* PR cards clickable */
+    .pr-card { cursor: pointer; }
+    .pr-card:hover { background: rgba(124,58,237,0.06); border-radius: var(--r-xs); }
   </style>
 </head>
 <body>
@@ -1328,6 +1507,48 @@
   <span id="lightbox-close" onclick="closeLightbox()">✕</span>
   <img id="lightbox-img" src="" alt="" onclick="event.stopPropagation()" />
   <div id="lightbox-label"></div>
+</div>
+
+<!-- ── Jira Detail Panel ─────────────────────────────────────────────────────── -->
+<div id="jira-panel-overlay" class="panel-overlay" onclick="closeJiraPanel()"></div>
+<div id="jira-panel" class="slide-panel">
+  <div class="panel-header">
+    <span class="panel-key-badge" id="jira-panel-key">—</span>
+    <div class="panel-title" id="jira-panel-summary">Loading…</div>
+    <div class="panel-close" onclick="closeJiraPanel()">✕</div>
+  </div>
+  <div class="panel-body" id="jira-panel-body">
+    <div class="skel-line skeleton" style="height:14px;margin-bottom:12px"></div>
+    <div class="skel-line skeleton" style="height:14px;margin-bottom:12px;width:70%"></div>
+    <div class="skel-line skeleton" style="height:14px;width:50%"></div>
+  </div>
+  <div class="panel-footer">
+    <label>Add Comment</label>
+    <textarea id="jira-panel-comment" placeholder="Write a comment…" style="margin-bottom:10px;min-height:72px"></textarea>
+    <button class="btn btn-primary w100" id="jira-panel-submit-btn" onclick="submitJiraPanelComment()" style="justify-content:center">
+      <div class="spin"></div><span class="label">Submit Comment</span>
+    </button>
+  </div>
+</div>
+
+<!-- ── PR Detail Panel ───────────────────────────────────────────────────────── -->
+<div id="pr-panel-overlay" class="panel-overlay" onclick="closePRPanel()"></div>
+<div id="pr-panel" class="slide-panel">
+  <div class="panel-header">
+    <span class="panel-key-badge" id="pr-panel-number">—</span>
+    <div class="panel-title" id="pr-panel-title">Loading…</div>
+    <div class="panel-close" onclick="closePRPanel()">✕</div>
+  </div>
+  <div class="panel-body" id="pr-panel-body">
+    <div class="skel-line skeleton" style="height:14px;margin-bottom:12px"></div>
+    <div class="skel-line skeleton" style="height:14px;margin-bottom:12px;width:70%"></div>
+    <div class="skel-line skeleton" style="height:14px;width:50%"></div>
+  </div>
+  <div class="panel-footer">
+    <button class="btn btn-primary w100" id="pr-panel-review-btn" onclick="prReviewFromPanel()" style="justify-content:center">
+      <div class="spin"></div><span class="label">🤖 Review with AI</span>
+    </button>
+  </div>
 </div>
 
 <!-- ── Modal ─────────────────────────────────────────────────────────────────── -->
@@ -1849,13 +2070,13 @@ function jiraFilter() {
 function renderJiraTable(rows) {
   document.getElementById('jira-tbody').innerHTML = rows.length
     ? rows.map(t => `
-      <tr class="fade-in">
-        <td><a href="${esc(t.url)}" target="_blank" class="td-mono">${esc(t.key)}</a></td>
-        <td style="max-width:280px">${esc(t.summary||'—')}</td>
+      <tr class="fade-in" onclick="openJiraPanel('${esc(t.key)}')">
+        <td class="td-mono">${esc(t.key)}</td>
+        <td style="max-width:260px">${esc(t.summary||'—')}</td>
         <td><span class="badge badge-neutral" style="font-size:10.5px">${esc(t.issue_type||'—')}</span></td>
         <td>${jiraBadge(t.status)}</td>
         <td class="td-muted">${esc(t.assignee||'Unassigned')}</td>
-        <td>
+        <td onclick="event.stopPropagation()">
           <div style="display:flex;gap:4px">
             <button class="btn btn-sm btn-danger" onclick="jiraClose('${esc(t.key)}')">Close</button>
             <button class="btn btn-sm btn-secondary" onclick="jiraComment('${esc(t.key)}')">💬</button>
@@ -2001,17 +2222,14 @@ async function prLoad(repo) {
     }
     listEl.innerHTML = data.prs.map(pr => {
       const initials = (pr.author||'?').slice(0,2).toUpperCase();
-      return `<div class="pr-card fade-in">
+      return `<div class="pr-card fade-in" onclick="openPRPanel('${repo}', ${pr.number}, '${esc(pr.title).replace(/'/g,"\\'")}')">
         <div class="pr-avatar">${esc(initials)}</div>
         <div class="pr-info">
-          <div class="pr-title">
-            <a href="${esc(pr.url)}" target="_blank">#${pr.number}</a>&nbsp;
-            ${esc(pr.title)}
-          </div>
+          <div class="pr-title">#${pr.number}&nbsp;${esc(pr.title)}</div>
           <div class="pr-meta">@${esc(pr.author)}</div>
         </div>
         <button class="btn btn-sm btn-secondary" id="pr-review-btn-${repo}-${pr.number}"
-          onclick="prReview('${repo}', ${pr.number}, '${esc(pr.title)}')">
+          onclick="event.stopPropagation();prReview('${repo}', ${pr.number}, '${esc(pr.title).replace(/'/g,"\\'")}')">
           <div class="spin"></div><span class="label">🤖 Review</span>
         </button>
       </div>`;
@@ -2054,12 +2272,192 @@ async function prReview(repo, prNumber, title) {
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// ── Jira Detail Panel ─────────────────────────────────────────────────────────
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+let _jiraCurrentKey = null;
+
+async function openJiraPanel(key) {
+  _jiraCurrentKey = key;
+  document.getElementById('jira-panel-key').textContent      = key;
+  document.getElementById('jira-panel-summary').textContent  = 'Loading…';
+  document.getElementById('jira-panel-comment').value        = '';
+  document.getElementById('jira-panel-body').innerHTML =
+    '<div class="skel-line skeleton" style="height:14px;margin-bottom:12px"></div>' +
+    '<div class="skel-line skeleton" style="height:14px;margin-bottom:12px;width:70%"></div>' +
+    '<div class="skel-line skeleton" style="height:60px;margin-bottom:12px;border-radius:8px"></div>' +
+    '<div class="skel-line skeleton" style="height:14px;width:50%"></div>';
+  document.getElementById('jira-panel-overlay').classList.add('open');
+  document.getElementById('jira-panel').classList.add('open');
+  try {
+    const d = await api(`/jira/ticket/${key}`);
+    document.getElementById('jira-panel-summary').textContent = d.summary || '—';
+    const comments = d.comments || [];
+    document.getElementById('jira-panel-body').innerHTML = `
+      <div class="panel-section">
+        <div class="panel-label">Summary</div>
+        <div class="panel-value" style="font-size:15px;font-weight:600;color:var(--text)">${esc(d.summary||'—')}</div>
+      </div>
+      <div class="panel-meta-row">
+        ${jiraBadge(d.status)}
+        <span class="badge badge-neutral" style="font-size:10.5px">${esc(d.issue_type||'—')}</span>
+        <a href="${esc(d.url||'')}" target="_blank" class="badge badge-info" style="text-decoration:none">↗ Open in Jira</a>
+      </div>
+      <div class="panel-section">
+        <div class="panel-label">Assignee</div>
+        <div class="panel-value">${esc(d.assignee||'Unassigned')}</div>
+      </div>
+      ${d.description ? `<div class="panel-section">
+        <div class="panel-label">Description</div>
+        <div class="pr-body-text">${esc(d.description)}</div>
+      </div>` : ''}
+      <div class="divider"></div>
+      <div class="panel-label" style="margin-bottom:14px">Comments <span style="font-weight:400;color:var(--text3)">(${comments.length})</span></div>
+      ${comments.length
+        ? comments.map(c => `<div class="comment-item">
+            <div class="comment-header">
+              <span class="comment-author">${esc(c.author)}</span>
+              <span class="comment-date">${fmtDate(c.created)}</span>
+            </div>
+            <div class="comment-body">${esc(c.body)}</div>
+          </div>`).join('')
+        : '<div style="color:var(--text3);font-size:12.5px;padding:8px 0">No comments yet.</div>'}
+    `;
+  } catch(e) {
+    document.getElementById('jira-panel-summary').textContent = 'Error';
+    document.getElementById('jira-panel-body').innerHTML =
+      `<div style="color:var(--error);font-size:13px">${esc(e.message)}</div>`;
+  }
+}
+
+function closeJiraPanel() {
+  document.getElementById('jira-panel-overlay').classList.remove('open');
+  document.getElementById('jira-panel').classList.remove('open');
+  _jiraCurrentKey = null;
+}
+
+async function submitJiraPanelComment() {
+  if (!_jiraCurrentKey) return;
+  const comment = document.getElementById('jira-panel-comment').value.trim();
+  if (!comment) { toast('Enter a comment first', 'warn'); return; }
+  btnLoad('jira-panel-submit-btn', true);
+  try {
+    await api(`/jira/tickets/${_jiraCurrentKey}/comment`, {
+      method: 'POST', body: JSON.stringify({ comment }),
+    });
+    toast(`Comment added to ${_jiraCurrentKey}`, 'success');
+    document.getElementById('jira-panel-comment').value = '';
+    openJiraPanel(_jiraCurrentKey);
+  } catch(e) { toast(e.message, 'error'); }
+  finally { btnLoad('jira-panel-submit-btn', false); }
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// ── PR Detail Panel ───────────────────────────────────────────────────────────
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+let _prCurrent = null;
+
+async function openPRPanel(repo, number, title) {
+  _prCurrent = { repo, number, title };
+  document.getElementById('pr-panel-number').textContent = `#${number}`;
+  document.getElementById('pr-panel-title').textContent  = title || 'Loading…';
+  document.getElementById('pr-panel-body').innerHTML =
+    '<div class="skel-line skeleton" style="height:14px;margin-bottom:12px"></div>' +
+    '<div class="skel-line skeleton" style="height:14px;margin-bottom:12px;width:70%"></div>' +
+    '<div class="skel-line skeleton" style="height:60px;border-radius:8px"></div>';
+  btnLoad('pr-panel-review-btn', false);
+  document.getElementById('pr-panel-overlay').classList.add('open');
+  document.getElementById('pr-panel').classList.add('open');
+  try {
+    const d = await api(`/pr/detail/${repo}/${number}`);
+    document.getElementById('pr-panel-title').textContent = d.title || title;
+    document.getElementById('pr-panel-body').innerHTML = `
+      <div class="panel-section">
+        <div class="panel-label">Author</div>
+        <div class="panel-value">@${esc(d.author||'?')}</div>
+      </div>
+      <div class="panel-section">
+        <div class="panel-label">Branch</div>
+        <div class="pr-branch-flow">
+          <span class="pr-branch-tag">${esc(d.head||'?')}</span>
+          <span class="pr-arrow">→</span>
+          <span class="pr-branch-tag">${esc(d.base||'?')}</span>
+        </div>
+      </div>
+      <div class="panel-meta-row">
+        <span class="badge badge-neutral">${esc(String(d.changed_files||0))} files changed</span>
+        <a href="${esc(d.url||'')}" target="_blank" class="badge badge-info" style="text-decoration:none">↗ Open on GitHub</a>
+      </div>
+      ${d.body ? `<div class="panel-section">
+        <div class="panel-label">Description</div>
+        <div class="pr-body-text">${esc(d.body)}</div>
+      </div>` : '<div style="color:var(--text3);font-size:12.5px;margin-bottom:16px">No description provided.</div>'}
+      <div id="pr-panel-review-section"></div>
+    `;
+  } catch(e) {
+    document.getElementById('pr-panel-title').textContent = 'Error';
+    document.getElementById('pr-panel-body').innerHTML =
+      `<div style="color:var(--error);font-size:13px">${esc(e.message)}</div>`;
+  }
+}
+
+function closePRPanel() {
+  document.getElementById('pr-panel-overlay').classList.remove('open');
+  document.getElementById('pr-panel').classList.remove('open');
+  _prCurrent = null;
+}
+
+async function prReviewFromPanel() {
+  if (!_prCurrent) return;
+  const { repo, number, title } = _prCurrent;
+  btnLoad('pr-panel-review-btn', true);
+  const reviewSection = document.getElementById('pr-panel-review-section');
+  if (reviewSection) {
+    reviewSection.innerHTML =
+      '<div class="divider"></div>' +
+      '<div class="panel-label" style="margin-bottom:10px">AI Review</div>' +
+      '<div class="skel-line skeleton" style="height:12px;margin-bottom:8px;width:80%"></div>' +
+      '<div class="skel-line skeleton" style="height:12px;margin-bottom:8px;width:60%"></div>' +
+      '<div class="skel-line skeleton" style="height:12px;width:70%"></div>';
+  }
+  toast(`Reviewing PR #${number} — running 3 Claude passes…`, 'info', 12000);
+  try {
+    const data = await api('/pr/review', {
+      method: 'POST',
+      body: JSON.stringify({ repo, pr_number: number }),
+    });
+    if (reviewSection) {
+      reviewSection.innerHTML =
+        '<div class="divider"></div>' +
+        '<div class="panel-label" style="margin-bottom:10px">AI Review</div>' +
+        `<div class="pr-review-panel-output">${renderMd(data.review)}</div>`;
+    }
+    toast(`Review complete for PR #${number}`, 'success');
+  } catch(e) {
+    if (reviewSection) {
+      reviewSection.innerHTML =
+        `<div class="divider"></div><div style="color:var(--error);font-size:13px">${esc(e.message)}</div>`;
+    }
+    toast(e.message, 'error');
+  } finally {
+    btnLoad('pr-panel-review-btn', false);
+  }
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // ── Init ──────────────────────────────────────────────────────────────────────
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 document.addEventListener('DOMContentLoaded', () => {
   // Nav clicks
   document.querySelectorAll('.nav-item[data-page]').forEach(el => {
     el.addEventListener('click', () => navigate(el.dataset.page));
+  });
+
+  // Escape closes panels/lightbox
+  document.addEventListener('keydown', e => {
+    if (e.key !== 'Escape') return;
+    if (document.getElementById('jira-panel').classList.contains('open'))  { closeJiraPanel(); return; }
+    if (document.getElementById('pr-panel').classList.contains('open'))    { closePRPanel();   return; }
+    if (document.getElementById('lightbox').classList.contains('open'))    { closeLightbox();  return; }
   });
 
   // API health check
