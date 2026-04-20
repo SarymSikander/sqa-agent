@@ -460,10 +460,7 @@
       font-weight: 800;
       letter-spacing: -0.8px;
       line-height: 1.15;
-      background: var(--gradient);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      background-clip: text;
+      color: var(--text);
     }
     .hero-sub { font-size: 15px; color: var(--text2); margin-top: 8px; }
 
@@ -857,25 +854,8 @@
       100% { background-position: 0% 50%; }
     }
 
-    /* ── Hero animated gradient background ───────────────────────────────────── */
-    .hero { position: relative; overflow: hidden; }
-    .hero::before {
-      content: '';
-      position: absolute;
-      inset: -60%;
-      background:
-        radial-gradient(ellipse at 20% 60%, rgba(79,70,229,0.18) 0%, transparent 55%),
-        radial-gradient(ellipse at 75% 40%, rgba(192,38,211,0.14) 0%, transparent 55%),
-        radial-gradient(ellipse at 50% 80%, rgba(124,58,237,0.1) 0%, transparent 50%);
-      animation: hero-drift 10s ease-in-out infinite;
-      pointer-events: none;
-    }
-    @keyframes hero-drift {
-      0%,100% { transform: scale(1) translate(0,0); }
-      33%     { transform: scale(1.08) translate(2%,-3%); }
-      66%     { transform: scale(0.96) translate(-3%,2%); }
-    }
-    .hero-title, .hero-sub { position: relative; z-index: 1; }
+    /* ── Hero ────────────────────────────────────────────────────────────────── */
+    .hero { }
 
     /* ── Env card pass/fail borders ──────────────────────────────────────────── */
     .env-card-pass {
@@ -1040,7 +1020,7 @@
       <div class="page-inner">
         <div class="hero">
           <div class="hero-title">Zambeel SQA Agent</div>
-          <div class="hero-sub">Automated quality assurance across Local, Staging &amp; Production environments.</div>
+          <div class="hero-sub">Automated quality assurance across Staging &amp; Production environments.</div>
         </div>
 
         <div class="stats-row mb24" id="ov-stats">
@@ -1067,20 +1047,6 @@
         </div>
 
         <div class="grid-3 mb24" id="env-cards">
-          <!-- Local -->
-          <div class="card env-card">
-            <div class="env-card-top">
-              <div>
-                <div class="env-name">Local</div>
-                <div class="env-url">localhost:5173</div>
-              </div>
-              <span id="ov-badge-local" class="badge badge-neutral">Unknown</span>
-            </div>
-            <div class="text-xs text-muted">Last run <span id="ov-last-local">—</span></div>
-            <button class="btn btn-primary" id="ov-run-local" onclick="ovRunEnv('local')">
-              <div class="spin"></div><span class="label">▶ Run All Tests</span>
-            </button>
-          </div>
           <!-- Staging -->
           <div class="card env-card">
             <div class="env-card-top">
@@ -1125,16 +1091,13 @@
     <!-- ══ Tests ════════════════════════════════════════════════════════════════ -->
     <section id="page-tests" class="page">
       <div class="page-inner">
-        <div class="notice warn">⚡ Local tests spin up the Vue dev server — allow 1–2 min. Staging and Production hit live URLs directly.</div>
-
         <div class="card mb24">
           <div class="card-title">Configure Test Run</div>
           <div style="display:flex;flex-wrap:wrap;align-items:flex-end;gap:20px">
             <div>
               <label>Environment</label>
               <div class="tabs" style="border:none;margin:0;gap:4px;display:flex">
-                <button class="pill active" id="tenv-local"      onclick="setTestEnv('local',this)">Local</button>
-                <button class="pill"        id="tenv-staging"    onclick="setTestEnv('staging',this)">Staging</button>
+                <button class="pill active" id="tenv-staging"    onclick="setTestEnv('staging',this)">Staging</button>
                 <button class="pill"        id="tenv-production" onclick="setTestEnv('production',this)">Production</button>
               </div>
             </div>
@@ -1314,8 +1277,7 @@
       <div class="page-inner">
         <div class="flex-between mb20">
           <div class="pill-group">
-            <button class="pill active" id="dbenv-local"      onclick="setDbEnv('local',this)">Local</button>
-            <button class="pill"        id="dbenv-staging"    onclick="setDbEnv('staging',this)">Staging</button>
+            <button class="pill active" id="dbenv-staging"    onclick="setDbEnv('staging',this)">Staging</button>
             <button class="pill"        id="dbenv-production" onclick="setDbEnv('production',this)">Production</button>
           </div>
           <button class="btn btn-secondary btn-sm" onclick="dbLoadTables()">Reload Tables</button>
@@ -1353,14 +1315,8 @@
       <div class="page-inner">
         <div class="card mb24">
           <div class="card-title">Generate Health Report</div>
-          <div class="notice warn" style="margin-bottom:14px">⏱ Reports run all three Playwright tests + DB checks. Allow 5+ minutes for Local.</div>
+          <div class="notice warn" style="margin-bottom:14px">⏱ Reports run all three Playwright tests + DB checks.</div>
           <div class="gen-row">
-            <div class="gen-btn-wrap">
-              <div class="gen-env-label">Local</div>
-              <button class="btn btn-secondary" id="rpt-gen-local-btn" onclick="reportsGenerate('local')">
-                <div class="spin"></div><span class="label">🏠 Generate</span>
-              </button>
-            </div>
             <div class="gen-btn-wrap">
               <div class="gen-env-label">Staging</div>
               <button class="btn btn-secondary" id="rpt-gen-staging-btn" onclick="reportsGenerate('staging')">
@@ -1476,9 +1432,9 @@ const API_BASE = 'https://sarimsikander-zambeel-sqa.hf.space';
 // ── State ─────────────────────────────────────────────────────────────────────
 const state = {
   ghSelected:   { frontend: null, backend: null },
-  testEnv:      'local',
+  testEnv:      'staging',
   testPortal:   '',
-  dbEnv:        'local',
+  dbEnv:        'staging',
   testResults:  [],
   jiraRows:     [],
 };
@@ -1668,7 +1624,7 @@ async function loadOverview() {
   markLastUpdated();
 
   // ── Restore last known env status from localStorage ───────────────────────
-  for (const env of ['local', 'staging', 'production']) {
+  for (const env of ['staging', 'production']) {
     const stored = loadEnvStatus(env);
     if (stored) {
       const isPass  = stored.pass === stored.total;

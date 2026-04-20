@@ -108,6 +108,22 @@ class PRReviewBody(BaseModel):
     repo: str
     pr_number: int
 
+# ── /debug/files ──────────────────────────────────────────────────────────────
+
+@app.get("/debug/files")
+def debug_files():
+    import os as _os
+    result = {"cwd": _os.getcwd()}
+    for path in ["/app", "/app/auth", "/app/tools", "/app/tools/../auth"]:
+        resolved = str(Path(path).resolve()) if path != "/app/tools/../auth" else str(Path("/app/tools/../auth").resolve())
+        exists = _os.path.exists(resolved)
+        result[path] = {
+            "resolved": resolved,
+            "exists": exists,
+            "listing": _os.listdir(resolved) if exists and _os.path.isdir(resolved) else None,
+        }
+    return result
+
 # ── /health ───────────────────────────────────────────────────────────────────
 
 @app.get("/health")
