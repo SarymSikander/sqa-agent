@@ -541,10 +541,10 @@ async def run_qa_endpoint(issue_key: str, body: RunQABody):
             if raw.startswith("```"):
                 parts = raw.split("```")
                 raw = parts[1].lstrip("json").strip() if len(parts) > 1 else raw
-            test_cases = json.loads(raw)
-            if not isinstance(test_cases, list):
-                print(f"[generate_test_cases] ERROR: parsed JSON is not a list, got {type(test_cases)}: {test_cases}")
-                test_cases = []
+            _parsed = json.loads(raw)
+            test_cases = _parsed.get("test_cases", []) if isinstance(_parsed, dict) else (_parsed if isinstance(_parsed, list) else [])
+            if not test_cases:
+                print(f"[generate_test_cases] ERROR: parsed JSON is not a list, got {type(_parsed)}: {_parsed}")
             else:
                 print(f"[generate_test_cases] Successfully parsed {len(test_cases)} test cases")
         except requests.exceptions.ConnectionError:
