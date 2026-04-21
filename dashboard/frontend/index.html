@@ -2537,6 +2537,22 @@ async function prLoad(repo) {
   } finally { btnLoad(btnId, false); }
 }
 
+function prReviewErrorHtml(msg) {
+  const LOCAL_PREFIX = 'PR Review is only available when running the SQA agent locally.';
+  if (msg && msg.startsWith(LOCAL_PREFIX)) {
+    const cmd = 'cd ~/Desktop/sqa-agent && source venv/bin/activate && cd dashboard/api && uvicorn main:app --port 8000';
+    return `<div style="padding:16px 0">
+      <div style="font-weight:600;color:var(--text);margin-bottom:8px">PR Review — Local Only</div>
+      <div style="color:var(--text2);font-size:13px;margin-bottom:12px">
+        PR Review requires the Claude CLI, which is only available when the SQA agent is running locally.
+        Start it with the command below:
+      </div>
+      <div style="position:relative;background:rgba(0,0,0,0.06);border:1px solid var(--border);border-radius:8px;padding:12px 48px 12px 14px;font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text);word-break:break-all">${esc(cmd)}<button onclick="navigator.clipboard.writeText('${cmd.replace(/'/g,"\\'")}')" title="Copy" style="position:absolute;top:8px;right:8px;background:none;border:none;cursor:pointer;color:var(--text3);padding:2px 4px;border-radius:4px;font-size:11px">Copy</button></div>
+    </div>`;
+  }
+  return `<div style="color:var(--error);font-size:13px">${esc(msg)}</div>`;
+}
+
 async function prReview(repo, prNumber, title) {
   const btnId = `pr-review-btn-${repo}-${prNumber}`;
   const btn   = document.getElementById(btnId);
@@ -2561,8 +2577,8 @@ async function prReview(repo, prNumber, title) {
     content.innerHTML = renderMd(data.review);
     toast(`Review posted to GitHub PR #${prNumber}`, 'success');
   } catch(e) {
-    content.innerHTML = `<div style="color:var(--error)">${esc(e.message)}</div>`;
-    toast(e.message, 'error');
+    content.innerHTML = prReviewErrorHtml(e.message);
+    toast('PR Review unavailable', 'error');
   } finally {
     if (btn) btnLoad(btn, false);
   }
@@ -3182,9 +3198,9 @@ async function prReviewFromPanel() {
   } catch(e) {
     if (reviewSection) {
       reviewSection.innerHTML =
-        `<div class="divider"></div><div style="color:var(--error);font-size:13px">${esc(e.message)}</div>`;
+        `<div class="divider"></div>${prReviewErrorHtml(e.message)}`;
     }
-    toast(e.message, 'error');
+    toast('PR Review unavailable', 'error');
   } finally {
     btnLoad('pr-panel-review-btn', false);
   }

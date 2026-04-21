@@ -885,6 +885,17 @@ async def get_pr_detail(repo: str, pr_number: int):
 
 @app.post("/pr/review")
 async def review_pr_endpoint(body: PRReviewBody):
+    import shutil
+    if shutil.which("claude") is None:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "PR Review is only available when running the SQA agent locally. "
+                "Start the local agent with: "
+                "cd ~/Desktop/sqa-agent && source venv/bin/activate && "
+                "cd dashboard/api && uvicorn main:app --port 8000"
+            ),
+        )
     try:
         review_text = await asyncio.to_thread(_pr.review_pr, body.repo, body.pr_number)
     except Exception as e:
