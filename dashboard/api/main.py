@@ -7,7 +7,6 @@ from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
-import anthropic as _anthropic
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -18,7 +17,8 @@ from fastapi.responses import StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-_ai_client = _anthropic.Anthropic()
+OLLAMA_URL = "http://localhost:11434/api/generate"
+OLLAMA_MODEL = "llama3.2"
 
 app = FastAPI(title="Zambeel SQA Dashboard API", version="1.0.0")
 
@@ -523,21 +523,25 @@ async def run_qa_endpoint(issue_key: str, body: RunQABody):
         if len(prompt) > 2000:
             print(f"... [truncated, full prompt is {len(prompt)} chars]")
         print(f"[generate_test_cases] ---- END PROMPT ----\n")
+        raw = ""
         try:
-            msg = await asyncio.to_thread(
-                _ai_client.messages.create,
-                model="claude-sonnet-4-6",
-                max_tokens=4096,
-                messages=[{"role": "user", "content": prompt}],
-            )
-            raw = msg.content[0].text.strip() if msg.content else ""
-            print(f"\n[generate_test_cases] ---- CLAUDE RESPONSE ({len(raw)} chars) ----")
+            def _call_ollama():
+                resp = requests.post(
+                    OLLAMA_URL,
+                    json={"model": OLLAMA_MODEL, "prompt": prompt, "stream": False, "format": "json"},
+                    timeout=120,
+                )
+                resp.raise_for_status()
+                return resp.json().get("response", "")
+
+            raw = await asyncio.to_thread(_call_ollama)
+            print(f"\n[generate_test_cases] ---- OLLAMA RESPONSE ({len(raw)} chars) ----")
             print(raw[:3000])
             if len(raw) > 3000:
                 print(f"... [truncated, full response is {len(raw)} chars]")
             print(f"[generate_test_cases] ---- END RESPONSE ----\n")
             if not raw:
-                print("[generate_test_cases] ERROR: Claude returned empty response!")
+                print("[generate_test_cases] ERROR: Ollama returned empty response!")
             if raw.startswith("```"):
                 parts = raw.split("```")
                 raw = parts[1].lstrip("json").strip() if len(parts) > 1 else raw
@@ -547,11 +551,16 @@ async def run_qa_endpoint(issue_key: str, body: RunQABody):
                 test_cases = []
             else:
                 print(f"[generate_test_cases] Successfully parsed {len(test_cases)} test cases")
+        except requests.exceptions.ConnectionError:
+            print("Ollama not running — start it with: ollama serve")
+            test_cases = []
         except json.JSONDecodeError as e:
             print(f"[generate_test_cases] JSON parse error: {e}\nRaw response was: {raw[:500]}")
             test_cases = []
         except Exception as e:
-            print(f"[generate_test_cases] ERROR calling Claude API: {type(e).__name__}: {e}")
+            print(f"[generate_test_cases] ERROR calling Ollama: {type(e).__name__}: {e}")
+            if "Connection" in type(e).__name__ or "connect" in str(e).lower():
+                print("Ollama not running — start it with: ollama serve")
             test_cases = []
         # save as Jira comment regardless of parse success
         if test_cases:
