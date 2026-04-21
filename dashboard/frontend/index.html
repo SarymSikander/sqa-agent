@@ -164,6 +164,64 @@
       0%, 100% { opacity: 1; box-shadow: 0 0 6px var(--success); }
       50% { opacity: 0.7; box-shadow: 0 0 14px var(--success); }
     }
+    .agent-mode-toggle {
+      margin-top: 14px;
+      padding-top: 14px;
+      border-top: 1px solid var(--border);
+    }
+    .agent-mode-label {
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--text3);
+      margin-bottom: 8px;
+    }
+    .toggle-pills {
+      display: flex;
+      background: rgba(0,0,0,0.05);
+      border-radius: 6px;
+      padding: 2px;
+      gap: 2px;
+    }
+    .toggle-pill {
+      flex: 1;
+      text-align: center;
+      padding: 5px 8px;
+      border-radius: 4px;
+      font-size: 11.5px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all .18s;
+      color: var(--text3);
+      user-select: none;
+    }
+    .toggle-pill.active {
+      background: var(--bg2);
+      color: var(--text);
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+    .toggle-pill.active.local { color: var(--success); }
+    .local-agent-badge {
+      display: none;
+      align-items: center;
+      gap: 6px;
+      background: var(--success-bg);
+      border: 1px solid rgba(22,163,74,0.3);
+      border-radius: 99px;
+      padding: 4px 12px 4px 8px;
+      font-size: 11.5px;
+      font-weight: 600;
+      color: var(--success);
+    }
+    .local-agent-badge.visible { display: flex; }
+    .local-agent-badge-dot {
+      width: 7px; height: 7px;
+      border-radius: 50%;
+      background: var(--success);
+      box-shadow: 0 0 8px var(--success);
+      flex-shrink: 0;
+    }
 
     /* ── Header ──────────────────────────────────────────────────────────────── */
     #topbar {
@@ -1356,6 +1414,13 @@
       <div class="api-dot" id="api-dot"></div>
       <span id="api-status-text">Connecting…</span>
     </div>
+    <div class="agent-mode-toggle">
+      <div class="agent-mode-label">Agent Mode</div>
+      <div class="toggle-pills">
+        <div class="toggle-pill active" id="mode-cloud" onclick="setAgentMode('cloud')">Cloud</div>
+        <div class="toggle-pill local" id="mode-local" onclick="setAgentMode('local')">Local</div>
+      </div>
+    </div>
   </div>
 </aside>
 
@@ -1375,6 +1440,9 @@
     <div class="last-updated-badge" id="last-updated-badge">
       <span class="lu-dot"></span>
       Updated <span id="last-updated-time">—</span>
+    </div>
+    <div class="local-agent-badge" id="local-agent-badge">
+      <span class="local-agent-badge-dot"></span>Local Agent Active
     </div>
     <div class="live-dot">Live</div>
   </header>
@@ -1863,7 +1931,17 @@
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // Config
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-const API_BASE = 'https://sarimsikander-zambeel-sqa.hf.space';
+const CLOUD_API = 'https://sarimsikander-zambeel-sqa.hf.space';
+const LOCAL_API  = 'http://localhost:8000';
+let   API_BASE   = CLOUD_API;
+
+function setAgentMode(mode) {
+  API_BASE = mode === 'local' ? LOCAL_API : CLOUD_API;
+  localStorage.setItem('agentMode', mode);
+  document.getElementById('mode-cloud').classList.toggle('active', mode === 'cloud');
+  document.getElementById('mode-local').classList.toggle('active', mode === 'local');
+  document.getElementById('local-agent-badge').classList.toggle('visible', mode === 'local');
+}
 
 // ── State ─────────────────────────────────────────────────────────────────────
 const state = {
@@ -3210,6 +3288,9 @@ async function prReviewFromPanel() {
 // ── Init ──────────────────────────────────────────────────────────────────────
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 document.addEventListener('DOMContentLoaded', () => {
+  // Restore agent mode from localStorage
+  setAgentMode(localStorage.getItem('agentMode') || 'cloud');
+
   // Nav clicks
   document.querySelectorAll('.nav-item[data-page]').forEach(el => {
     el.addEventListener('click', () => navigate(el.dataset.page));
