@@ -1,7 +1,7 @@
 import os
+import subprocess
 from datetime import datetime
 
-import anthropic
 import requests
 from dotenv import load_dotenv
 
@@ -22,8 +22,6 @@ GH_HEADERS = {
     "Accept": "application/vnd.github+json",
     "X-GitHub-Api-Version": "2022-11-28",
 }
-
-_client = anthropic.Anthropic()
 
 _REVIEW_PASSES = [
     {
@@ -88,49 +86,30 @@ def get_pr_diff(repo: str, pr_number: int) -> str:
 
 
 def _run_review_pass(diff: str, pr_title: str, pass_info: dict) -> str:
-    """Send one focused review pass to Claude and return the text response."""
-    with _client.messages.stream(
-        model="claude-opus-4-7",
-        max_tokens=4096,
-        thinking={"type": "adaptive"},
-        system=[
-            {
-                "type": "text",
-                "text": (
-                    "You are a senior software engineer performing a focused code review. "
-                    "Be concise, actionable, and specific. Use markdown. "
-                    "Group findings by severity: 🔴 Critical, 🟡 Warning, 🟢 Suggestion. "
-                    "If nothing noteworthy in your focus area, say so in one sentence."
-                ),
-                "cache_control": {"type": "ephemeral"},
-            }
-        ],
-        messages=[
-            {
-                "role": "user",
-                "content": [
-                    {
-                        "type": "text",
-                        "text": f"PR: **{pr_title}**\n\n```diff\n{diff}\n```",
-                        "cache_control": {"type": "ephemeral"},
-                    },
-                    {
-                        "type": "text",
-                        "text": (
-                            f"Review this PR diff focusing **only** on: {pass_info['focus']}. "
-                            "Do not repeat findings from other review areas."
-                        ),
-                    },
-                ],
-            }
-        ],
-    ) as stream:
-        final = stream.get_final_message()
-
-    return next(
-        (block.text for block in final.content if block.type == "text"),
-        "(no output)",
+    """Run one focused review pass via Claude CLI and return the text response."""
+    prompt = (
+        "You are a senior software engineer performing a focused code review. "
+        "Be concise, actionable, and specific. Use markdown. "
+        "Group findings by severity: 🔴 Critical, 🟡 Warning, 🟢 Suggestion. "
+        "If nothing noteworthy in your focus area, say so in one sentence.\n\n"
+        f"PR: **{pr_title}**\n\n"
+        f"```diff\n{diff}\n```\n\n"
+        f"Review this PR diff focusing **only** on: {pass_info['focus']}. "
+        "Do not repeat findings from other review areas."
     )
+    result = subprocess.run(
+        ["claude", "--dangerously-skip-permissions", "--print", prompt],
+        capture_output=True,
+        text=True,
+        timeout=300,
+    )
+    output = result.stdout.strip()
+    if result.returncode != 0 or not output:
+        stderr = result.stderr.strip()
+        raise RuntimeError(
+            f"Claude CLI failed (exit {result.returncode}): {stderr or '(no stderr)'}"
+        )
+    return output
 
 
 def review_pr(repo: str, pr_number: int) -> str:

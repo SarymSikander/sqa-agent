@@ -885,7 +885,10 @@ async def get_pr_detail(repo: str, pr_number: int):
 
 @app.post("/pr/review")
 async def review_pr_endpoint(body: PRReviewBody):
-    review_text = await asyncio.to_thread(_pr.review_pr, body.repo, body.pr_number)
+    try:
+        review_text = await asyncio.to_thread(_pr.review_pr, body.repo, body.pr_number)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"PR review failed: {e}")
     try:
         await asyncio.to_thread(
             _slack.send_message,
