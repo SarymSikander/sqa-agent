@@ -325,6 +325,53 @@ async def get_ticket_detail(issue_key: str):
         ],
     }
 
+def generate_test_cases(ticket_key, title, description):
+    import re
+
+    # Extract only relevant paragraphs from app_context
+    relevant = []
+    keywords = (title + ' ' + description).lower().split()
+    keywords = [k for k in keywords if len(k) > 3]
+
+    for para in APP_CONTEXT.split('\n\n'):
+        if any(kw in para.lower() for kw in keywords):
+            relevant.append(para.strip())
+
+    context = '\n\n'.join(relevant[:8])[:3000]
+
+    prompt = f'''You are a QA engineer for Zambeel e-commerce platform.
+Generate exactly 3 test cases as JSON for this ticket.
+
+Ticket: {title}
+Description: {description}
+
+Relevant context:
+{context}
+
+Return ONLY this JSON, no other text:
+{{"test_cases": [{{"test_name": "string", "url_path": "string", "steps": ["string"], "expected_result": "string", "evidence_selector": "string"}}]}}'''
+
+    print(f'[generate_test_cases] prompt length: {len(prompt)} chars')
+    print('Ollama thinking...')
+
+    try:
+        resp = requests.post(
+            OLLAMA_URL,
+            json={'model': OLLAMA_MODEL, 'prompt': prompt, 'stream': False, 'format': 'json'},
+            timeout=120
+        )
+        raw = resp.json().get('response', '')
+        print(f'[generate_test_cases] response: {raw[:500]}')
+        parsed = json.loads(raw)
+        if isinstance(parsed, dict) and 'test_cases' in parsed:
+            return parsed['test_cases']
+        if isinstance(parsed, list):
+            return parsed
+    except Exception as e:
+        print(f'[generate_test_cases] ERROR: {e}')
+    return []
+
+
 def _build_qa_report(*, issue_key, summary, env, frontend_branch, backend_branch,
                      test_cases, test_results, all_pass, new_status, elapsed):
     ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -488,76 +535,7 @@ async def run_qa_endpoint(issue_key: str, body: RunQABody):
         # ── Stage: generate test cases ─────────────────────────────────────────
         yield evt({"stage": "generating_test_cases", "status": "running"})
         yield f": keepalive\n\n"
-        portal_ctx = body.portal if body.portal else "all three portals (Seller, Admin, Agency)"
-        # Use up to 50KB of app context (already truncated at startup if >100KB)
-        app_ctx_section = f"\n\n## App Context\n{APP_CONTEXT}" if APP_CONTEXT else ""
-        print(f"\n[generate_test_cases] app_context available={bool(APP_CONTEXT)} chars={len(APP_CONTEXT)}")
-        prompt = (
-            f"You are a QA engineer for Zambeel, an e-commerce dropshipping platform with three portals:\n"
-            f"- Seller Portal: sellers manage products, orders, inventory, and storefronts\n"
-            f"- Admin Portal: platform admins manage orders, users, commissions, and settings\n"
-            f"- Agency Portal: agencies manage multiple seller accounts under their umbrella\n"
-            f"{app_ctx_section}\n\n"
-            f"Jira Ticket: {issue_key}\n"
-            f"Summary: {summary}\n"
-            f"Description: {description[:1500] or 'No description'}\n"
-            f"Recent Comments:\n{chr(10).join(comment_texts[:5]) or 'None'}\n\n"
-            f"Portal(s) under test: {portal_ctx}\n"
-            f"Environment: {body.env}\n\n"
-            f"Generate 5-8 specific, actionable Playwright test cases for this ticket. "
-            f"For each test case, include an 'evidence_selector' field: the exact CSS selector "
-            f"that proves the feature was tested (e.g. 'input[min=\"0\"]' for a zero commission test). "
-            f"Include a 'url_path' field: the frontend route path to navigate to for this test case "
-            f"(e.g. '/orders-management/dashboard' or '/seller/products'). "
-            f"Return ONLY a raw JSON array (no markdown, no code fences). "
-            f"Each element must have: test_name (string), description (string), url_path (string), "
-            f"steps (array of strings), expected_result (string), evidence_selector (string)."
-        )
-        print(f"\n[generate_test_cases] ---- PROMPT ({len(prompt)} chars) ----")
-        print(prompt[:2000])
-        if len(prompt) > 2000:
-            print(f"... [truncated, full prompt is {len(prompt)} chars]")
-        print(f"[generate_test_cases] ---- END PROMPT ----\n")
-        raw = ""
-        try:
-            def _call_ollama():
-                print("Ollama thinking... this may take a few minutes")
-                resp = requests.post(
-                    OLLAMA_URL,
-                    json={"model": OLLAMA_MODEL, "prompt": prompt, "stream": False, "format": "json"},
-                    timeout=600,
-                )
-                resp.raise_for_status()
-                return resp.json().get("response", "")
-
-            raw = await asyncio.to_thread(_call_ollama)
-            print(f"\n[generate_test_cases] ---- OLLAMA RESPONSE ({len(raw)} chars) ----")
-            print(raw[:3000])
-            if len(raw) > 3000:
-                print(f"... [truncated, full response is {len(raw)} chars]")
-            print(f"[generate_test_cases] ---- END RESPONSE ----\n")
-            if not raw:
-                print("[generate_test_cases] ERROR: Ollama returned empty response!")
-            if raw.startswith("```"):
-                parts = raw.split("```")
-                raw = parts[1].lstrip("json").strip() if len(parts) > 1 else raw
-            _parsed = json.loads(raw)
-            test_cases = _parsed.get("test_cases", []) if isinstance(_parsed, dict) else (_parsed if isinstance(_parsed, list) else [])
-            if not test_cases:
-                print(f"[generate_test_cases] ERROR: parsed JSON is not a list, got {type(_parsed)}: {_parsed}")
-            else:
-                print(f"[generate_test_cases] Successfully parsed {len(test_cases)} test cases")
-        except requests.exceptions.ConnectionError:
-            print("Ollama not running — start it with: ollama serve")
-            test_cases = []
-        except json.JSONDecodeError as e:
-            print(f"[generate_test_cases] JSON parse error: {e}\nRaw response was: {raw[:500]}")
-            test_cases = []
-        except Exception as e:
-            print(f"[generate_test_cases] ERROR calling Ollama: {type(e).__name__}: {e}")
-            if "Connection" in type(e).__name__ or "connect" in str(e).lower():
-                print("Ollama not running — start it with: ollama serve")
-            test_cases = []
+        test_cases = await asyncio.to_thread(generate_test_cases, issue_key, summary, description)
         # save as Jira comment regardless of parse success
         if test_cases:
             try:
