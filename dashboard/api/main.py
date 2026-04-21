@@ -357,7 +357,7 @@ def generate_test_cases(ticket_key, title, description):
 
         print(f'[generate_test_cases] running claude CLI (ticket={ticket_key})...')
         result = subprocess.run(
-            ['claude', '--print', claude_prompt],
+            ['claude', '--dangerously-skip-permissions', '--print', claude_prompt],
             capture_output=True, text=True, timeout=300,
         )
         output = (result.stdout or '') + (result.stderr or '')
