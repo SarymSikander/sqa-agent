@@ -18,7 +18,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 OLLAMA_URL = "http://localhost:11434/api/generate"
-OLLAMA_MODEL = "llama3.2"
+OLLAMA_MODEL = "qwen2.5:1.5b"
 
 app = FastAPI(title="Zambeel SQA Dashboard API", version="1.0.0")
 
@@ -45,13 +45,8 @@ _app_context_found = _APP_CONTEXT_PATH.exists()
 _app_context_size  = _APP_CONTEXT_PATH.stat().st_size if _app_context_found else 0
 print(f"[startup] app_context.md found={_app_context_found} path={_APP_CONTEXT_PATH} size={_app_context_size} bytes")
 
-_MAX_CONTEXT_BYTES = 100_000
-_TRUNCATE_TO_BYTES = 50_000
 try:
     _raw_ctx = _APP_CONTEXT_PATH.read_text()
-    if len(_raw_ctx.encode()) > _MAX_CONTEXT_BYTES:
-        print(f"[startup] app_context.md exceeds {_MAX_CONTEXT_BYTES} bytes — truncating to {_TRUNCATE_TO_BYTES} bytes")
-        _raw_ctx = _raw_ctx.encode()[:_TRUNCATE_TO_BYTES].decode("utf-8", errors="ignore")
     APP_CONTEXT = _raw_ctx
 except Exception as _e:
     print(f"[startup] Failed to load app_context.md: {_e}")
@@ -526,10 +521,11 @@ async def run_qa_endpoint(issue_key: str, body: RunQABody):
         raw = ""
         try:
             def _call_ollama():
+                print("Ollama thinking... this may take a few minutes")
                 resp = requests.post(
                     OLLAMA_URL,
                     json={"model": OLLAMA_MODEL, "prompt": prompt, "stream": False, "format": "json"},
-                    timeout=120,
+                    timeout=600,
                 )
                 resp.raise_for_status()
                 return resp.json().get("response", "")

@@ -2783,11 +2783,15 @@ async function _runQAStream(key, env, fe, be, portal, apiBase) {
   const base = apiBase || API_BASE;
   console.log('[RunQA] stream start', { key, env, fe, be, portal, base });
   try {
+    const _qaAbort = new AbortController();
+    const _qaTimeout = setTimeout(() => _qaAbort.abort(), 15 * 60 * 1000);
     const resp = await fetch(`${base}/jira/tickets/${key}/run-qa`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ env, frontend_branch: fe, backend_branch: be, portal }),
+      signal: _qaAbort.signal,
     });
+    clearTimeout(_qaTimeout);
     if (!resp.ok) {
       const err = await resp.json().catch(() => ({ detail: `HTTP ${resp.status}` }));
       throw new Error(err.detail || `HTTP ${resp.status}`);
