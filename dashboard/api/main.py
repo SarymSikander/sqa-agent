@@ -1,6 +1,8 @@
 import asyncio
 import json
 import os
+import subprocess
+import tempfile
 import time
 import requests
 from datetime import datetime
@@ -17,8 +19,6 @@ from fastapi.responses import StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-OLLAMA_URL = "http://localhost:11434/api/generate"
-OLLAMA_MODEL = "qwen2.5:1.5b"
 
 app = FastAPI(title="Zambeel SQA Dashboard API", version="1.0.0")
 
@@ -328,48 +328,83 @@ async def get_ticket_detail(issue_key: str):
 def generate_test_cases(ticket_key, title, description):
     import re
 
-    # Extract only relevant paragraphs from app_context
-    relevant = []
-    keywords = (title + ' ' + description).lower().split()
-    keywords = [k for k in keywords if len(k) > 3]
+    # Write ticket details + app_context to a temp file for reference
+    context_content = (
+        f"# Ticket: {ticket_key}\n"
+        f"## Title: {title}\n"
+        f"## Description:\n{description}\n\n"
+        f"## App Context:\n{APP_CONTEXT}\n"
+    )
 
-    for para in APP_CONTEXT.split('\n\n'):
-        if any(kw in para.lower() for kw in keywords):
-            relevant.append(para.strip())
-
-    context = '\n\n'.join(relevant[:8])[:3000]
-
-    prompt = f'''You are a QA engineer for Zambeel e-commerce platform.
-Generate exactly 3 test cases as JSON for this ticket.
-
-Ticket: {title}
-Description: {description}
-
-Relevant context:
-{context}
-
-Return ONLY this JSON, no other text:
-{{"test_cases": [{{"test_name": "string", "url_path": "string", "steps": ["string"], "expected_result": "string", "evidence_selector": "string"}}]}}'''
-
-    print(f'[generate_test_cases] prompt length: {len(prompt)} chars')
-    print('Ollama thinking...')
-
+    context_file = None
     try:
-        resp = requests.post(
-            OLLAMA_URL,
-            json={'model': OLLAMA_MODEL, 'prompt': prompt, 'stream': False, 'format': 'json'},
-            timeout=120
+        with tempfile.NamedTemporaryFile(
+            mode='w', suffix='.md',
+            prefix=f'qa_context_{ticket_key}_',
+            delete=False
+        ) as f:
+            f.write(context_content)
+            context_file = f.name
+        print(f'[generate_test_cases] wrote context to {context_file}')
+
+        claude_prompt = (
+            f"Read the zambeel-fe source at ~/Documents/GitHub/zambeel-fe, "
+            f"understand this ticket: {title} - {description}, "
+            f"write a Playwright test script that actually tests this feature with real CSS selectors "
+            f"from the source code, save it to /tmp/qa_test_{ticket_key}.py, "
+            f"then run it with python3 and return the output"
         )
-        raw = resp.json().get('response', '')
-        print(f'[generate_test_cases] response: {raw[:500]}')
-        parsed = json.loads(raw)
-        if isinstance(parsed, dict) and 'test_cases' in parsed:
-            return parsed['test_cases']
-        if isinstance(parsed, list):
-            return parsed
+
+        print(f'[generate_test_cases] running claude CLI (ticket={ticket_key})...')
+        result = subprocess.run(
+            ['claude', '--print', claude_prompt],
+            capture_output=True, text=True, timeout=300,
+        )
+        output = (result.stdout or '') + (result.stderr or '')
+        print(f'[generate_test_cases] claude output ({len(output)} chars): {output[:500]}')
+
+        # Try to extract a structured JSON test_cases block from the output
+        json_match = re.search(r'\{[^{}]*"test_cases"[^{}]*\[.*?\]\s*\}', output, re.DOTALL)
+        if json_match:
+            try:
+                parsed = json.loads(json_match.group())
+                if isinstance(parsed, dict) and 'test_cases' in parsed:
+                    return parsed['test_cases']
+            except json.JSONDecodeError:
+                pass
+
+        # Fall back: wrap execution output as a single test case entry
+        passed = (
+            result.returncode == 0
+            or 'passed' in output.lower()
+            or 'PASSED' in output
+        )
+        return [{
+            'test_name': f'Claude-generated test — {ticket_key}',
+            'url_path': '/',
+            'steps': [
+                f'Claude CLI generated and executed Playwright test for: {title}',
+                'Script saved to /tmp/qa_test_{}.py'.format(ticket_key),
+                'Executed with python3',
+            ],
+            'expected_result': 'Test passes without errors',
+            'evidence_selector': '',
+            'execution_output': output[:2000],
+            'status': 'PASS' if passed else 'FAIL',
+        }]
+
+    except subprocess.TimeoutExpired:
+        print(f'[generate_test_cases] claude CLI timed out after 300s')
+        return []
     except Exception as e:
         print(f'[generate_test_cases] ERROR: {e}')
-    return []
+        return []
+    finally:
+        if context_file:
+            try:
+                os.unlink(context_file)
+            except Exception:
+                pass
 
 
 def _build_qa_report(*, issue_key, summary, env, frontend_branch, backend_branch,
