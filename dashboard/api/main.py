@@ -36,12 +36,28 @@ REPORTS_DIR = _HERE / "reports"
 SCREENSHOTS_DIR.mkdir(exist_ok=True)
 REPORTS_DIR.mkdir(exist_ok=True)
 
-# Load app context for Claude prompts (template Sarim fills in)
-_APP_CONTEXT_PATH = Path(__file__).resolve().parent.parent.parent / "app_context.md"
+# Load app context for Claude prompts — prefer local copy, fall back to repo root
+_APP_CONTEXT_PATH = Path(__file__).resolve().parent / "app_context.md"
+if not _APP_CONTEXT_PATH.exists():
+    _APP_CONTEXT_PATH = Path(__file__).resolve().parent.parent.parent / "app_context.md"
+
+_app_context_found = _APP_CONTEXT_PATH.exists()
+_app_context_size  = _APP_CONTEXT_PATH.stat().st_size if _app_context_found else 0
+print(f"[startup] app_context.md found={_app_context_found} path={_APP_CONTEXT_PATH} size={_app_context_size} bytes")
+
+_MAX_CONTEXT_BYTES = 100_000
+_TRUNCATE_TO_BYTES = 50_000
 try:
-    APP_CONTEXT = _APP_CONTEXT_PATH.read_text()
-except Exception:
+    _raw_ctx = _APP_CONTEXT_PATH.read_text()
+    if len(_raw_ctx.encode()) > _MAX_CONTEXT_BYTES:
+        print(f"[startup] app_context.md exceeds {_MAX_CONTEXT_BYTES} bytes — truncating to {_TRUNCATE_TO_BYTES} bytes")
+        _raw_ctx = _raw_ctx.encode()[:_TRUNCATE_TO_BYTES].decode("utf-8", errors="ignore")
+    APP_CONTEXT = _raw_ctx
+except Exception as _e:
+    print(f"[startup] Failed to load app_context.md: {_e}")
     APP_CONTEXT = ""
+
+print(f"[startup] APP_CONTEXT loaded: {len(APP_CONTEXT)} chars")
 
 app.mount("/screenshots", StaticFiles(directory=str(SCREENSHOTS_DIR)), name="screenshots")
 
@@ -478,7 +494,9 @@ async def run_qa_endpoint(issue_key: str, body: RunQABody):
         yield evt({"stage": "generating_test_cases", "status": "running"})
         yield f": keepalive\n\n"
         portal_ctx = body.portal if body.portal else "all three portals (Seller, Admin, Agency)"
-        app_ctx_section = f"\n\n## App Context\n{APP_CONTEXT[:3000]}" if APP_CONTEXT else ""
+        # Use up to 50KB of app context (already truncated at startup if >100KB)
+        app_ctx_section = f"\n\n## App Context\n{APP_CONTEXT}" if APP_CONTEXT else ""
+        print(f"\n[generate_test_cases] app_context available={bool(APP_CONTEXT)} chars={len(APP_CONTEXT)}")
         prompt = (
             f"You are a QA engineer for Zambeel, an e-commerce dropshipping platform with three portals:\n"
             f"- Seller Portal: sellers manage products, orders, inventory, and storefronts\n"
@@ -492,28 +510,48 @@ async def run_qa_endpoint(issue_key: str, body: RunQABody):
             f"Portal(s) under test: {portal_ctx}\n"
             f"Environment: {body.env}\n\n"
             f"Generate 5-8 specific, actionable Playwright test cases for this ticket. "
-            f"For each test case, also include an 'evidence_selector' field: the exact CSS selector "
-            f"or UI element that proves the feature was tested (e.g. 'input[min=\"0\"]' for a zero "
-            f"commission test, or 'Found input field with min=0 attribute'). "
+            f"For each test case, include an 'evidence_selector' field: the exact CSS selector "
+            f"that proves the feature was tested (e.g. 'input[min=\"0\"]' for a zero commission test). "
+            f"Include a 'url_path' field: the frontend route path to navigate to for this test case "
+            f"(e.g. '/orders-management/dashboard' or '/seller/products'). "
             f"Return ONLY a raw JSON array (no markdown, no code fences). "
-            f"Each element must have: test_name (string), description (string), "
+            f"Each element must have: test_name (string), description (string), url_path (string), "
             f"steps (array of strings), expected_result (string), evidence_selector (string)."
         )
+        print(f"\n[generate_test_cases] ---- PROMPT ({len(prompt)} chars) ----")
+        print(prompt[:2000])
+        if len(prompt) > 2000:
+            print(f"... [truncated, full prompt is {len(prompt)} chars]")
+        print(f"[generate_test_cases] ---- END PROMPT ----\n")
         try:
             msg = await asyncio.to_thread(
                 _ai_client.messages.create,
-                model="claude-opus-4-7",
-                max_tokens=2048,
+                model="claude-sonnet-4-6",
+                max_tokens=4096,
                 messages=[{"role": "user", "content": prompt}],
             )
-            raw = msg.content[0].text.strip()
+            raw = msg.content[0].text.strip() if msg.content else ""
+            print(f"\n[generate_test_cases] ---- CLAUDE RESPONSE ({len(raw)} chars) ----")
+            print(raw[:3000])
+            if len(raw) > 3000:
+                print(f"... [truncated, full response is {len(raw)} chars]")
+            print(f"[generate_test_cases] ---- END RESPONSE ----\n")
+            if not raw:
+                print("[generate_test_cases] ERROR: Claude returned empty response!")
             if raw.startswith("```"):
                 parts = raw.split("```")
                 raw = parts[1].lstrip("json").strip() if len(parts) > 1 else raw
             test_cases = json.loads(raw)
             if not isinstance(test_cases, list):
+                print(f"[generate_test_cases] ERROR: parsed JSON is not a list, got {type(test_cases)}: {test_cases}")
                 test_cases = []
+            else:
+                print(f"[generate_test_cases] Successfully parsed {len(test_cases)} test cases")
+        except json.JSONDecodeError as e:
+            print(f"[generate_test_cases] JSON parse error: {e}\nRaw response was: {raw[:500]}")
+            test_cases = []
         except Exception as e:
+            print(f"[generate_test_cases] ERROR calling Claude API: {type(e).__name__}: {e}")
             test_cases = []
         # save as Jira comment regardless of parse success
         if test_cases:
@@ -532,29 +570,62 @@ async def run_qa_endpoint(issue_key: str, body: RunQABody):
         # ── Stage: run Playwright tests ────────────────────────────────────────
         yield evt({"stage": "running_tests", "status": "running"})
         portals = [body.portal] if (body.portal and body.portal != "all") else ["seller", "admin", "agency"]
+
+        if test_cases:
+            print(f"\n[run_tests] Using run_qa_test_cases with {len(test_cases)} AI-generated test cases")
+        else:
+            print(f"\n[run_tests] No test cases generated — falling back to login-only run_tests()")
+
         for portal in portals:
             yield f": keepalive\n\n"
+            print(f"\n[run_tests] Running portal={portal} env={run_env} use_ai_cases={bool(test_cases)}")
             try:
-                status, res = await asyncio.to_thread(_playwright.run_tests, portal, run_env)
-                r = res if isinstance(res, dict) else {}
-                screenshots_for_portal = r.get("screenshots", [])
-                test_results.append({
-                    "portal":           portal,
-                    "status":           status,
-                    "message":          r.get("message", "") or str(res),
-                    "url":              r.get("url"),
-                    "console_errors":   r.get("console_errors", []),
-                    "load_time_ms":     r.get("load_time_ms", 0),
-                    "nav_elements_found": r.get("nav_elements_found", []),
-                    "screenshots":      [
-                        {**s, "url": f"/screenshots/{s['filename']}"}
-                        for s in screenshots_for_portal
-                        if s.get("filename")
-                    ],
-                    "execution_log":    r.get("execution_log", []),
-                    "feature_evidence": r.get("feature_evidence", []),
-                })
+                if test_cases:
+                    r = await asyncio.to_thread(
+                        _playwright.run_qa_test_cases, portal, run_env, test_cases
+                    )
+                    status = r.get("status", "FAIL")
+                    print(f"[run_tests] run_qa_test_cases done: status={status} evidence={len(r.get('feature_evidence', []))} screenshots={len(r.get('screenshots', []))}")
+                    screenshots_for_portal = r.get("screenshots", [])
+                    test_results.append({
+                        "portal":             portal,
+                        "status":             status,
+                        "message":            r.get("message", ""),
+                        "url":                r.get("url"),
+                        "console_errors":     r.get("console_errors", []),
+                        "load_time_ms":       r.get("load_time_ms", 0),
+                        "nav_elements_found": r.get("nav_elements_found", []),
+                        "screenshots":        [
+                            {**s, "url": f"/screenshots/{s['filename']}"}
+                            for s in screenshots_for_portal
+                            if s.get("filename")
+                        ],
+                        "execution_log":      r.get("execution_log", []),
+                        "feature_evidence":   r.get("feature_evidence", []),
+                    })
+                else:
+                    status, res = await asyncio.to_thread(_playwright.run_tests, portal, run_env)
+                    r = res if isinstance(res, dict) else {}
+                    print(f"[run_tests] run_tests done: status={status}")
+                    screenshots_for_portal = r.get("screenshots", [])
+                    test_results.append({
+                        "portal":             portal,
+                        "status":             status,
+                        "message":            r.get("message", "") or str(res),
+                        "url":                r.get("url"),
+                        "console_errors":     r.get("console_errors", []),
+                        "load_time_ms":       r.get("load_time_ms", 0),
+                        "nav_elements_found": r.get("nav_elements_found", []),
+                        "screenshots":        [
+                            {**s, "url": f"/screenshots/{s['filename']}"}
+                            for s in screenshots_for_portal
+                            if s.get("filename")
+                        ],
+                        "execution_log":      r.get("execution_log", []),
+                        "feature_evidence":   r.get("feature_evidence", []),
+                    })
             except Exception as e:
+                print(f"[run_tests] ERROR for portal={portal}: {type(e).__name__}: {e}")
                 test_results.append({
                     "portal": portal, "status": "ERROR", "message": str(e),
                     "url": None, "console_errors": [], "load_time_ms": 0,
