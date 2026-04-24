@@ -164,64 +164,6 @@
       0%, 100% { opacity: 1; box-shadow: 0 0 6px var(--success); }
       50% { opacity: 0.7; box-shadow: 0 0 14px var(--success); }
     }
-    .agent-mode-toggle {
-      margin-top: 14px;
-      padding-top: 14px;
-      border-top: 1px solid var(--border);
-    }
-    .agent-mode-label {
-      font-size: 10px;
-      font-weight: 600;
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
-      color: var(--text3);
-      margin-bottom: 8px;
-    }
-    .toggle-pills {
-      display: flex;
-      background: rgba(0,0,0,0.05);
-      border-radius: 6px;
-      padding: 2px;
-      gap: 2px;
-    }
-    .toggle-pill {
-      flex: 1;
-      text-align: center;
-      padding: 5px 8px;
-      border-radius: 4px;
-      font-size: 11.5px;
-      font-weight: 600;
-      cursor: pointer;
-      transition: all .18s;
-      color: var(--text3);
-      user-select: none;
-    }
-    .toggle-pill.active {
-      background: var(--bg2);
-      color: var(--text);
-      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-    }
-    .toggle-pill.active.local { color: var(--success); }
-    .local-agent-badge {
-      display: none;
-      align-items: center;
-      gap: 6px;
-      background: var(--success-bg);
-      border: 1px solid rgba(22,163,74,0.3);
-      border-radius: 99px;
-      padding: 4px 12px 4px 8px;
-      font-size: 11.5px;
-      font-weight: 600;
-      color: var(--success);
-    }
-    .local-agent-badge.visible { display: flex; }
-    .local-agent-badge-dot {
-      width: 7px; height: 7px;
-      border-radius: 50%;
-      background: var(--success);
-      box-shadow: 0 0 8px var(--success);
-      flex-shrink: 0;
-    }
 
     /* ── Header ──────────────────────────────────────────────────────────────── */
     #topbar {
@@ -1230,61 +1172,6 @@
     }
     .qa-tc-name { font-weight: 600; color: var(--text); margin-bottom: 3px; }
     .qa-tc-desc { color: var(--text2); font-size: 11.5px; }
-    /* Local setup checklist */
-    .qa-setup-header {
-      font-size: 14px; font-weight: 700; color: var(--text);
-      margin-bottom: 16px; display: flex; align-items: center; gap: 8px;
-    }
-    .qa-setup-header span { font-size: 18px; }
-    .qa-setup-step {
-      background: var(--card);
-      border: 1px solid var(--border);
-      border-radius: var(--r-sm);
-      padding: 14px;
-      margin-bottom: 10px;
-    }
-    .qa-step-num {
-      display: inline-flex; align-items: center; justify-content: center;
-      width: 20px; height: 20px;
-      background: #5B3DF5; color: #fff;
-      border-radius: 50%; font-size: 11px; font-weight: 700;
-      margin-right: 6px; flex-shrink: 0;
-    }
-    .qa-step-title {
-      font-size: 12.5px; font-weight: 600; color: var(--text);
-      display: flex; align-items: center; margin-bottom: 8px;
-    }
-    .qa-step-cmd-wrap {
-      display: flex; align-items: center; gap: 6px;
-      background: #1e1e2e; border-radius: var(--r-xs);
-      padding: 8px 10px; margin-bottom: 6px;
-    }
-    .qa-step-cmd {
-      font-family: monospace; font-size: 11.5px; color: #e2e8f0;
-      flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-    }
-    .qa-copy-btn {
-      background: rgba(255,255,255,0.12); border: none; color: #e2e8f0;
-      border-radius: 4px; padding: 3px 8px; font-size: 11px; cursor: pointer;
-      flex-shrink: 0; transition: background .15s;
-    }
-    .qa-copy-btn:hover { background: rgba(255,255,255,0.22); }
-    .qa-check-row { display: flex; align-items: center; gap: 8px; margin-top: 6px; }
-    .qa-check-btn {
-      font-size: 11px; padding: 3px 10px; border-radius: 4px;
-      border: 1px solid var(--border); background: var(--bg2); cursor: pointer;
-      color: var(--text2); transition: background .15s;
-    }
-    .qa-check-btn:hover { background: var(--bg); }
-    .qa-check-status { font-size: 11px; color: var(--text3); }
-    .qa-setup-run-btn {
-      width: 100%; margin-top: 16px; padding: 11px;
-      background: linear-gradient(135deg,#5B3DF5,#8B5CF6);
-      color: #fff; border: none; border-radius: var(--r-sm);
-      font-size: 13px; font-weight: 600; cursor: pointer;
-      transition: opacity .15s;
-    }
-    .qa-setup-run-btn:hover { opacity: .9; }
 
     /* ── QA Evidence / Metrics ──────────────────────────────────────────────── */
     .qa-metrics-row {
@@ -1414,13 +1301,6 @@
       <div class="api-dot" id="api-dot"></div>
       <span id="api-status-text">Connecting…</span>
     </div>
-    <div class="agent-mode-toggle">
-      <div class="agent-mode-label">Agent Mode</div>
-      <div class="toggle-pills">
-        <div class="toggle-pill active" id="mode-cloud" onclick="setAgentMode('cloud')">Cloud</div>
-        <div class="toggle-pill local" id="mode-local" onclick="setAgentMode('local')">Local</div>
-      </div>
-    </div>
   </div>
 </aside>
 
@@ -1440,9 +1320,6 @@
     <div class="last-updated-badge" id="last-updated-badge">
       <span class="lu-dot"></span>
       Updated <span id="last-updated-time">—</span>
-    </div>
-    <div class="local-agent-badge" id="local-agent-badge">
-      <span class="local-agent-badge-dot"></span>Local Agent Active
     </div>
     <div class="live-dot">Live</div>
   </header>
@@ -1821,32 +1698,8 @@
       <div class="rqa-field">
         <label>Test Environment</label>
         <div class="rqa-radio-group">
-          <label class="rqa-radio-label"><input type="radio" name="rqa-env" value="local" onchange="rqaEnvChanged()"> Local</label>
-          <label class="rqa-radio-label"><input type="radio" name="rqa-env" value="staging" checked onchange="rqaEnvChanged()"> Staging</label>
-        </div>
-        <div id="rqa-local-warning" class="hidden" style="margin-top:10px;display:flex;align-items:flex-start;gap:8px;background:#FFFBEB;border:1px solid #FCD34D;border-radius:var(--r-sm);padding:10px 12px;font-size:12px;color:#92400E;line-height:1.5">
-          <span style="flex-shrink:0;font-size:14px">⚠️</span>
-          <span>Branch switching requires running the agent locally on your machine. On the cloud dashboard, tests will run on <strong>staging</strong> instead.</span>
-        </div>
-      </div>
-
-      <div id="rqa-branch-section">
-        <div class="rqa-field">
-          <label>Frontend Branch</label>
-          <input id="rqa-fe-input" type="text" placeholder="e.g. OMS-215" />
-          <label class="rqa-checkbox-row">
-            <input type="checkbox" id="rqa-fe-same" checked onchange="rqaFeSameToggle()">
-            Same as ticket number
-          </label>
-        </div>
-
-        <div class="rqa-field">
-          <label>Backend Branch</label>
-          <input id="rqa-be-input" type="text" value="main" />
-          <label class="rqa-checkbox-row">
-            <input type="checkbox" id="rqa-be-main" checked onchange="rqaBeMainToggle()">
-            Keep on main
-          </label>
+          <label class="rqa-radio-label"><input type="radio" name="rqa-env" value="staging" checked> Staging</label>
+          <label class="rqa-radio-label"><input type="radio" name="rqa-env" value="production"> Production</label>
         </div>
       </div>
 
@@ -1932,16 +1785,7 @@
 // Config
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 const CLOUD_API = 'https://sarimsikander-zambeel-sqa.hf.space';
-const LOCAL_API  = 'http://localhost:8000';
-let   API_BASE   = CLOUD_API;
-
-function setAgentMode(mode) {
-  API_BASE = mode === 'local' ? LOCAL_API : CLOUD_API;
-  localStorage.setItem('agentMode', mode);
-  document.getElementById('mode-cloud').classList.toggle('active', mode === 'cloud');
-  document.getElementById('mode-local').classList.toggle('active', mode === 'local');
-  document.getElementById('local-agent-badge').classList.toggle('visible', mode === 'local');
-}
+const API_BASE  = CLOUD_API;
 
 // ── State ─────────────────────────────────────────────────────────────────────
 const state = {
@@ -2616,18 +2460,6 @@ async function prLoad(repo) {
 }
 
 function prReviewErrorHtml(msg) {
-  const LOCAL_PREFIX = 'PR Review is only available when running the SQA agent locally.';
-  if (msg && msg.startsWith(LOCAL_PREFIX)) {
-    const cmd = 'cd ~/Desktop/sqa-agent && source venv/bin/activate && cd dashboard/api && uvicorn main:app --port 8000';
-    return `<div style="padding:16px 0">
-      <div style="font-weight:600;color:var(--text);margin-bottom:8px">PR Review — Local Only</div>
-      <div style="color:var(--text2);font-size:13px;margin-bottom:12px">
-        PR Review requires the Claude CLI, which is only available when the SQA agent is running locally.
-        Start it with the command below:
-      </div>
-      <div style="position:relative;background:rgba(0,0,0,0.06);border:1px solid var(--border);border-radius:8px;padding:12px 48px 12px 14px;font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text);word-break:break-all">${esc(cmd)}<button onclick="navigator.clipboard.writeText('${cmd.replace(/'/g,"\\'")}')" title="Copy" style="position:absolute;top:8px;right:8px;background:none;border:none;cursor:pointer;color:var(--text3);padding:2px 4px;border-radius:4px;font-size:11px">Copy</button></div>
-    </div>`;
-  }
   return `<div style="color:var(--error);font-size:13px">${esc(msg)}</div>`;
 }
 
@@ -2748,32 +2580,22 @@ async function submitJiraPanelComment() {
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 const QA_STAGES = [
-  { id: 'analysing_ticket',      label: 'Analysing ticket with AI',  localOnly: false },
-  { id: 'switching_branches',    label: 'Switching branches',         localOnly: true  },
-  { id: 'generating_test_cases', label: 'Generating test cases',      localOnly: false },
-  { id: 'running_tests',         label: 'Running Playwright tests',   localOnly: false },
-  { id: 'updating_jira',         label: 'Updating Jira status',       localOnly: false },
-  { id: 'sending_slack',         label: 'Sending Slack report',       localOnly: false },
+  { id: 'analysing_ticket',      label: 'Analysing ticket with AI' },
+  { id: 'generating_test_cases', label: 'Generating test cases'    },
+  { id: 'running_tests',         label: 'Running Playwright tests' },
+  { id: 'updating_jira',         label: 'Updating Jira status'     },
+  { id: 'sending_slack',         label: 'Sending Slack report'     },
 ];
 
 let _rqaEnv = 'staging';
-let _rqaLocalSetupData = null;
 
 function openRunQAModal() {
   if (!_jiraCurrentKey) return;
-  _rqaCurrentKey = _jiraCurrentKey;          // save before closing the panel
-  closeJiraPanel();                           // close the panel (nulls _jiraCurrentKey)
+  _rqaCurrentKey = _jiraCurrentKey;
+  closeJiraPanel();
   document.getElementById('rqa-modal-key').textContent = _rqaCurrentKey;
-  // reset to defaults
   document.querySelector('input[name="rqa-env"][value="staging"]').checked = true;
-  document.getElementById('rqa-fe-same').checked   = true;
-  document.getElementById('rqa-be-main').checked   = true;
-  document.getElementById('rqa-fe-input').value    = _rqaCurrentKey;
-  document.getElementById('rqa-fe-input').disabled = true;
-  document.getElementById('rqa-be-input').value    = 'main';
-  document.getElementById('rqa-be-input').disabled = true;
-  document.getElementById('rqa-portal').value      = '';
-  rqaEnvChanged(); // hide branch section for staging (default)
+  document.getElementById('rqa-portal').value = '';
   document.getElementById('run-qa-modal').classList.add('open');
 }
 
@@ -2782,27 +2604,6 @@ function closeRunQAModal() {
   btnLoad('rqa-confirm-btn', false);
 }
 
-function rqaEnvChanged() {
-  const isLocal = document.querySelector('input[name="rqa-env"]:checked').value === 'local';
-  const warn    = document.getElementById('rqa-local-warning');
-  const branch  = document.getElementById('rqa-branch-section');
-  if (warn)   { warn.style.display   = isLocal ? 'flex' : 'none'; }
-  if (branch) { branch.style.display = isLocal ? ''     : 'none'; }
-}
-
-function rqaFeSameToggle() {
-  const cb = document.getElementById('rqa-fe-same');
-  const inp = document.getElementById('rqa-fe-input');
-  if (cb.checked) { inp.value = _rqaCurrentKey; inp.disabled = true; }
-  else { inp.disabled = false; inp.focus(); }
-}
-
-function rqaBeMainToggle() {
-  const cb = document.getElementById('rqa-be-main');
-  const inp = document.getElementById('rqa-be-input');
-  if (cb.checked) { inp.value = 'main'; inp.disabled = true; }
-  else { inp.disabled = false; inp.focus(); }
-}
 
 function _qaStageIcon(status) {
   if (status === 'pending')  return '<span style="color:var(--text3);font-size:16px">○</span>';
@@ -2814,7 +2615,7 @@ function _qaStageIcon(status) {
 }
 
 function _buildProgressHTML(env, key) {
-  const stages = QA_STAGES.filter(s => !s.localOnly || env === 'local');
+  const stages = QA_STAGES;
   const rows = stages.map(s => `
     <div class="qa-stage" id="qas-${s.id}">
       <div class="qa-stage-icon" id="qas-icon-${s.id}">${_qaStageIcon('pending')}</div>
@@ -2844,19 +2645,9 @@ function _setQAStage(id, status, subText) {
 
 async function confirmRunQA() {
   const env    = document.querySelector('input[name="rqa-env"]:checked').value;
-  const isLocal = env === 'local';
-  // For staging the branch section is hidden — use sensible defaults
-  const frontend_branch = isLocal
-    ? document.getElementById('rqa-fe-input').value.trim()
-    : (_rqaCurrentKey || 'main');
-  const backend_branch  = isLocal
-    ? document.getElementById('rqa-be-input').value.trim()
-    : 'main';
-  const portal          = document.getElementById('rqa-portal').value;
-  const key             = _rqaCurrentKey;
+  const portal = document.getElementById('rqa-portal').value;
+  const key    = _rqaCurrentKey;
   if (!key) { toast('No ticket selected', 'error'); return; }
-  if (isLocal && !frontend_branch) { toast('Enter a frontend branch', 'warn'); return; }
-  if (isLocal && !backend_branch)  { toast('Enter a backend branch',  'warn'); return; }
 
   btnLoad('rqa-confirm-btn', true);
   closeRunQAModal();
@@ -2869,7 +2660,7 @@ async function confirmRunQA() {
   document.getElementById('jira-panel').classList.add('open');
   btnLoad('jira-run-qa-btn', true);
 
-  await _runQAStream(key, env, frontend_branch, backend_branch, portal);
+  await _runQAStream(key, env, key || 'main', 'main', portal);
   btnLoad('jira-run-qa-btn', false);
 }
 
@@ -2916,106 +2707,11 @@ async function _runQAStream(key, env, fe, be, portal, apiBase) {
   }
 }
 
-async function runQALocal() {
-  if (!_rqaLocalSetupData) {
-    console.warn('[RunQA] _rqaLocalSetupData is null — cannot run local QA');
-    toast('Setup data missing — please reopen the ticket and run QA again', 'error');
-    return;
-  }
-  const { issue_key, frontend_branch, backend_branch, portal } = _rqaLocalSetupData;
-  console.log('[RunQA] runQALocal called', { issue_key, frontend_branch, backend_branch, portal });
-  Object.keys(_qaPortalProgress).forEach(k => delete _qaPortalProgress[k]);
-  document.getElementById('jira-panel-body').innerHTML = _buildProgressHTML('local', issue_key);
-  document.getElementById('jira-panel-summary').textContent = 'QA Running…';
-  btnLoad('jira-run-qa-btn', true);
-  // Use local agent running at localhost:8000 — HuggingFace can't reach local repos
-  await _runQAStream(issue_key, 'local', frontend_branch, backend_branch, portal, 'http://localhost:8000');
-  btnLoad('jira-run-qa-btn', false);
-}
-
-function copyQACmd(elemId) {
-  const el = document.getElementById(elemId);
-  if (!el) return;
-  navigator.clipboard.writeText(el.textContent.trim()).then(() => {
-    toast('Copied!', 'success', 1500);
-  }).catch(() => {});
-}
-
-async function checkQAServer(url, statusId) {
-  const el = document.getElementById(statusId);
-  if (el) { el.textContent = 'Checking…'; el.style.color = 'var(--text3)'; }
-  try {
-    await fetch(url, { mode: 'no-cors', signal: AbortSignal.timeout(3000) });
-    if (el) { el.textContent = '✓ Running'; el.style.color = 'var(--success)'; }
-  } catch(e) {
-    if (el) { el.textContent = '✗ Not reachable'; el.style.color = 'var(--error)'; }
-  }
-}
-
-function _showLocalSetupChecklist(data) {
-  _rqaLocalSetupData = data;
-  const { issue_key, frontend_branch, backend_branch, portal } = data;
-  const beCmd = `cd ~/Documents/GitHub/zambeel-api && git checkout ${backend_branch} && npm run server`;
-  const feCmd = `cd ~/Documents/GitHub/zambeel-fe && git checkout ${frontend_branch} && npm run dev`;
-
-  document.getElementById('jira-panel-body').innerHTML = `
-    <div class="qa-setup-header"><span>⚙️</span> Local Setup Required</div>
-    <div style="font-size:12.5px;color:var(--text2);margin-bottom:16px;line-height:1.5">
-      The QA agent is running on the cloud and can't reach your local repos directly.
-      Complete these steps on your machine, then click <strong>Run QA Now</strong>.
-    </div>
-
-    <div class="qa-setup-step">
-      <div class="qa-step-title"><span class="qa-step-num">1</span>Start the backend server</div>
-      <div class="qa-step-cmd-wrap">
-        <span class="qa-step-cmd" id="qa-cmd-be">${esc(beCmd)}</span>
-        <button class="qa-copy-btn" onclick="copyQACmd('qa-cmd-be')">Copy</button>
-      </div>
-      <div class="qa-check-row">
-        <button class="qa-check-btn" onclick="checkQAServer('http://localhost:3000/health','qa-be-status')">Check</button>
-        <span class="qa-check-status" id="qa-be-status">—</span>
-      </div>
-    </div>
-
-    <div class="qa-setup-step">
-      <div class="qa-step-title"><span class="qa-step-num">2</span>Start the frontend server</div>
-      <div class="qa-step-cmd-wrap">
-        <span class="qa-step-cmd" id="qa-cmd-fe">${esc(feCmd)}</span>
-        <button class="qa-copy-btn" onclick="copyQACmd('qa-cmd-fe')">Copy</button>
-      </div>
-      <div class="qa-check-row">
-        <button class="qa-check-btn" onclick="checkQAServer('http://localhost:5173','qa-fe-status')">Check</button>
-        <span class="qa-check-status" id="qa-fe-status">—</span>
-      </div>
-    </div>
-
-    <div class="qa-setup-step">
-      <div class="qa-step-title"><span class="qa-step-num">3</span>Branches are already set</div>
-      <div style="font-size:12px;color:var(--text2)">
-        Frontend: <code style="background:var(--bg);padding:1px 5px;border-radius:3px">${esc(frontend_branch)}</code>
-        &nbsp;Backend: <code style="background:var(--bg);padding:1px 5px;border-radius:3px">${esc(backend_branch)}</code>
-      </div>
-      <div style="font-size:11.5px;color:var(--text3);margin-top:4px">
-        The steps above already include <code>git checkout</code> for each repo.
-      </div>
-    </div>
-
-    <button class="qa-setup-run-btn" onclick="runQALocal()">
-      ✓ All Ready — Run QA Now
-    </button>
-  `;
-  document.getElementById('jira-panel-summary').textContent = 'Local Setup Required';
-}
 
 const _qaPortalProgress = {};
 
 function _handleQAEvent(ev) {
   const { stage, status, message, portal, result, count, all_pass, new_status } = ev;
-
-  if (stage === 'needs_local_setup') {
-    _showLocalSetupChecklist(ev);
-    return;
-  }
 
   if (stage === 'running_tests' && status === 'progress') {
     if (!_qaPortalProgress[portal]) {
@@ -3031,7 +2727,6 @@ function _handleQAEvent(ev) {
   }
 
   if (stage === 'done') {
-    if (ev.result && ev.result.needs_local_setup) return; // checklist already shown
     _showQAFinalResult(ev.result, ev.error);
     return;
   }
@@ -3288,9 +2983,6 @@ async function prReviewFromPanel() {
 // ── Init ──────────────────────────────────────────────────────────────────────
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 document.addEventListener('DOMContentLoaded', () => {
-  // Restore agent mode from localStorage
-  setAgentMode(localStorage.getItem('agentMode') || 'cloud');
-
   // Nav clicks
   document.querySelectorAll('.nav-item[data-page]').forEach(el => {
     el.addEventListener('click', () => navigate(el.dataset.page));
