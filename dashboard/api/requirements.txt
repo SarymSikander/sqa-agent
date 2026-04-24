@@ -4,6 +4,6 @@ python-multipart
 python-dotenv
 requests
 gitpython
-anthropic
+openai
 playwright
 mysql-connector-python
