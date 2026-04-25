@@ -336,6 +336,296 @@ def run_tests(portal, env):
 
 
 # ---------------------------------------------------------------------------
+# AI test case executor
+# ---------------------------------------------------------------------------
+
+def run_qa_test_cases(portal: str, env: str, test_cases: list) -> dict:
+    """
+    Execute AI-generated structured test cases for a single portal/env.
+
+    Each test case step string begins with a keyword:
+      CLICK: selector
+      FILL: selector | value
+      WAIT: selector
+      NAVIGATE: /path
+      ASSERT_EXISTS: selector
+      ASSERT_NOT_EXISTS: selector
+      ASSERT_TEXT: selector | expected text
+      SCREENSHOT: label
+
+    After all steps, the evidence_selector is checked to determine PASS/FAIL.
+    Returns a result dict compatible with run_tests().
+    """
+    portal = portal.lower()
+    env    = env.lower()
+
+    url = URL_MAP.get(env)
+    if not url:
+        return {
+            "status": "FAIL",
+            "message": f"Unknown environment '{env}'. Choose: local, staging, production.",
+            "url": None, "console_errors": [], "nav_elements_found": [], "load_time_ms": 0,
+            "screenshot_path": None, "screenshots": [], "execution_log": [],
+            "feature_evidence": [], "steps_executed": 0,
+        }
+
+    try:
+        auth_file = get_auth_file(portal, env)
+    except FileNotFoundError as e:
+        return {
+            "status": "FAIL", "message": str(e), "url": None,
+            "console_errors": [], "nav_elements_found": [], "load_time_ms": 0,
+            "screenshot_path": None, "screenshots": [],
+            "execution_log": [{"step": "Load auth session", "result": "fail", "detail": str(e)}],
+            "feature_evidence": [], "steps_executed": 0,
+        }
+
+    local_process = None
+    if env == "local":
+        local_process = start_local_server()
+
+    base_url = url.rstrip("/").split("/login")[0]
+
+    screenshots        = []
+    execution_log      = []
+    feature_evidence   = []
+    console_errors     = []
+    load_time_ms       = 0
+    current_url        = base_url
+    overall_status     = "PASS"
+    steps_executed     = 0
+
+    def _log(step, result="ok", detail=None):
+        execution_log.append({"step": step, "result": result, "detail": detail})
+
+    def _take_screenshot(page, label):
+        ts    = datetime.now().strftime("%Y%m%d_%H%M%S")
+        safe  = (label.lower()
+                 .replace(" ", "_").replace("/", "_").replace(":", "")
+                 .replace("(", "").replace(")", "").replace("—", ""))
+        fname = f"{portal}_{env}_{safe}_{ts}.png"
+        path  = os.path.join(SCREENSHOTS_DIR, fname)
+        try:
+            page.screenshot(path=path, full_page=True, timeout=12000)
+            screenshots.append({"label": label, "path": path, "filename": fname})
+            _log(f"Screenshot: {label}", "ok", fname)
+            return path
+        except Exception as ex:
+            _log(f"Screenshot: {label}", "warn", str(ex))
+            return None
+
+    try:
+        with sync_playwright() as p:
+            browser = p.chromium.launch(headless=True)
+
+            with open(auth_file) as f:
+                auth_data = json.load(f)
+            auth_storage_value = None
+            for origin in auth_data.get("origins", []):
+                for item in origin.get("localStorage", []):
+                    if item["name"] == "auth-storage":
+                        auth_storage_value = item["value"]
+                        break
+
+            context = browser.new_context(storage_state=auth_file)
+            page    = context.new_page()
+
+            def _capture_console(msg):
+                if msg.type == "error":
+                    console_errors.append(msg.text)
+            page.on("console", _capture_console)
+
+            if auth_storage_value:
+                page.add_init_script(
+                    f"localStorage.setItem('auth-storage', {json.dumps(auth_storage_value)});"
+                )
+                _log("Injected auth-storage", "ok")
+
+            # Warm-up navigation to first test case's path
+            first_path = (test_cases[0].get("url_path") or "/") if test_cases else "/"
+            t0 = time.time()
+            page.goto(base_url + first_path, timeout=60000, wait_until="domcontentloaded")
+            page.wait_for_timeout(2000)
+            current_url  = page.url
+            load_time_ms = int((time.time() - t0) * 1000)
+            _log(f"Initial navigation → {first_path}", "ok", current_url)
+
+            for tc in test_cases:
+                tc_name = tc.get("test_name", "Unnamed test")
+                _log(f"── Test case: {tc_name} ──", "ok")
+                tc_pass = True
+
+                # Navigate to test case URL
+                url_path = tc.get("url_path") or "/"
+                try:
+                    page.goto(base_url + url_path, timeout=30000, wait_until="domcontentloaded")
+                    page.wait_for_timeout(1500)
+                    _log(f"NAVIGATE to {url_path}", "pass", page.url)
+                    steps_executed += 1
+                except Exception as e:
+                    _log(f"NAVIGATE to {url_path}", "fail", str(e))
+                    tc_pass = False
+
+                # Execute each step
+                for step_str in (tc.get("steps") or []):
+                    step_str = step_str.strip()
+                    if not step_str:
+                        continue
+                    try:
+                        if step_str.startswith("CLICK:"):
+                            sel = step_str[6:].strip()
+                            page.wait_for_selector(sel, timeout=8000)
+                            page.click(sel, timeout=8000)
+                            _log(f"CLICK: {sel}", "pass")
+                            steps_executed += 1
+
+                        elif step_str.startswith("FILL:"):
+                            parts = step_str[5:].split("|", 1)
+                            sel   = parts[0].strip()
+                            val   = parts[1].strip() if len(parts) > 1 else ""
+                            page.wait_for_selector(sel, timeout=8000)
+                            page.fill(sel, val)
+                            _log(f"FILL: {sel} → '{val}'", "pass")
+                            steps_executed += 1
+
+                        elif step_str.startswith("WAIT:"):
+                            sel = step_str[5:].strip()
+                            page.wait_for_selector(sel, timeout=10000)
+                            _log(f"WAIT: {sel}", "pass")
+                            steps_executed += 1
+
+                        elif step_str.startswith("NAVIGATE:"):
+                            path = step_str[9:].strip()
+                            page.goto(base_url + path, timeout=30000, wait_until="domcontentloaded")
+                            page.wait_for_timeout(1500)
+                            _log(f"NAVIGATE: {path}", "pass", page.url)
+                            steps_executed += 1
+
+                        elif step_str.startswith("ASSERT_EXISTS:"):
+                            sel = step_str[14:].strip()
+                            found = bool(page.query_selector(sel))
+                            if found:
+                                _log(f"ASSERT_EXISTS: {sel}", "pass")
+                            else:
+                                _log(f"ASSERT_EXISTS: {sel}", "fail", "Element not found")
+                                tc_pass = False
+                            steps_executed += 1
+
+                        elif step_str.startswith("ASSERT_NOT_EXISTS:"):
+                            sel = step_str[18:].strip()
+                            found = bool(page.query_selector(sel))
+                            if not found:
+                                _log(f"ASSERT_NOT_EXISTS: {sel}", "pass")
+                            else:
+                                _log(f"ASSERT_NOT_EXISTS: {sel}", "fail", "Element unexpectedly present")
+                                tc_pass = False
+                            steps_executed += 1
+
+                        elif step_str.startswith("ASSERT_TEXT:"):
+                            parts    = step_str[12:].split("|", 1)
+                            sel      = parts[0].strip()
+                            expected = parts[1].strip() if len(parts) > 1 else ""
+                            el = page.query_selector(sel)
+                            if el:
+                                actual = el.inner_text()
+                                if expected.lower() in actual.lower():
+                                    _log(f"ASSERT_TEXT: {sel}", "pass", f"Found '{expected}'")
+                                else:
+                                    _log(f"ASSERT_TEXT: {sel}", "fail",
+                                         f"Expected '{expected}' in '{actual[:100]}'")
+                                    tc_pass = False
+                            else:
+                                _log(f"ASSERT_TEXT: {sel}", "fail", "Element not found")
+                                tc_pass = False
+                            steps_executed += 1
+
+                        elif step_str.startswith("SCREENSHOT:"):
+                            label = step_str[11:].strip()
+                            _take_screenshot(page, label)
+                            steps_executed += 1
+
+                        else:
+                            _log(f"UNKNOWN step (skipped): {step_str[:80]}", "skip")
+
+                    except Exception as e:
+                        _log(f"ERROR — {step_str[:80]}", "fail", str(e))
+                        tc_pass = False
+
+                # Check evidence selector
+                ev_sel = tc.get("evidence_selector", "").strip()
+                if ev_sel:
+                    try:
+                        el    = page.query_selector(ev_sel)
+                        found = bool(el)
+                        detail = None
+                        if found and el:
+                            try:
+                                detail = el.inner_text()[:100].strip() or el.get_attribute("class") or "present"
+                            except Exception:
+                                detail = "present"
+                        feature_evidence.append({
+                            "selector":    ev_sel,
+                            "description": tc_name,
+                            "found":       found,
+                            "detail":      detail or ("Element found" if found else "Element not found"),
+                        })
+                        if found:
+                            _log(f"Evidence PASS: {ev_sel}", "pass", detail)
+                        else:
+                            _log(f"Evidence FAIL: {ev_sel}", "fail", "Selector not found on page")
+                            tc_pass = False
+                    except Exception as e:
+                        _log(f"Evidence ERROR: {ev_sel}", "fail", str(e))
+                        tc_pass = False
+
+                # Screenshot after each test case
+                _take_screenshot(page, f"{tc_name} — {'PASS' if tc_pass else 'FAIL'}")
+
+                if not tc_pass:
+                    overall_status = "FAIL"
+
+            try:
+                current_url = page.url
+            except Exception:
+                pass
+
+            browser.close()
+
+    except Exception as e:
+        overall_status = "FAIL"
+        _log("Playwright exception", "fail", str(e))
+    finally:
+        if local_process:
+            stop_local_server(local_process)
+
+    # Hard guard: zero steps executed → FAIL regardless
+    if steps_executed == 0:
+        overall_status = "FAIL"
+        _log("No steps executed — result forced to FAIL", "fail")
+
+    message = (
+        f"Executed {steps_executed} step(s) across {len(test_cases)} test case(s). "
+        f"Evidence: {len(feature_evidence)} selector(s) checked."
+    )
+    result = {
+        "status":             overall_status,
+        "message":            message,
+        "url":                current_url,
+        "console_errors":     console_errors,
+        "nav_elements_found": [],
+        "load_time_ms":       load_time_ms,
+        "screenshot_path":    screenshots[-1]["path"] if screenshots else None,
+        "screenshots":        screenshots,
+        "execution_log":      execution_log,
+        "feature_evidence":   feature_evidence,
+        "steps_executed":     steps_executed,
+    }
+    print(f"[{overall_status}] run_qa_test_cases {portal}/{env} — {steps_executed} steps | "
+          f"evidence:{len(feature_evidence)} | screenshots:{len(screenshots)}")
+    return result
+
+
+# ---------------------------------------------------------------------------
 # Convenience wrappers
 # ---------------------------------------------------------------------------
 

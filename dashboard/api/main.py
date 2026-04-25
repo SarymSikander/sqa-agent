@@ -378,17 +378,62 @@ async def get_ticket_detail(issue_key: str):
         ],
     }
 
+def _extract_relevant_context(title: str, description: str, max_chars: int = 4000) -> str:
+    """Score APP_CONTEXT paragraphs by keyword overlap with the ticket, return top sections."""
+    import re as _re
+    if not APP_CONTEXT:
+        return ""
+
+    combined  = f"{title} {description}".lower()
+    stopwords = {"that", "this", "with", "from", "have", "will", "been", "they",
+                 "when", "what", "which", "where", "then", "also", "should", "would"}
+    keywords  = set(_re.findall(r'\b\w{4,}\b', combined)) - stopwords
+
+    sections = _re.split(r'\n{2,}', APP_CONTEXT)
+    scored   = sorted(
+        ((sum(1 for kw in keywords if kw in s.lower()), s) for s in sections),
+        key=lambda x: x[0], reverse=True,
+    )
+
+    result, total = [], 0
+    for _, section in scored:
+        if total >= max_chars:
+            break
+        chunk = section[:max_chars - total]
+        result.append(chunk)
+        total += len(chunk)
+    return "\n\n".join(result)[:max_chars]
+
+
 def generate_test_cases(ticket_key, title, description):
     import re
 
+    relevant_context = _extract_relevant_context(title, description)
+
     prompt = (
-        "You are a QA engineer. Generate Playwright test cases for the following ticket.\n\n"
+        "You are an expert QA engineer for Zambeel, a B2B e-commerce platform.\n"
+        "You write Playwright test scripts in Python that actually execute in a browser.\n\n"
         f"Ticket: {ticket_key}\n"
         f"Title: {title}\n"
         f"Description: {description}\n\n"
-        f"App Context:\n{APP_CONTEXT}\n\n"
-        "Return a JSON object with a 'test_cases' array. Each item must have: "
-        "test_name, description, steps (array of strings), expected_result, evidence_selector."
+        f"Relevant app context:\n{relevant_context}\n\n"
+        "Generate 3-5 test cases as JSON. Each test case must have:\n"
+        "- test_name: string\n"
+        "- url_path: exact URL path to navigate to (e.g. /orders-management/dashboard)\n"
+        "- portal: which portal to test (admin/seller/agency)\n"
+        "- steps: array of Playwright actions as strings, each starting with one of:\n"
+        "  CLICK: css-selector\n"
+        "  FILL: css-selector | value\n"
+        "  WAIT: css-selector\n"
+        "  NAVIGATE: /path\n"
+        "  ASSERT_EXISTS: css-selector\n"
+        "  ASSERT_NOT_EXISTS: css-selector\n"
+        "  ASSERT_TEXT: css-selector | expected text\n"
+        "  SCREENSHOT: label\n"
+        "- expected_result: what success looks like\n"
+        "- evidence_selector: ONE valid CSS selector that proves the feature works\n\n"
+        "Use real CSS selectors based on the app context. "
+        "Return ONLY valid JSON: {\"test_cases\": [...]}"
     )
 
     try:
@@ -399,42 +444,40 @@ def generate_test_cases(ticket_key, title, description):
         response = client.chat.completions.create(
             model="gpt-4o",
             messages=[{"role": "user", "content": prompt}],
-            max_tokens=2000,
+            max_tokens=2500,
         )
-        output = response.choices[0].message.content or ""
+        output = (response.choices[0].message.content or "").strip()
         print(f"[generate_test_cases] gpt-4o output ({len(output)} chars): {output[:500]}")
 
-        # Try JSON code block first
-        code_match = re.search(r"```(?:json)?\s*(\{.*?\})\s*```", output, re.DOTALL)
+        # Strip markdown code fences
+        code_match = re.search(r"```(?:json)?\s*(\{.*?\}|\[.*?\])\s*```", output, re.DOTALL)
         if code_match:
-            try:
-                parsed = json.loads(code_match.group(1))
-                if isinstance(parsed, dict) and "test_cases" in parsed:
-                    return parsed["test_cases"]
-            except json.JSONDecodeError:
-                pass
+            output = code_match.group(1)
 
-        # Try bare JSON object
-        json_match = re.search(r'\{[^{}]*"test_cases"[^{}]*\[.*?\]\s*\}', output, re.DOTALL)
-        if json_match:
-            try:
-                parsed = json.loads(json_match.group())
-                if isinstance(parsed, dict) and "test_cases" in parsed:
-                    return parsed["test_cases"]
-            except json.JSONDecodeError:
-                pass
+        parsed = json.loads(output)
 
-        # Fall back: wrap the raw output as a single descriptive test case
-        return [{
-            "test_name": f"AI-generated test — {ticket_key}",
-            "url_path": "/",
-            "description": title,
-            "steps": [f"GPT-4o generated test plan for: {title}", output[:500]],
-            "expected_result": "Feature works as described in the ticket",
-            "evidence_selector": "",
-            "execution_output": output[:2000],
-            "status": "PASS",
-        }]
+        if isinstance(parsed, list):
+            raw_cases = parsed
+        elif isinstance(parsed, dict) and "test_cases" in parsed:
+            raw_cases = parsed["test_cases"]
+        else:
+            print(f"[generate_test_cases] Unexpected JSON shape: {type(parsed)}")
+            return []
+
+        valid = []
+        for tc in raw_cases:
+            if not isinstance(tc, dict):
+                continue
+            if not tc.get("test_name") or not tc.get("steps"):
+                continue
+            tc.setdefault("url_path", "/")
+            tc.setdefault("portal", "seller")
+            tc.setdefault("expected_result", "Feature works as expected")
+            tc.setdefault("evidence_selector", "")
+            valid.append(tc)
+
+        print(f"[generate_test_cases] Parsed {len(valid)} valid test cases")
+        return valid
 
     except Exception as e:
         print(f"[generate_test_cases] ERROR: {e}")
@@ -621,23 +664,33 @@ async def run_qa_endpoint(issue_key: str, body: RunQABody):
 
         # ── Stage: run Playwright tests ────────────────────────────────────────
         yield evt({"stage": "running_tests", "status": "running"})
-        portals = [body.portal] if (body.portal and body.portal != "all") else ["seller", "admin", "agency"]
 
+        # Derive portals from test case metadata; fall back to body.portal or all
         if test_cases:
-            print(f"\n[run_tests] Using run_qa_test_cases with {len(test_cases)} AI-generated test cases")
+            seen_portals: set = set()
+            portals: list = []
+            for _tc in test_cases:
+                _p = (_tc.get("portal") or "seller").lower()
+                if _p not in seen_portals:
+                    portals.append(_p)
+                    seen_portals.add(_p)
+            print(f"\n[run_tests] AI test cases derive portals={portals}")
         else:
-            print(f"\n[run_tests] No test cases generated — falling back to login-only run_tests()")
+            portals = [body.portal] if (body.portal and body.portal != "all") else ["seller", "admin", "agency"]
+            print(f"\n[run_tests] No test cases — login-only for portals={portals}")
 
         for portal in portals:
             yield f": keepalive\n\n"
-            print(f"\n[run_tests] Running portal={portal} env={run_env} use_ai_cases={bool(test_cases)}")
+            print(f"\n[run_tests] Running portal={portal} env={run_env}")
             try:
                 if test_cases:
+                    portal_tcs = [tc for tc in test_cases if tc.get("portal", "seller").lower() == portal]
                     r = await asyncio.to_thread(
-                        _playwright.run_qa_test_cases, portal, run_env, test_cases
+                        _playwright.run_qa_test_cases, portal, run_env, portal_tcs
                     )
                     status = r.get("status", "FAIL")
-                    print(f"[run_tests] run_qa_test_cases done: status={status} evidence={len(r.get('feature_evidence', []))} screenshots={len(r.get('screenshots', []))}")
+                    print(f"[run_tests] run_qa_test_cases: portal={portal} status={status} "
+                          f"steps={r.get('steps_executed',0)} evidence={len(r.get('feature_evidence',[]))}")
                     screenshots_for_portal = r.get("screenshots", [])
                     test_results.append({
                         "portal":             portal,
@@ -649,16 +702,16 @@ async def run_qa_endpoint(issue_key: str, body: RunQABody):
                         "nav_elements_found": r.get("nav_elements_found", []),
                         "screenshots":        [
                             {**s, "url": f"/screenshots/{s['filename']}"}
-                            for s in screenshots_for_portal
-                            if s.get("filename")
+                            for s in screenshots_for_portal if s.get("filename")
                         ],
                         "execution_log":      r.get("execution_log", []),
                         "feature_evidence":   r.get("feature_evidence", []),
+                        "steps_executed":     r.get("steps_executed", 0),
                     })
                 else:
                     status, res = await asyncio.to_thread(_playwright.run_tests, portal, run_env)
                     r = res if isinstance(res, dict) else {}
-                    print(f"[run_tests] run_tests done: status={status}")
+                    print(f"[run_tests] run_tests done: portal={portal} status={status}")
                     screenshots_for_portal = r.get("screenshots", [])
                     test_results.append({
                         "portal":             portal,
@@ -670,11 +723,11 @@ async def run_qa_endpoint(issue_key: str, body: RunQABody):
                         "nav_elements_found": r.get("nav_elements_found", []),
                         "screenshots":        [
                             {**s, "url": f"/screenshots/{s['filename']}"}
-                            for s in screenshots_for_portal
-                            if s.get("filename")
+                            for s in screenshots_for_portal if s.get("filename")
                         ],
                         "execution_log":      r.get("execution_log", []),
                         "feature_evidence":   r.get("feature_evidence", []),
+                        "steps_executed":     0,
                     })
             except Exception as e:
                 print(f"[run_tests] ERROR for portal={portal}: {type(e).__name__}: {e}")
@@ -683,7 +736,7 @@ async def run_qa_endpoint(issue_key: str, body: RunQABody):
                     "url": None, "console_errors": [], "load_time_ms": 0,
                     "nav_elements_found": [], "screenshots": [],
                     "execution_log": [{"step": "Run test", "result": "fail", "detail": str(e)}],
-                    "feature_evidence": [],
+                    "feature_evidence": [], "steps_executed": 0,
                 })
             yield evt({"stage": "running_tests", "status": "progress",
                        "portal": portal, "result": test_results[-1]["status"]})
@@ -692,10 +745,15 @@ async def run_qa_endpoint(issue_key: str, body: RunQABody):
 
         # ── Stage: update Jira ────────────────────────────────────────────────
         yield evt({"stage": "updating_jira", "status": "running"})
-        if not test_cases:
+        total_steps_executed = sum(r.get("steps_executed", 0) for r in test_results)
+        if not test_cases or total_steps_executed == 0:
             yield evt({
                 "stage": "updating_jira", "status": "skipped",
-                "message": "QA Incomplete — no feature tests executed. Jira status unchanged.",
+                "message": (
+                    "QA Incomplete — no test cases generated. Jira status unchanged."
+                    if not test_cases
+                    else "QA Incomplete — zero steps executed. Jira status unchanged."
+                ),
             })
         else:
             try:
