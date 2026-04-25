@@ -114,6 +114,11 @@ class CreateTicketBody(BaseModel):
     issue_type: str = "Task"
     description: Optional[str] = None
 
+class GenerateTicketBody(BaseModel):
+    description: str
+    project_key: str = "OMS"
+    issue_type: str = "Bug"
+
 class CloseTicketBody(BaseModel):
     comment: Optional[str] = None
 
@@ -267,6 +272,54 @@ async def create_ticket(body: CreateTicketBody):
         body.project_key, body.summary, body.issue_type, body.description,
     )
     return {"key": key, "url": f"https://zambeel.atlassian.net/browse/{key}"}
+
+@app.post("/jira/generate-ticket")
+async def generate_ticket_ai(body: GenerateTicketBody):
+    import re
+
+    def _generate():
+        is_bug = body.issue_type.lower() == "bug"
+        desc_sections = (
+            "**Problem Statement**\n[Clear description of the issue]\n\n"
+            "**Expected Behavior**\n[What should happen]\n\n"
+            + ("**Steps to Reproduce**\n1. [Step 1]\n2. [Step 2]\n3. [Step 3]\n\n" if is_bug else "")
+            + "**Acceptance Criteria**\n1. [Criterion 1]\n2. [Criterion 2]"
+        )
+        prompt = (
+            "You are a senior QA engineer writing a professional Jira ticket.\n\n"
+            f"Issue Type: {body.issue_type}\n"
+            f"Project: {body.project_key}\n\n"
+            f"User description:\n{body.description}\n\n"
+            "Return ONLY valid JSON (no markdown, no code fences) with exactly:\n"
+            '{"summary": "<max 10 words, no trailing punctuation>", '
+            '"description": "<full description with sections: '
+            + ("Problem Statement, Expected Behavior, Steps to Reproduce, Acceptance Criteria" if is_bug
+               else "Problem Statement, Expected Behavior, Acceptance Criteria")
+            + '>"}'
+        )
+
+        client = OpenAI(
+            base_url="https://models.inference.ai.azure.com",
+            api_key=os.getenv("GITHUB_TOKEN"),
+        )
+        response = client.chat.completions.create(
+            model="gpt-4o",
+            messages=[{"role": "user", "content": prompt}],
+            max_tokens=900,
+        )
+        output = (response.choices[0].message.content or "").strip()
+
+        code_match = re.search(r"```(?:json)?\s*(\{.*?\})\s*```", output, re.DOTALL)
+        if code_match:
+            output = code_match.group(1)
+
+        parsed = json.loads(output)
+        return {"summary": str(parsed["summary"]), "description": str(parsed["description"])}
+
+    try:
+        return await asyncio.to_thread(_generate)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/jira/tickets/{project_key}")
 async def get_tickets(project_key: str):

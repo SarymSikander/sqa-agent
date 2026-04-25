@@ -1450,7 +1450,13 @@
 
           <!-- Create ticket form -->
           <div class="card">
-            <div class="card-title">Create Ticket</div>
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+              <div class="card-title" style="margin-bottom:0">Create Ticket</div>
+              <div style="display:flex;gap:6px;align-items:center">
+                <button class="btn btn-secondary btn-sm hidden" id="regen-ticket-btn" onclick="openGenTicketModal()" title="Regenerate with AI">🔄 Regenerate</button>
+                <button class="btn btn-secondary btn-sm" onclick="openGenTicketModal()">✨ Generate Ticket</button>
+              </div>
+            </div>
             <div class="form-row form-row-2">
               <div>
                 <label>Project</label>
@@ -1698,6 +1704,53 @@
     <button class="btn btn-primary w100" id="pr-panel-review-btn" onclick="prReviewFromPanel()" style="justify-content:center">
       <div class="spin"></div><span class="label">🤖 Review with AI</span>
     </button>
+  </div>
+</div>
+
+<!-- ── Generate Ticket Modal ─────────────────────────────────────────────────── -->
+<div id="gen-ticket-modal" class="modal-overlay" onclick="if(event.target===this)closeGenTicketModal()">
+  <div class="modal-box" style="max-width:520px">
+    <div class="modal-header">
+      <div class="modal-title">✨ Generate Ticket with AI</div>
+      <div class="modal-close" onclick="closeGenTicketModal()">✕</div>
+    </div>
+    <div class="modal-body" style="overflow:visible">
+      <div class="form-row" style="margin-bottom:14px">
+        <div>
+          <label>Describe the feature or bug in plain English</label>
+          <textarea id="gen-ticket-desc" style="min-height:100px" placeholder="e.g. When a seller clicks export orders, the CSV file should include the tracking number column which is currently missing"></textarea>
+        </div>
+      </div>
+      <div class="form-row form-row-2" style="margin-bottom:16px">
+        <div>
+          <label>Project</label>
+          <select id="gen-ticket-project">
+            <option value="OMS">OMS — Order Management</option>
+            <option value="ZSP">ZSP — Seller Portal</option>
+          </select>
+        </div>
+        <div>
+          <label>Issue Type</label>
+          <select id="gen-ticket-type">
+            <option value="Bug">🐛 Bug</option>
+            <option value="Story">📖 Story</option>
+            <option value="Task">✅ Task</option>
+          </select>
+        </div>
+      </div>
+      <div id="gen-ticket-status" style="display:none;align-items:center;gap:10px;padding:12px 14px;background:#EEF2FF;border:1px solid rgba(91,61,245,0.2);border-radius:8px;margin-bottom:14px;font-size:13px;color:#5B3DF5">
+        <div class="qa-spin"></div>
+        <span>AI is writing your ticket…</span>
+      </div>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-primary" id="gen-ticket-btn" onclick="genTicket()" style="flex:1;justify-content:center">
+          <div class="spin"></div><span class="label">✨ Generate</span>
+        </button>
+        <button class="btn btn-secondary" id="gen-ticket-regen-modal-btn" onclick="genTicket()" style="justify-content:center;display:none">
+          <div class="spin"></div><span class="label">🔄 Regenerate</span>
+        </button>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -2253,6 +2306,56 @@ async function jiraComment(key) {
     await api(`/jira/tickets/${key}/comment`, { method:'POST', body: JSON.stringify({ comment }) });
     toast(`Comment added to ${key}`, 'success');
   } catch(e) { toast(e.message, 'error'); }
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// ── Generate Ticket with AI ───────────────────────────────────────────────────
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+function openGenTicketModal() {
+  document.getElementById('gen-ticket-status').style.display = 'none';
+  document.getElementById('gen-ticket-regen-modal-btn').style.display = 'none';
+  document.getElementById('gen-ticket-modal').classList.add('open');
+  setTimeout(() => document.getElementById('gen-ticket-desc').focus(), 80);
+}
+
+function closeGenTicketModal() {
+  document.getElementById('gen-ticket-modal').classList.remove('open');
+}
+
+async function genTicket() {
+  const desc = document.getElementById('gen-ticket-desc').value.trim();
+  if (!desc) { toast('Please describe the ticket first', 'warn'); return; }
+
+  const project = document.getElementById('gen-ticket-project').value;
+  const type    = document.getElementById('gen-ticket-type').value;
+
+  const statusEl = document.getElementById('gen-ticket-status');
+  const regenEl  = document.getElementById('gen-ticket-regen-modal-btn');
+  statusEl.style.display = 'flex';
+  regenEl.style.display  = 'none';
+  btnLoad('gen-ticket-btn', true);
+
+  try {
+    const data = await api('/jira/generate-ticket', {
+      method: 'POST',
+      body: JSON.stringify({ description: desc, project_key: project, issue_type: type }),
+    });
+
+    document.getElementById('j-project').value     = project;
+    document.getElementById('j-type').value        = type;
+    document.getElementById('j-summary').value     = data.summary;
+    document.getElementById('j-description').value = data.description;
+
+    closeGenTicketModal();
+    document.getElementById('regen-ticket-btn').classList.remove('hidden');
+    toast('Ticket generated — review and edit before submitting', 'success', 4000);
+  } catch(e) {
+    toast(e.message, 'error');
+    regenEl.style.display = 'inline-flex';
+  } finally {
+    statusEl.style.display = 'none';
+    btnLoad('gen-ticket-btn', false);
+  }
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
