@@ -91,9 +91,9 @@
       overflow: hidden;
     }
     .sidebar-logo {
-      padding: 20px 18px 18px;
+      padding: 22px 22px 20px;
       border-bottom: 1px solid var(--border);
-      margin-bottom: 10px;
+      margin-bottom: 8px;
     }
     .logo-svg-wrap svg {
       width: 140px;
@@ -108,29 +108,20 @@
       letter-spacing: 0.08em;
       text-transform: uppercase;
     }
-    .nav-section-label {
-      font-size: 10px;
-      font-weight: 600;
-      letter-spacing: 0.1em;
-      text-transform: uppercase;
-      color: var(--text3);
-      padding: 10px 18px 4px;
-    }
     .nav-item {
       display: flex;
       align-items: center;
       gap: 10px;
-      padding: 9px 18px 9px 16px;
-      margin: 1px 8px;
-      border-radius: var(--r-xs);
+      padding: 10px 22px;
+      margin: 0;
+      border-radius: 0;
       cursor: pointer;
       color: var(--text2);
       font-size: 13.5px;
       font-weight: 500;
-      transition: all .18s;
+      transition: background .15s, color .15s;
       user-select: none;
       border-left: 3px solid transparent;
-      position: relative;
     }
     .nav-item:hover { background: rgba(0,0,0,0.04); color: var(--text); }
     .nav-item.active {
@@ -1272,22 +1263,15 @@
   </div>
 
   <nav>
-    <div class="nav-section-label">Workspace</div>
     <div class="nav-item active" data-page="overview">
       <span class="nav-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9.5L12 3l9 6.5V20a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9.5z"/><path d="M9 21V12h6v9"/></svg></span> Overview
     </div>
     <div class="nav-item" data-page="tests">
       <span class="nav-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3v11.5a3.5 3.5 0 0 0 7 0V3"/><path d="M6.5 21h11"/><path d="M9 3h6"/><path d="M8 9h2m4 0h2"/></svg></span> Tests
     </div>
-
-    <div class="nav-section-label" style="margin-top:8px">Tools</div>
     <div class="nav-item" data-page="jira">
       <span class="nav-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg></span> Jira
     </div>
-    <div class="nav-item" data-page="github">
-      <span class="nav-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="6" r="2"/><circle cx="18" cy="6" r="2"/><circle cx="6" cy="18" r="2"/><path d="M6 8v8"/><path d="M8 6h6a2 2 0 0 1 2 2v6"/></svg></span> GitHub
-    </div>
-    <div class="nav-section-label" style="margin-top:8px">Insights</div>
     <div class="nav-item" data-page="reports">
       <span class="nav-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M8 17v-6"/><path d="M12 17v-4"/><path d="M16 17v-8"/></svg></span> Reports
     </div>
@@ -1532,58 +1516,6 @@
       </div>
     </section>
 
-    <!-- ══ GitHub ════════════════════════════════════════════════════════════════ -->
-    <section id="page-github" class="page">
-      <div class="page-inner">
-        <div class="grid-2" id="github-grid">
-          <!-- Frontend -->
-          <div class="card">
-            <div class="flex-between mb16">
-              <div class="repo-header" style="margin:0">
-                <div class="repo-name">🖥 Frontend</div>
-                <div class="repo-sub">zambeel-fe · Vue / Vite</div>
-              </div>
-              <button class="btn btn-secondary btn-sm" id="gh-load-fe-btn" onclick="ghLoad('frontend')">
-                <div class="spin"></div><span class="label">Refresh</span>
-              </button>
-            </div>
-            <div style="margin-bottom:14px">
-              <label>Current Branch</label>
-              <div id="gh-current-frontend" class="branch-current">⎇ Loading…</div>
-            </div>
-            <label>All Branches <span class="text-xs text-muted">(click to select)</span></label>
-            <div class="branch-list mt8" id="gh-branches-frontend"></div>
-            <div class="divider"></div>
-            <button class="btn btn-primary btn-sm" id="gh-switch-fe-btn" onclick="ghSwitch('frontend')">
-              <div class="spin"></div><span class="label">Switch to Selected</span>
-            </button>
-          </div>
-          <!-- Backend -->
-          <div class="card">
-            <div class="flex-between mb16">
-              <div class="repo-header" style="margin:0">
-                <div class="repo-name">⚙️ Backend</div>
-                <div class="repo-sub">zambeel-api · Node / Express</div>
-              </div>
-              <button class="btn btn-secondary btn-sm" id="gh-load-be-btn" onclick="ghLoad('backend')">
-                <div class="spin"></div><span class="label">Refresh</span>
-              </button>
-            </div>
-            <div style="margin-bottom:14px">
-              <label>Current Branch</label>
-              <div id="gh-current-backend" class="branch-current">⎇ Loading…</div>
-            </div>
-            <label>All Branches <span class="text-xs text-muted">(click to select)</span></label>
-            <div class="branch-list mt8" id="gh-branches-backend"></div>
-            <div class="divider"></div>
-            <button class="btn btn-primary btn-sm" id="gh-switch-be-btn" onclick="ghSwitch('backend')">
-              <div class="spin"></div><span class="label">Switch to Selected</span>
-            </button>
-          </div>
-        </div>
-      </div>
-    </section>
-
     <!-- ══ Reports ════════════════════════════════════════════════════════════════ -->
     <section id="page-reports" class="page">
       <div class="page-inner">
@@ -1789,7 +1721,6 @@ const API_BASE  = CLOUD_API;
 
 // ── State ─────────────────────────────────────────────────────────────────────
 const state = {
-  ghSelected:   { frontend: null, backend: null },
   testEnv:      'staging',
   testPortal:   '',
   testResults:  [],
@@ -1837,7 +1768,7 @@ function btnLoad(id, on) {
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 const PAGE_LABELS = {
   overview: 'Overview', tests: 'Tests', jira: 'Jira',
-  github: 'GitHub', reports: 'Reports', 'pr-review': 'PR Review',
+  reports: 'Reports', 'pr-review': 'PR Review',
 };
 
 function navigate(page) {
@@ -1854,7 +1785,6 @@ function navigate(page) {
 function onPageEnter(page) {
   if (page === 'overview')  loadOverview();
   if (page === 'tests')     loadScreenshots();
-  if (page === 'github')    { ghLoad('frontend'); ghLoad('backend'); }
   if (page === 'reports')   reportsLoad();
 }
 
@@ -2323,51 +2253,6 @@ async function jiraComment(key) {
     await api(`/jira/tickets/${key}/comment`, { method:'POST', body: JSON.stringify({ comment }) });
     toast(`Comment added to ${key}`, 'success');
   } catch(e) { toast(e.message, 'error'); }
-}
-
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// ── GitHub ────────────────────────────────────────────────────────────────────
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-async function ghLoad(repo) {
-  const btnId = `gh-load-${repo === 'frontend' ? 'fe' : 'be'}-btn`;
-  btnLoad(btnId, true);
-  state.ghSelected[repo] = null;
-  const curEl  = document.getElementById(`gh-current-${repo}`);
-  const listEl = document.getElementById(`gh-branches-${repo}`);
-  curEl.innerHTML = '⎇ Loading…';
-  listEl.innerHTML = '<div class="skel-line skeleton" style="height:28px;width:200px"></div>';
-  try {
-    const data = await api(`/github/branches/${repo}`);
-    curEl.innerHTML = `⎇ ${esc(data.current)}`;
-    state.ghSelected[repo] = data.current;
-    listEl.innerHTML = data.branches.map(b => `
-      <span class="branch-badge ${b === data.current ? 'active' : ''}"
-            onclick="ghSelect('${repo}', '${esc(b)}', this)">${esc(b)}</span>
-    `).join('');
-  } catch(e) {
-    curEl.innerHTML = '⎇ Error';
-    listEl.innerHTML = `<span style="color:var(--error);font-size:12px">${esc(e.message)}</span>`;
-    toast(e.message, 'error');
-  } finally { btnLoad(btnId, false); }
-}
-
-function ghSelect(repo, branch, el) {
-  state.ghSelected[repo] = branch;
-  document.querySelectorAll(`#gh-branches-${repo} .branch-badge`).forEach(b => b.classList.remove('active'));
-  el.classList.add('active');
-}
-
-async function ghSwitch(repo) {
-  const branch = state.ghSelected[repo];
-  if (!branch) { toast('Select a branch first', 'warn'); return; }
-  const btnId = `gh-switch-${repo === 'frontend' ? 'fe' : 'be'}-btn`;
-  btnLoad(btnId, true);
-  try {
-    await api('/github/switch', { method:'POST', body: JSON.stringify({ repo, branch }) });
-    toast(`Switched ${repo} → ${branch}`, 'success');
-    document.getElementById(`gh-current-${repo}`).innerHTML = `⎇ ${esc(branch)}`;
-  } catch(e) { toast(e.message, 'error'); }
-  finally { btnLoad(btnId, false); }
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
