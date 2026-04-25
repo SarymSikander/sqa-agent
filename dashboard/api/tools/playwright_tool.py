@@ -1,6 +1,5 @@
 import json
 import os
-import re
 import subprocess
 import time
 from datetime import datetime
@@ -9,11 +8,11 @@ from playwright.sync_api import sync_playwright
 
 load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), "..", ".env"))
 
-LOCAL_URL      = os.getenv("LOCAL_URL", "")
-STAGING_URL    = os.getenv("STAGING_URL", "")
-PRODUCTION_URL = os.getenv("PRODUCTION_URL", "")
+LOCAL_URL      = os.getenv("LOCAL_URL")
+STAGING_URL    = os.getenv("STAGING_URL")
+PRODUCTION_URL = os.getenv("PRODUCTION_URL")
 
-FRONTEND_REPO_PATH = os.getenv("FRONTEND_REPO_PATH", "")
+FRONTEND_REPO_PATH = os.getenv("FRONTEND_REPO_PATH")
 FRONTEND_DEV_CMD   = os.getenv("FRONTEND_DEV_CMD", "npm run dev")
 
 AUTH_DIR        = os.path.join(os.path.dirname(__file__), "..", "auth")
@@ -26,9 +25,46 @@ URL_MAP = {
     "production": PRODUCTION_URL,
 }
 
+# Nav selectors checked after a successful login
+_NAV_SELECTORS = [
+    "nav",
+    "[role='navigation']",
+    "header",
+    ".sidebar",
+    "[class*='sidebar']",
+    "[class*='navbar']",
+    "[class*='nav-menu']",
+    "[class*='top-bar']",
+]
+
+# Feature-specific elements to probe per portal (selector, human description)
+_FEATURE_SELECTORS = {
+    "admin": [
+        ("input[type='number']",         "Number input field"),
+        ("input[min='0']",               "Input with min=0 (allows zero commission)"),
+        ("[class*='commission']",        "Commission-related element"),
+        ("[class*='dashboard']",         "Dashboard element"),
+        ("table, [class*='table']",      "Data table"),
+        ("[class*='order']",             "Orders element"),
+        ("button[type='submit']",        "Submit / save button"),
+    ],
+    "seller": [
+        ("[class*='get-started']",       "Get-started page element"),
+        ("[class*='onboard']",           "Onboarding element"),
+        ("[class*='product']",           "Product element"),
+        ("[class*='store']",             "Store element"),
+        ("button",                       "Action button"),
+    ],
+    "agency": [
+        ("[class*='get-started']",       "Get-started page element"),
+        ("[class*='seller']",            "Seller management element"),
+        ("[class*='account']",           "Account element"),
+        ("button",                       "Action button"),
+    ],
+}
+
 
 def get_auth_file(portal, env):
-    """Return path to the saved auth JSON for (portal, env). Raises if missing."""
     path = os.path.join(AUTH_DIR, f"{portal}_{env}.json")
     if not os.path.exists(path):
         raise FileNotFoundError(
@@ -39,7 +75,6 @@ def get_auth_file(portal, env):
 
 
 def start_local_server():
-    """Start the frontend dev server and return the process handle."""
     print(f"Starting dev server: {FRONTEND_DEV_CMD} in {FRONTEND_REPO_PATH}")
     cmd = FRONTEND_DEV_CMD.split()
     process = subprocess.Popen(
@@ -54,7 +89,6 @@ def start_local_server():
 
 
 def stop_local_server(process):
-    """Terminate the dev server process."""
     if process and process.poll() is None:
         process.terminate()
         process.wait()
@@ -63,27 +97,42 @@ def stop_local_server(process):
 
 def run_tests(portal, env):
     """
-    Run a login-validation test for the given portal and environment.
+    Run a full login + post-login validation test for the given portal and environment.
 
-    Returns a tuple: ("PASS" | "FAIL", message)
+    Returns (status, result_dict). result_dict keys:
+      status, message, url, console_errors, nav_elements_found, load_time_ms,
+      screenshot_path  — main full-page screenshot (backwards compat)
+      screenshots      — list of {label, path, filename} step-by-step evidence
+      execution_log    — list of {step, result, detail} Playwright steps
+      feature_evidence — list of {selector, description, found, detail}
     """
     portal = portal.lower()
-    env = env.lower()
+    env    = env.lower()
 
     url = URL_MAP.get(env)
     if not url:
-        return ("FAIL", f"Unknown environment '{env}'. Choose: local, staging, production.")
+        return ("FAIL", {
+            "status": "FAIL",
+            "message": f"Unknown environment '{env}'. Choose: local, staging, production.",
+            "url": None, "console_errors": [], "nav_elements_found": [], "load_time_ms": 0,
+            "screenshot_path": None, "screenshots": [], "execution_log": [], "feature_evidence": [],
+        })
 
     try:
         auth_file = get_auth_file(portal, env)
     except FileNotFoundError as e:
-        return ("FAIL", str(e))
+        return ("FAIL", {
+            "status": "FAIL", "message": str(e), "url": None,
+            "console_errors": [], "nav_elements_found": [], "load_time_ms": 0,
+            "screenshot_path": None, "screenshots": [],
+            "execution_log": [{"step": "Load auth session", "result": "fail", "detail": str(e)}],
+            "feature_evidence": [],
+        })
 
     local_process = None
     if env == "local":
         local_process = start_local_server()
 
-    # Extract auth-storage value from the saved JSON for init script injection
     with open(auth_file) as f:
         auth_data = json.load(f)
     auth_storage_value = None
@@ -98,328 +147,482 @@ def run_tests(portal, env):
         "seller": "/get-started",
         "agency": "/get-started",
     }
-    expected = success_slugs.get(portal, "")
-    base_url = url.rstrip("/").split("/login")[0]
+    expected   = success_slugs.get(portal, "")
+    base_url   = url.rstrip("/").split("/login")[0]
     target_url = base_url + expected
+
+    # mutable accumulators
+    screenshots       = []
+    execution_log     = []
+    feature_evidence  = []
+    console_errors    = []
+    nav_elements_found = []
+    load_time_ms      = 0
+    current_url       = target_url
+    screenshot_path   = None
+    status            = "FAIL"
+    message           = "Test did not complete"
+
+    def _log(step, result="ok", detail=None):
+        execution_log.append({"step": step, "result": result, "detail": detail})
+
+    def _screenshot(page, label):
+        ts    = datetime.now().strftime("%Y%m%d_%H%M%S")
+        safe  = (label.lower()
+                 .replace(" ", "_").replace("/", "_").replace(":", "")
+                 .replace("(", "").replace(")", "").replace("—", ""))
+        fname = f"{portal}_{env}_{safe}_{ts}.png"
+        path  = os.path.join(SCREENSHOTS_DIR, fname)
+        try:
+            page.screenshot(path=path, full_page=True, timeout=12000)
+            screenshots.append({"label": label, "path": path, "filename": fname})
+            _log(f"Screenshot: {label}", "ok", f"Saved as {fname}")
+            return path
+        except Exception as ex:
+            _log(f"Screenshot: {label}", "warn", f"Skipped — {ex}")
+            return None
 
     try:
         with sync_playwright() as p:
+
+            # ── Step 1: capture the login page (unauthenticated) ─────────────────
+            _log("Launch browser (no auth) to capture login page", "ok", "Headless Chromium")
+            browser_pre = p.chromium.launch(headless=True)
+            try:
+                ctx_pre  = browser_pre.new_context()
+                page_pre = ctx_pre.new_page()
+                _log(f"Navigate to base URL: {base_url}", "ok")
+                page_pre.goto(base_url, timeout=30000, wait_until="domcontentloaded")
+                page_pre.wait_for_timeout(2000)
+                _log(f"Login page loaded: {page_pre.url}", "ok")
+                _screenshot(page_pre, "Login page")
+            except Exception as e:
+                _log("Login page capture failed", "warn", str(e))
+            finally:
+                browser_pre.close()
+
+            # ── Step 2: authenticated test ────────────────────────────────────────
+            _log(f"Launch authenticated browser for {portal}/{env}", "ok",
+                 f"Auth: {portal}_{env}.json")
             browser = p.chromium.launch(headless=True)
             context = browser.new_context(storage_state=auth_file)
-            page = context.new_page()
+            page    = context.new_page()
+
+            def _capture_console(msg):
+                if msg.type == "error":
+                    console_errors.append(msg.text)
+            page.on("console", _capture_console)
 
             if auth_storage_value:
                 page.add_init_script(f"""
                     localStorage.setItem('auth-storage', {json.dumps(auth_storage_value)});
                 """)
+                _log("Injected auth-storage via localStorage init script", "ok")
 
-            print(f"Navigating to {target_url} as {portal} ({env})...")
-            page.goto(target_url, timeout=60000, wait_until="commit")
-            page.wait_for_timeout(5000)
+            _log(f"Navigate to target: {target_url}", "ok", f"Expected path: {expected}")
+            t0 = time.time()
+            page.goto(target_url, timeout=60000, wait_until="domcontentloaded")
+            page.wait_for_timeout(2000)
+            _screenshot(page, f"After auth — {portal}")
 
-            current_url = page.url
+            page.wait_for_timeout(2000)
+            load_time_ms = int((time.time() - t0) * 1000)
+            current_url  = page.url
+            _log(f"Page settled at {current_url}", "ok", f"Total load time: {load_time_ms}ms")
+
             if expected and expected in current_url:
-                result = ("PASS", f"Logged in successfully. URL: {current_url}")
+                status  = "PASS"
+                message = f"Logged in successfully. Landed on: {current_url}"
+                _log(f"URL check PASS — '{expected}' present in URL", "pass", current_url)
             elif "/login" in current_url:
-                result = ("FAIL", f"Still on login page after auth load. URL: {current_url}")
+                status  = "FAIL"
+                message = f"Redirected to login — session may be expired. URL: {current_url}"
+                _log("URL check FAIL — redirected to /login (session expired?)", "fail", current_url)
             else:
-                result = ("FAIL", f"Unexpected URL after auth load (expected '{expected}'). URL: {current_url}")
+                status  = "FAIL"
+                message = f"Unexpected URL after auth (expected '{expected}'). URL: {current_url}"
+                _log(f"URL check FAIL — unexpected path", "fail",
+                     f"Got: {current_url} | Expected: {expected}")
 
+            # ── Settled-state screenshot (labelled with pass/fail) ────────────────
+            _screenshot(page, f"Feature page — {status}")
+
+            # ── Nav element checks ────────────────────────────────────────────────
+            if status == "PASS":
+                _log("Checking navigation / shell elements", "ok")
+                for selector in _NAV_SELECTORS:
+                    try:
+                        found = bool(page.query_selector(selector))
+                        if found:
+                            nav_elements_found.append(selector)
+                        _log(f"Nav selector: {selector}",
+                             "found" if found else "not_found")
+                    except Exception:
+                        pass
+
+            # ── Feature-specific evidence ─────────────────────────────────────────
+            _log(f"Checking {portal} feature-specific selectors", "ok")
+            for selector, desc in _FEATURE_SELECTORS.get(portal, []):
+                try:
+                    el    = page.query_selector(selector)
+                    found = bool(el)
+                    detail = None
+                    if found and el:
+                        # capture meaningful attributes as evidence
+                        for attr in ("min", "max", "type", "name", "value"):
+                            try:
+                                val = el.get_attribute(attr)
+                                if val is not None:
+                                    detail = (detail or "") + f"{attr}={val} "
+                            except Exception:
+                                pass
+                    feature_evidence.append({
+                        "selector":    selector,
+                        "description": desc,
+                        "found":       found,
+                        "detail":      (detail.strip() if detail else None) or
+                                       (f"Element present" if found else "Element not found"),
+                    })
+                    _log(f"Feature check — {desc}",
+                         "found" if found else "not_found", selector)
+                except Exception as ex:
+                    _log(f"Feature check — {desc}", "error", str(ex))
+
+            # ── Console error summary ─────────────────────────────────────────────
+            if console_errors:
+                _log(f"{len(console_errors)} JS console error(s) captured", "warn",
+                     " | ".join(console_errors[:3]))
+            else:
+                _log("No JS console errors", "ok")
+
+            # ── Final full-page screenshot (backwards-compat field) ───────────────
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            screenshot_path = os.path.join(SCREENSHOTS_DIR, f"{portal}_{env}_{result[0]}_{timestamp}.png")
+            screenshot_path = os.path.join(
+                SCREENSHOTS_DIR, f"{portal}_{env}_{status}_{timestamp}.png"
+            )
             try:
-                page.screenshot(path=screenshot_path, timeout=10000)
+                page.screenshot(path=screenshot_path, full_page=True, timeout=15000)
+                _log("Full-page screenshot saved", "ok", os.path.basename(screenshot_path))
                 print(f"Screenshot saved: {screenshot_path}")
             except Exception:
-                print(f"Screenshot skipped (font timeout)")
+                _log("Full-page screenshot skipped", "warn")
+                screenshot_path = None
 
             browser.close()
+
     except Exception as e:
-        result = ("FAIL", f"Playwright error: {e}")
+        status  = "FAIL"
+        message = f"Playwright error: {e}"
+        _log("Playwright exception", "fail", str(e))
     finally:
         if local_process:
             stop_local_server(local_process)
 
-    status, message = result
-    print(f"[{status}] {portal}/{env} — {message}")
-    return result
+    result = {
+        "status":             status,
+        "message":            message,
+        "url":                current_url,
+        "console_errors":     console_errors,
+        "nav_elements_found": nav_elements_found,
+        "load_time_ms":       load_time_ms,
+        "screenshot_path":    screenshot_path,
+        "screenshots":        screenshots,
+        "execution_log":      execution_log,
+        "feature_evidence":   feature_evidence,
+    }
+    print(f"[{status}] {portal}/{env} — {message} | load:{load_time_ms}ms | "
+          f"steps:{len(execution_log)} | evidence:{len(feature_evidence)}")
+    return (status, result)
 
 
 # ---------------------------------------------------------------------------
-# AI test-case executor
+# AI test case executor
 # ---------------------------------------------------------------------------
 
-def _parse_nav_path(step: str):
-    """Return a URL path (e.g. /orders-management/dashboard) from a navigation step, or None."""
-    m = re.search(r'(?:navigate to|go to|open|visit)\s+["\']?(/[^\s"\',.]+)', step, re.I)
-    if m:
-        return m.group(1).rstrip(".,)")
-    m = re.search(r'(/[a-zA-Z][a-zA-Z0-9\-_/]+)', step)
-    if m:
-        return m.group(1)
-    return None
-
-
-def _parse_click_target(step: str):
-    """Return the text/selector to click from a step, or None."""
-    m = re.search(r'click\s+(?:on\s+)?["\']([^"\']+)["\']', step, re.I)
-    if m:
-        return m.group(1)
-    m = re.search(r'click\s+(?:on\s+)?(?:the\s+)?(.+?)(?:\s+button|\s+link|\s+tab|\s+icon|$)', step, re.I)
-    if m:
-        text = m.group(1).strip().strip('"\'')
-        if 2 < len(text) < 80:
-            return text
-    return None
-
-
-def run_qa_test_cases(portal, env, test_cases):
+def run_qa_test_cases(portal: str, env: str, test_cases: list) -> dict:
     """
-    Execute Claude-generated test cases using Playwright.
+    Execute AI-generated structured test cases for a single portal/env.
 
-    Navigates to pages, checks evidence selectors, takes per-test screenshots.
-    Returns a result dict compatible with the run-qa endpoint's test_results list.
+    Each test case step string begins with a keyword:
+      CLICK: selector
+      FILL: selector | value
+      WAIT: selector
+      NAVIGATE: /path
+      ASSERT_EXISTS: selector
+      ASSERT_NOT_EXISTS: selector
+      ASSERT_TEXT: selector | expected text
+      SCREENSHOT: label
+
+    After all steps, the evidence_selector is checked to determine PASS/FAIL.
+    Returns a result dict compatible with run_tests().
     """
     portal = portal.lower()
-    env = env.lower()
-
-    print(f"\n{'='*60}")
-    print(f"[run_qa_test_cases] portal={portal} env={env} cases={len(test_cases)}")
-    print(f"{'='*60}")
+    env    = env.lower()
 
     url = URL_MAP.get(env)
     if not url:
         return {
-            "portal": portal, "env": env, "status": "FAIL",
-            "message": f"Unknown environment '{env}'",
-            "url": None, "screenshots": [], "feature_evidence": [],
-            "execution_log": [{"step": "Init", "result": "fail", "detail": f"Unknown env: {env}"}],
-            "console_errors": [], "load_time_ms": 0, "nav_elements_found": [],
+            "status": "FAIL",
+            "message": f"Unknown environment '{env}'. Choose: local, staging, production.",
+            "url": None, "console_errors": [], "nav_elements_found": [], "load_time_ms": 0,
+            "screenshot_path": None, "screenshots": [], "execution_log": [],
+            "feature_evidence": [], "steps_executed": 0,
         }
 
     try:
         auth_file = get_auth_file(portal, env)
     except FileNotFoundError as e:
-        print(f"[run_qa_test_cases] Auth file missing: {e}")
         return {
-            "portal": portal, "env": env, "status": "FAIL",
-            "message": str(e),
-            "url": None, "screenshots": [], "feature_evidence": [],
-            "execution_log": [{"step": "Load auth", "result": "fail", "detail": str(e)}],
-            "console_errors": [], "load_time_ms": 0, "nav_elements_found": [],
+            "status": "FAIL", "message": str(e), "url": None,
+            "console_errors": [], "nav_elements_found": [], "load_time_ms": 0,
+            "screenshot_path": None, "screenshots": [],
+            "execution_log": [{"step": "Load auth session", "result": "fail", "detail": str(e)}],
+            "feature_evidence": [], "steps_executed": 0,
         }
 
-    with open(auth_file) as f:
-        auth_data = json.load(f)
-    auth_storage_value = None
-    for origin in auth_data.get("origins", []):
-        for item in origin.get("localStorage", []):
-            if item["name"] == "auth-storage":
-                auth_storage_value = item["value"]
-                break
+    local_process = None
+    if env == "local":
+        local_process = start_local_server()
 
-    success_slugs = {
-        "admin":  "/orders-management/dashboard",
-        "seller": "/get-started",
-        "agency": "/get-started",
-    }
     base_url = url.rstrip("/").split("/login")[0]
-    entry_url = base_url + success_slugs.get(portal, "")
 
-    execution_log = []
-    feature_evidence = []
-    screenshots = []
-    overall_pass = True
+    screenshots        = []
+    execution_log      = []
+    feature_evidence   = []
+    console_errors     = []
+    load_time_ms       = 0
+    current_url        = base_url
+    overall_status     = "PASS"
+    steps_executed     = 0
+
+    def _log(step, result="ok", detail=None):
+        execution_log.append({"step": step, "result": result, "detail": detail})
+
+    def _take_screenshot(page, label):
+        ts    = datetime.now().strftime("%Y%m%d_%H%M%S")
+        safe  = (label.lower()
+                 .replace(" ", "_").replace("/", "_").replace(":", "")
+                 .replace("(", "").replace(")", "").replace("—", ""))
+        fname = f"{portal}_{env}_{safe}_{ts}.png"
+        path  = os.path.join(SCREENSHOTS_DIR, fname)
+        try:
+            page.screenshot(path=path, full_page=True, timeout=12000)
+            screenshots.append({"label": label, "path": path, "filename": fname})
+            _log(f"Screenshot: {label}", "ok", fname)
+            return path
+        except Exception as ex:
+            _log(f"Screenshot: {label}", "warn", str(ex))
+            return None
 
     try:
         with sync_playwright() as p:
             browser = p.chromium.launch(headless=True)
+
+            with open(auth_file) as f:
+                auth_data = json.load(f)
+            auth_storage_value = None
+            for origin in auth_data.get("origins", []):
+                for item in origin.get("localStorage", []):
+                    if item["name"] == "auth-storage":
+                        auth_storage_value = item["value"]
+                        break
+
             context = browser.new_context(storage_state=auth_file)
-            page = context.new_page()
+            page    = context.new_page()
+
+            def _capture_console(msg):
+                if msg.type == "error":
+                    console_errors.append(msg.text)
+            page.on("console", _capture_console)
 
             if auth_storage_value:
                 page.add_init_script(
                     f"localStorage.setItem('auth-storage', {json.dumps(auth_storage_value)});"
                 )
+                _log("Injected auth-storage", "ok")
 
-            # Start at portal landing page to establish session
-            print(f"[run_qa_test_cases] Navigating to entry: {entry_url}")
-            page.goto(entry_url, timeout=60000, wait_until="domcontentloaded")
-            page.wait_for_timeout(3000)
-            print(f"[run_qa_test_cases] Current URL after entry: {page.url}")
-            execution_log.append({"step": "Open portal", "result": "pass", "detail": page.url})
+            # Warm-up navigation to first test case's path
+            first_path = (test_cases[0].get("url_path") or "/") if test_cases else "/"
+            t0 = time.time()
+            page.goto(base_url + first_path, timeout=60000, wait_until="domcontentloaded")
+            page.wait_for_timeout(2000)
+            current_url  = page.url
+            load_time_ms = int((time.time() - t0) * 1000)
+            _log(f"Initial navigation → {first_path}", "ok", current_url)
 
-            for i, tc in enumerate(test_cases):
-                test_name = tc.get("test_name", f"Test {i+1}")
-                steps = tc.get("steps") or []
-                evidence_selector = tc.get("evidence_selector", "").strip()
-                url_path = tc.get("url_path", "").strip()
+            for tc in test_cases:
+                tc_name = tc.get("test_name", "Unnamed test")
+                _log(f"── Test case: {tc_name} ──", "ok")
                 tc_pass = True
 
-                print(f"\n[TC {i+1}/{len(test_cases)}] {test_name}")
-                print(f"  Description: {tc.get('description','')}")
-                print(f"  url_path: '{url_path}' evidence_selector: '{evidence_selector}'")
-                execution_log.append({
-                    "step": f"TC {i+1}: {test_name}",
-                    "result": "start",
-                    "detail": tc.get("description", ""),
-                })
+                # Navigate to test case URL
+                url_path = tc.get("url_path") or "/"
+                try:
+                    page.goto(base_url + url_path, timeout=30000, wait_until="domcontentloaded")
+                    page.wait_for_timeout(1500)
+                    _log(f"NAVIGATE to {url_path}", "pass", page.url)
+                    steps_executed += 1
+                except Exception as e:
+                    _log(f"NAVIGATE to {url_path}", "fail", str(e))
+                    tc_pass = False
 
-                # Navigate to the test case's target page before running steps
-                if url_path:
-                    tc_url = base_url + url_path
-                    print(f"  -> Navigating to tc url_path: {tc_url}")
+                # Execute each step
+                for step_str in (tc.get("steps") or []):
+                    step_str = step_str.strip()
+                    if not step_str:
+                        continue
                     try:
-                        page.goto(tc_url, timeout=30000, wait_until="domcontentloaded")
-                        page.wait_for_timeout(2000)
-                        execution_log.append({"step": f"Navigate to {url_path}", "result": "pass", "detail": page.url})
-                        print(f"  -> Landed at: {page.url}")
+                        if step_str.startswith("CLICK:"):
+                            sel = step_str[6:].strip()
+                            page.wait_for_selector(sel, timeout=8000)
+                            page.click(sel, timeout=8000)
+                            _log(f"CLICK: {sel}", "pass")
+                            steps_executed += 1
+
+                        elif step_str.startswith("FILL:"):
+                            parts = step_str[5:].split("|", 1)
+                            sel   = parts[0].strip()
+                            val   = parts[1].strip() if len(parts) > 1 else ""
+                            page.wait_for_selector(sel, timeout=8000)
+                            page.fill(sel, val)
+                            _log(f"FILL: {sel} → '{val}'", "pass")
+                            steps_executed += 1
+
+                        elif step_str.startswith("WAIT:"):
+                            sel = step_str[5:].strip()
+                            page.wait_for_selector(sel, timeout=10000)
+                            _log(f"WAIT: {sel}", "pass")
+                            steps_executed += 1
+
+                        elif step_str.startswith("NAVIGATE:"):
+                            path = step_str[9:].strip()
+                            page.goto(base_url + path, timeout=30000, wait_until="domcontentloaded")
+                            page.wait_for_timeout(1500)
+                            _log(f"NAVIGATE: {path}", "pass", page.url)
+                            steps_executed += 1
+
+                        elif step_str.startswith("ASSERT_EXISTS:"):
+                            sel = step_str[14:].strip()
+                            found = bool(page.query_selector(sel))
+                            if found:
+                                _log(f"ASSERT_EXISTS: {sel}", "pass")
+                            else:
+                                _log(f"ASSERT_EXISTS: {sel}", "fail", "Element not found")
+                                tc_pass = False
+                            steps_executed += 1
+
+                        elif step_str.startswith("ASSERT_NOT_EXISTS:"):
+                            sel = step_str[18:].strip()
+                            found = bool(page.query_selector(sel))
+                            if not found:
+                                _log(f"ASSERT_NOT_EXISTS: {sel}", "pass")
+                            else:
+                                _log(f"ASSERT_NOT_EXISTS: {sel}", "fail", "Element unexpectedly present")
+                                tc_pass = False
+                            steps_executed += 1
+
+                        elif step_str.startswith("ASSERT_TEXT:"):
+                            parts    = step_str[12:].split("|", 1)
+                            sel      = parts[0].strip()
+                            expected = parts[1].strip() if len(parts) > 1 else ""
+                            el = page.query_selector(sel)
+                            if el:
+                                actual = el.inner_text()
+                                if expected.lower() in actual.lower():
+                                    _log(f"ASSERT_TEXT: {sel}", "pass", f"Found '{expected}'")
+                                else:
+                                    _log(f"ASSERT_TEXT: {sel}", "fail",
+                                         f"Expected '{expected}' in '{actual[:100]}'")
+                                    tc_pass = False
+                            else:
+                                _log(f"ASSERT_TEXT: {sel}", "fail", "Element not found")
+                                tc_pass = False
+                            steps_executed += 1
+
+                        elif step_str.startswith("SCREENSHOT:"):
+                            label = step_str[11:].strip()
+                            _take_screenshot(page, label)
+                            steps_executed += 1
+
+                        else:
+                            _log(f"UNKNOWN step (skipped): {step_str[:80]}", "skip")
+
                     except Exception as e:
-                        print(f"  -> Navigation failed: {e}")
-                        execution_log.append({"step": f"Navigate to {url_path}", "result": "fail", "detail": str(e)})
+                        _log(f"ERROR — {step_str[:80]}", "fail", str(e))
                         tc_pass = False
 
-                for step in steps:
-                    print(f"  Step: {step}")
-                    sl = step.lower()
-
-                    # Navigation
-                    if any(kw in sl for kw in ("navigate to", "go to", "open ", "visit ")):
-                        path = _parse_nav_path(step)
-                        if path:
-                            nav_url = base_url + path
-                            print(f"    -> navigate {nav_url}")
-                            try:
-                                page.goto(nav_url, timeout=30000, wait_until="domcontentloaded")
-                                page.wait_for_timeout(2000)
-                                execution_log.append({"step": step, "result": "pass", "detail": f"Navigated to {nav_url} -> {page.url}"})
-                                print(f"    -> landed at {page.url}")
-                            except Exception as e:
-                                print(f"    -> nav error: {e}")
-                                execution_log.append({"step": step, "result": "fail", "detail": str(e)})
-                                tc_pass = False
-                        else:
-                            execution_log.append({"step": step, "result": "skip", "detail": "No path extracted"})
-
-                    # Click
-                    elif "click" in sl:
-                        target = _parse_click_target(step)
-                        if target:
-                            print(f"    -> click '{target}'")
-                            try:
-                                # Try text selector first, then CSS
-                                try:
-                                    page.get_by_text(target, exact=False).first.click(timeout=5000)
-                                    execution_log.append({"step": step, "result": "pass", "detail": f"Clicked text: {target}"})
-                                    page.wait_for_timeout(1000)
-                                except Exception:
-                                    page.click(target, timeout=3000)
-                                    execution_log.append({"step": step, "result": "pass", "detail": f"Clicked selector: {target}"})
-                                    page.wait_for_timeout(1000)
-                            except Exception as e:
-                                print(f"    -> click fail: {e}")
-                                execution_log.append({"step": step, "result": "warn", "detail": f"Could not click '{target}': {str(e)[:120]}"})
-                        else:
-                            execution_log.append({"step": step, "result": "skip", "detail": "No click target extracted"})
-
-                    # Type / fill / input
-                    elif any(kw in sl for kw in ("type ", "enter ", "fill ", "input ")):
-                        execution_log.append({"step": step, "result": "skip", "detail": "Input step — skipped in automated run"})
-
-                    # Verify / check / assert
-                    elif any(kw in sl for kw in ("verify", "check", "assert", "confirm", "ensure")):
-                        # Try to evaluate the check via evidence_selector if provided
-                        execution_log.append({"step": step, "result": "info", "detail": "Verification step — checked via evidence selector"})
-
-                    else:
-                        execution_log.append({"step": step, "result": "skip", "detail": "Step type not automated"})
-
                 # Check evidence selector
-                if evidence_selector:
-                    print(f"  Evidence selector: '{evidence_selector}'")
+                ev_sel = tc.get("evidence_selector", "").strip()
+                if ev_sel:
                     try:
-                        el = page.query_selector(evidence_selector)
-                        found = el is not None
-                        detail = ""
-                        if found:
+                        el    = page.query_selector(ev_sel)
+                        found = bool(el)
+                        detail = None
+                        if found and el:
                             try:
-                                detail = (el.get_attribute("class") or el.inner_text() or "present")[:100]
+                                detail = el.inner_text()[:100].strip() or el.get_attribute("class") or "present"
                             except Exception:
                                 detail = "present"
-                        print(f"  Evidence: {'FOUND' if found else 'NOT FOUND'} ({detail})")
                         feature_evidence.append({
-                            "test_name": test_name,
-                            "description": tc.get("description", ""),
-                            "selector": evidence_selector,
-                            "found": found,
-                            "detail": detail,
+                            "selector":    ev_sel,
+                            "description": tc_name,
+                            "found":       found,
+                            "detail":      detail or ("Element found" if found else "Element not found"),
                         })
-                        execution_log.append({
-                            "step": f"Evidence check: {evidence_selector}",
-                            "result": "pass" if found else "warn",
-                            "detail": f"{'Found' if found else 'Not found'}: {detail}",
-                        })
-                        if not found:
+                        if found:
+                            _log(f"Evidence PASS: {ev_sel}", "pass", detail)
+                        else:
+                            _log(f"Evidence FAIL: {ev_sel}", "fail", "Selector not found on page")
                             tc_pass = False
                     except Exception as e:
-                        print(f"  Evidence error: {e}")
-                        feature_evidence.append({
-                            "test_name": test_name,
-                            "description": tc.get("description", ""),
-                            "selector": evidence_selector,
-                            "found": False,
-                            "detail": str(e),
-                        })
-                        execution_log.append({
-                            "step": f"Evidence check: {evidence_selector}",
-                            "result": "error",
-                            "detail": str(e),
-                        })
+                        _log(f"Evidence ERROR: {ev_sel}", "fail", str(e))
                         tc_pass = False
 
                 # Screenshot after each test case
-                ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-                shot_filename = f"{portal}_{env}_tc{i+1:02d}_{ts}.png"
-                shot_path = os.path.join(SCREENSHOTS_DIR, shot_filename)
-                try:
-                    page.screenshot(path=shot_path, timeout=10000)
-                    screenshots.append({"filename": shot_filename, "label": test_name})
-                    print(f"  Screenshot: {shot_filename}")
-                except Exception as e:
-                    print(f"  Screenshot failed: {e}")
+                _take_screenshot(page, f"{tc_name} — {'PASS' if tc_pass else 'FAIL'}")
 
-                execution_log.append({
-                    "step": f"TC {i+1} complete",
-                    "result": "pass" if tc_pass else "fail",
-                    "detail": f"Evidence found: {sum(1 for e in feature_evidence if e.get('test_name') == test_name and e.get('found'))}"
-                              f"/{1 if evidence_selector else 0}",
-                })
                 if not tc_pass:
-                    overall_pass = False
+                    overall_status = "FAIL"
+
+            try:
+                current_url = page.url
+            except Exception:
+                pass
 
             browser.close()
 
     except Exception as e:
-        print(f"[run_qa_test_cases] Playwright error: {e}")
-        execution_log.append({"step": "Playwright runner", "result": "error", "detail": str(e)})
-        overall_pass = False
+        overall_status = "FAIL"
+        _log("Playwright exception", "fail", str(e))
+    finally:
+        if local_process:
+            stop_local_server(local_process)
 
-    status = "PASS" if overall_pass else "FAIL"
-    print(f"\n[run_qa_test_cases] Final status={status} evidence_checks={len(feature_evidence)} screenshots={len(screenshots)}")
+    # Hard guard: zero steps executed → FAIL regardless
+    if steps_executed == 0:
+        overall_status = "FAIL"
+        _log("No steps executed — result forced to FAIL", "fail")
 
-    return {
-        "portal": portal,
-        "env": env,
-        "status": status,
-        "message": f"Executed {len(test_cases)} AI-generated test cases — {sum(1 for e in feature_evidence if e.get('found'))}/{len(feature_evidence)} evidence selectors found",
-        "url": base_url,
-        "screenshots": screenshots,
-        "feature_evidence": feature_evidence,
-        "execution_log": execution_log,
-        "console_errors": [],
-        "load_time_ms": 0,
+    message = (
+        f"Executed {steps_executed} step(s) across {len(test_cases)} test case(s). "
+        f"Evidence: {len(feature_evidence)} selector(s) checked."
+    )
+    result = {
+        "status":             overall_status,
+        "message":            message,
+        "url":                current_url,
+        "console_errors":     console_errors,
         "nav_elements_found": [],
+        "load_time_ms":       load_time_ms,
+        "screenshot_path":    screenshots[-1]["path"] if screenshots else None,
+        "screenshots":        screenshots,
+        "execution_log":      execution_log,
+        "feature_evidence":   feature_evidence,
+        "steps_executed":     steps_executed,
     }
+    print(f"[{overall_status}] run_qa_test_cases {portal}/{env} — {steps_executed} steps | "
+          f"evidence:{len(feature_evidence)} | screenshots:{len(screenshots)}")
+    return result
 
 
 # ---------------------------------------------------------------------------
