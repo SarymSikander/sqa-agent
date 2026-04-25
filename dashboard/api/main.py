@@ -378,6 +378,91 @@ async def get_ticket_detail(issue_key: str):
         ],
     }
 
+def extract_selectors_from_source(keywords: list) -> str:
+    """
+    Extract real UI elements from zambeel-fe/src matching the given keywords.
+    Falls back to mining app_context.md if the source tree is unavailable (cloud).
+    """
+    import re as _re
+
+    kw_set = set(kw.lower() for kw in keywords if kw and len(kw) >= 3)
+
+    src_path = os.path.expanduser("~/Documents/GitHub/zambeel-fe/src")
+
+    if os.path.isdir(src_path):
+        # ── Local: scan .tsx / .ts files ──────────────────────────────────────
+        matches = []
+        for root, dirs, files in os.walk(src_path):
+            dirs[:] = [d for d in dirs if d not in ("node_modules", ".git", "dist")]
+            for fname in files:
+                if not (fname.endswith(".tsx") or fname.endswith(".ts")):
+                    continue
+                fpath = os.path.join(root, fname)
+                try:
+                    content = open(fpath, encoding="utf-8", errors="ignore").read()
+                except Exception:
+                    continue
+                if not any(kw in content.lower() for kw in kw_set):
+                    continue
+
+                rel = os.path.relpath(fpath, src_path)
+                matches.append(f"[File: {rel}]")
+
+                for m in _re.finditer(r"<[Bb]utton[^>]*>\s*([^<{]{1,60})\s*</[Bb]utton>", content):
+                    txt = m.group(1).strip()
+                    if txt:
+                        matches.append(f"Button: '{txt}'")
+
+                for m in _re.finditer(r'placeholder=["\']([^"\']{1,80})["\']', content):
+                    matches.append(f"Input placeholder: '{m.group(1)}'")
+
+                for m in _re.finditer(r"<label[^>]*>\s*([^<]{1,60})\s*</label>", content, _re.IGNORECASE):
+                    txt = m.group(1).strip()
+                    if txt:
+                        matches.append(f"Label: '{txt}'")
+
+                for m in _re.finditer(r"""path:\s*['"]([^'"]{2,80})['"]""", content):
+                    matches.append(f"Route: {m.group(1)}")
+
+                for m in _re.finditer(r"""to=['"](/[^'"]{1,80})['"]""", content):
+                    matches.append(f"Nav link: {m.group(1)}")
+
+                for m in _re.finditer(r'(?:data-testid|id)=["\']([^"\']{3,60})["\']', content):
+                    matches.append(f"ID/testid: #{m.group(1)}")
+
+                for m in _re.finditer(r'className=["\']([^"\']{4,60})["\']', content):
+                    cls = m.group(1).split()[0]
+                    if any(kw in cls.lower() for kw in kw_set):
+                        matches.append(f"CSS class: .{cls}")
+
+        seen: set = set()
+        unique = [x for x in matches if not (x in seen or seen.add(x))]  # type: ignore[func-returns-value]
+        items = unique[:120]
+        source = "zambeel-fe/src (local scan)"
+    else:
+        # ── Cloud fallback: mine app_context.md ───────────────────────────────
+        items = []
+        if APP_CONTEXT:
+            for line in APP_CONTEXT.splitlines():
+                if not any(kw in line.lower() for kw in kw_set):
+                    continue
+                for m in _re.finditer(r'`(/[a-z0-9/\-_]+)`', line):
+                    items.append(f"Route: {m.group(1)}")
+                for m in _re.finditer(r'`([^`]{3,60})`', line):
+                    txt = m.group(1)
+                    if any(kw in txt.lower() for kw in kw_set):
+                        items.append(f"Element: '{txt}'")
+                for m in _re.finditer(r'\b([A-Z][a-z]+(?:[A-Z][a-z]+)+)\b', line):
+                    items.append(f"Component: {m.group(1)}")
+            seen2: set = set()
+            items = [x for x in items if not (x in seen2 or seen2.add(x))][:80]  # type: ignore[func-returns-value]
+        source = "app_context.md (cloud fallback)"
+
+    if not items:
+        return f"(No UI elements found in {source} for: {', '.join(list(kw_set)[:8])})"
+    return f"Source: {source}\n" + "\n".join(items)
+
+
 def _extract_relevant_context(title: str, description: str, max_chars: int = 4000) -> str:
     """Score APP_CONTEXT paragraphs by keyword overlap with the ticket, return top sections."""
     import re as _re
@@ -410,6 +495,15 @@ def generate_test_cases(ticket_key, title, description):
 
     relevant_context = _extract_relevant_context(title, description)
 
+    # Extract keywords for source scan
+    stopwords = {"that", "this", "with", "from", "have", "will", "been", "they",
+                 "when", "what", "which", "where", "then", "also", "should", "would"}
+    keywords = list(
+        set(re.findall(r'\b\w{4,}\b', f"{title} {description}".lower())) - stopwords
+    )[:25]
+    selectors_context = extract_selectors_from_source(keywords)
+    print(f"[generate_test_cases] selectors_context ({len(selectors_context)} chars)")
+
     prompt = (
         "You are an expert QA engineer for Zambeel, a B2B e-commerce platform.\n"
         "You write Playwright test scripts in Python that actually execute in a browser.\n\n"
@@ -417,6 +511,7 @@ def generate_test_cases(ticket_key, title, description):
         f"Title: {title}\n"
         f"Description: {description}\n\n"
         f"Relevant app context:\n{relevant_context}\n\n"
+        f"REAL UI ELEMENTS FROM SOURCE CODE:\n{selectors_context}\n\n"
         "Generate 3-5 test cases as JSON. Each test case must have:\n"
         "- test_name: string\n"
         "- url_path: exact URL path to navigate to (e.g. /orders-management/dashboard)\n"
@@ -432,7 +527,7 @@ def generate_test_cases(ticket_key, title, description):
         "  SCREENSHOT: label\n"
         "- expected_result: what success looks like\n"
         "- evidence_selector: ONE valid CSS selector that proves the feature works\n\n"
-        "Use real CSS selectors based on the app context. "
+        "Use ONLY selectors from the REAL UI ELEMENTS section above. "
         "Return ONLY valid JSON: {\"test_cases\": [...]}"
     )
 
@@ -487,6 +582,10 @@ def generate_test_cases(ticket_key, title, description):
 def _build_qa_report(*, issue_key, summary, env, frontend_branch, backend_branch,
                      test_cases, test_results, all_pass, new_status, elapsed):
     ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    branch_rows = (
+        [f"| Frontend Branch | `{frontend_branch}` |", f"| Backend Branch | `{backend_branch}` |"]
+        if env == "local" else []
+    )
     lines = [
         f"# QA Report — {issue_key}",
         f"**{summary}**",
@@ -495,8 +594,7 @@ def _build_qa_report(*, issue_key, summary, env, frontend_branch, backend_branch
         f"|-------|-------|",
         f"| Ticket | [{issue_key}](https://zambeel.atlassian.net/browse/{issue_key}) |",
         f"| Environment | `{env.upper()}` |",
-        f"| Frontend Branch | `{frontend_branch}` |",
-        f"| Backend Branch | `{backend_branch}` |",
+        *branch_rows,
         f"| Result | {'✅ All Passed' if all_pass else '❌ Some Failed'} |",
         f"| Jira Status | {new_status} |",
         f"| Elapsed | {elapsed}s |",
@@ -604,6 +702,15 @@ async def run_qa_endpoint(issue_key: str, body: RunQABody):
             return
         yield evt({"stage": "analysing_ticket", "status": "done"})
 
+        # ── Stage: set QA In Progress immediately ──────────────────────────────
+        yield evt({"stage": "setting_qa_in_progress", "status": "running"})
+        try:
+            await asyncio.to_thread(_jira.update_ticket_status, issue_key, "QA In Progress")
+            yield evt({"stage": "setting_qa_in_progress", "status": "done"})
+        except Exception as e:
+            yield evt({"stage": "setting_qa_in_progress", "status": "error", "message": str(e)})
+            # Non-fatal — continue with the run
+
         # ── Stage: switch branches (local only) ────────────────────────────────
         run_env = body.env  # may be overridden to 'staging' if repos unavailable
         if body.env == "local":
@@ -651,7 +758,9 @@ async def run_qa_endpoint(issue_key: str, body: RunQABody):
         # save as Jira comment regardless of parse success
         if test_cases:
             try:
-                lines = [f"🤖 *AI-Generated QA Test Cases — {issue_key}* ({body.env.upper()} | fe:`{body.frontend_branch}` be:`{body.backend_branch}`)"]
+                _env_label = body.env.upper()
+                _branch_label = f" | fe:`{body.frontend_branch}` be:`{body.backend_branch}`" if body.env == "local" else ""
+                lines = [f"🤖 *AI-Generated QA Test Cases — {issue_key}* ({_env_label}{_branch_label})"]
                 for i, tc in enumerate(test_cases, 1):
                     lines.append(f"\n*{i}. {tc.get('test_name','Test')}*\n_{tc.get('description','')}_")
                     for s in (tc.get("steps") or []):
@@ -750,53 +859,54 @@ async def run_qa_endpoint(issue_key: str, body: RunQABody):
             yield evt({
                 "stage": "updating_jira", "status": "skipped",
                 "message": (
-                    "QA Incomplete — no test cases generated. Jira status unchanged."
+                    "QA Incomplete — no test cases generated. Ticket stays QA In Progress."
                     if not test_cases
-                    else "QA Incomplete — zero steps executed. Jira status unchanged."
+                    else "QA Incomplete — zero steps executed. Ticket stays QA In Progress."
                 ),
             })
         else:
+            _branch_suffix = (
+                f" | fe:`{body.frontend_branch}` be:`{body.backend_branch}`"
+                if body.env == "local" else ""
+            )
             try:
-                new_status = "Ready for Review" if all_pass else "Dev In Progress"
-                await asyncio.to_thread(_jira.update_ticket_status, issue_key, new_status)
                 if all_pass:
-                    comment_lines = [f"✅ *QA Passed* — {body.env.upper()} | fe:`{body.frontend_branch}` be:`{body.backend_branch}`"]
+                    new_status = "Ready for Review"
+                    await asyncio.to_thread(_jira.update_ticket_status, issue_key, new_status)
+                else:
+                    new_status = "QA In Progress"
+                    # already QA In Progress — no transition needed
+                if all_pass:
+                    comment_lines = [f"✅ *QA Passed* — {body.env.upper()}{_branch_suffix}"]
                     for r in test_results:
                         comment_lines.append(f"• {r['portal'].upper()}: PASS — {r.get('url') or ''} | load: {r.get('load_time_ms',0)}ms")
-                        evidence = r.get("feature_evidence") or []
-                        found_ev = [e for e in evidence if e.get("found")]
+                        found_ev = [e for e in (r.get("feature_evidence") or []) if e.get("found")]
                         if found_ev:
-                            comment_lines.append(f"  Evidence: " + "; ".join(
-                                f"{e['description']} ({e.get('detail','found')})"
-                                for e in found_ev[:4]
+                            comment_lines.append("  Evidence: " + "; ".join(
+                                f"{e['description']} ({e.get('detail','found')})" for e in found_ev[:4]
                             ))
                         shots = r.get("screenshots") or []
                         if shots:
-                            comment_lines.append("  Screenshots: " + ", ".join(
-                                s["filename"] for s in shots
-                            ))
+                            comment_lines.append("  Screenshots: " + ", ".join(s["filename"] for s in shots))
                     if assignee:
                         comment_lines.append(f"\n@{assignee} All tests passing — moving to Ready for Review.")
                 else:
-                    comment_lines = [f"❌ *QA Failed* — {body.env.upper()} | fe:`{body.frontend_branch}` be:`{body.backend_branch}`"]
+                    comment_lines = [f"❌ *QA Failed* — {body.env.upper()}{_branch_suffix}"]
                     for r in test_results:
                         icon = "✅" if r["status"] == "PASS" else "❌"
                         comment_lines.append(f"• {r['portal'].upper()}: {icon} {r['status']} — {str(r.get('message',''))[:200]}")
                         for err in (r.get("console_errors") or [])[:3]:
                             comment_lines.append(f"  Console error: {str(err)[:120]}")
-                        evidence = r.get("feature_evidence") or []
-                        found_ev = [e for e in evidence if e.get("found")]
+                        found_ev = [e for e in (r.get("feature_evidence") or []) if e.get("found")]
                         if found_ev:
-                            comment_lines.append(f"  Elements found: " + "; ".join(
-                                f"{e['description']}" for e in found_ev[:4]
+                            comment_lines.append("  Elements found: " + "; ".join(
+                                e["description"] for e in found_ev[:4]
                             ))
                         shots = r.get("screenshots") or []
                         if shots:
-                            comment_lines.append("  Screenshots: " + ", ".join(
-                                s["filename"] for s in shots
-                            ))
+                            comment_lines.append("  Screenshots: " + ", ".join(s["filename"] for s in shots))
                     if assignee:
-                        comment_lines.append(f"\n@{assignee} Tests failing — moving back to Dev In Progress.")
+                        comment_lines.append(f"\n@{assignee} Tests failing — ticket stays in QA In Progress.")
                 await asyncio.to_thread(_jira.add_comment, issue_key, "\n".join(comment_lines))
             except Exception as e:
                 yield evt({"stage": "updating_jira", "status": "error", "message": str(e)})
@@ -822,15 +932,18 @@ async def run_qa_endpoint(issue_key: str, body: RunQABody):
                 f"• {r['portal'].upper()}: {'✅ PASS' if r['status']=='PASS' else '❌ FAIL'} {r.get('url') or ''}"
                 for r in test_results
             ) or "No tests run"
+            _branch_lines = (
+                f"*Frontend Branch:* `{body.frontend_branch}`\n"
+                f"*Backend Branch:* `{body.backend_branch}`\n"
+            ) if run_env == "local" else ""
             slack_msg = (
                 f"🤖 *QA Run Complete* — <https://zambeel.atlassian.net/browse/{issue_key}|{issue_key}>\n"
                 f"*{summary}*\n\n"
                 f"*Environment:* `{run_env.upper()}`{' *(local repos unavailable, ran on staging)*' if run_env != body.env else ''}\n"
-                f"*Frontend Branch:* `{body.frontend_branch}`\n"
-                f"*Backend Branch:* `{body.backend_branch}`\n\n"
+                f"{_branch_lines}"
                 f"*AI-Generated Test Cases:*\n{tc_summary}\n\n"
                 f"*Playwright Results:*\n{results_summary}\n\n"
-                f"*Jira Status → * {'Ready for Review ✅' if all_pass else 'Dev In Progress ❌'}\n"
+                f"*Jira Status →* {'Ready for Review ✅' if all_pass else 'QA In Progress 🔄'}\n"
                 f"*Time:* {elapsed}s"
             )
             await asyncio.to_thread(_slack.send_message, slack_msg)

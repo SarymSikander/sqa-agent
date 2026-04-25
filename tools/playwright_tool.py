@@ -445,12 +445,31 @@ def run_qa_test_cases(portal: str, env: str, test_cases: list) -> dict:
             first_path = (test_cases[0].get("url_path") or "/") if test_cases else "/"
             t0 = time.time()
             page.goto(base_url + first_path, timeout=60000, wait_until="domcontentloaded")
-            page.wait_for_timeout(2000)
+            page.wait_for_timeout(8000)  # allow up to 8s for auth redirect to settle
             current_url  = page.url
             load_time_ms = int((time.time() - t0) * 1000)
             _log(f"Initial navigation → {first_path}", "ok", current_url)
 
+            # ── Auth check: fail fast if session expired ──────────────────────
+            auth_ok = "/login" not in current_url
+            if not auth_ok:
+                err_msg = (
+                    f"Auth session expired for {portal}/{env} — "
+                    f"refresh it by running: python tools/auth_setup.py {portal} {env}"
+                )
+                _log("Auth session check", "fail", err_msg)
+                feature_evidence.append({
+                    "selector":    "N/A",
+                    "description": "Auth session check",
+                    "found":       False,
+                    "detail":      f"Redirected to {current_url} — session expired",
+                })
+                overall_status = "FAIL"
+                _take_screenshot(page, f"auth_expired_{portal}_{env}")
+
             for tc in test_cases:
+                if not auth_ok:
+                    break
                 tc_name = tc.get("test_name", "Unnamed test")
                 _log(f"── Test case: {tc_name} ──", "ok")
                 tc_pass = True
@@ -603,10 +622,18 @@ def run_qa_test_cases(portal: str, env: str, test_cases: list) -> dict:
         overall_status = "FAIL"
         _log("No steps executed — result forced to FAIL", "fail")
 
-    message = (
-        f"Executed {steps_executed} step(s) across {len(test_cases)} test case(s). "
-        f"Evidence: {len(feature_evidence)} selector(s) checked."
-    )
+    # Build human-readable message
+    auth_ev = next((e for e in feature_evidence if e.get("description") == "Auth session check" and not e.get("found")), None)
+    if auth_ev:
+        message = (
+            f"Auth session expired for {portal}/{env} — "
+            f"refresh it by running: python tools/auth_setup.py {portal} {env}"
+        )
+    else:
+        message = (
+            f"Executed {steps_executed} step(s) across {len(test_cases)} test case(s). "
+            f"Evidence: {len(feature_evidence)} selector(s) checked."
+        )
     result = {
         "status":             overall_status,
         "message":            message,
