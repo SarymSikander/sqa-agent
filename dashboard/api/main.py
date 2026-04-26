@@ -435,6 +435,11 @@ def extract_selectors_from_source(keywords: list) -> str:
                     if any(kw in cls.lower() for kw in kw_set):
                         matches.append(f"CSS class: .{cls}")
 
+                for m in _re.finditer(
+                    r'export\s+(?:default\s+)?(?:function|const)\s+([A-Z][A-Za-z0-9]+)', content
+                ):
+                    matches.append(f"Component: {m.group(1)}")
+
         seen: set = set()
         unique = [x for x in matches if not (x in seen or seen.add(x))]  # type: ignore[func-returns-value]
         items = unique[:120]
@@ -459,8 +464,9 @@ def extract_selectors_from_source(keywords: list) -> str:
         source = "app_context.md (cloud fallback)"
 
     if not items:
-        return f"(No UI elements found in {source} for: {', '.join(list(kw_set)[:8])})"
-    return f"Source: {source}\n" + "\n".join(items)
+        return f"REAL SELECTORS FROM SOURCE:\n(No UI elements found in {source} for: {', '.join(list(kw_set)[:8])})"
+    content_str = f"Source: {source}\n" + "\n".join(items)
+    return f"REAL SELECTORS FROM SOURCE:\n{content_str[:2000]}"
 
 
 def _extract_relevant_context(title: str, description: str, max_chars: int = 4000) -> str:
@@ -511,7 +517,7 @@ def generate_test_cases(ticket_key, title, description):
         f"Title: {title}\n"
         f"Description: {description}\n\n"
         f"Relevant app context:\n{relevant_context}\n\n"
-        f"REAL UI ELEMENTS FROM SOURCE CODE:\n{selectors_context}\n\n"
+        f"{selectors_context}\n\n"
         "Generate 3-5 test cases as JSON. Each test case must have:\n"
         "- test_name: string\n"
         "- url_path: exact URL path to navigate to (e.g. /orders-management/dashboard)\n"
@@ -527,7 +533,11 @@ def generate_test_cases(ticket_key, title, description):
         "  SCREENSHOT: label\n"
         "- expected_result: what success looks like\n"
         "- evidence_selector: ONE valid CSS selector that proves the feature works\n\n"
-        "Use ONLY selectors from the REAL UI ELEMENTS section above. "
+        "IMPORTANT: This is a React app that uses Tailwind CSS and rarely uses IDs. "
+        "Use ONLY these selector types: button:has-text(\"exact button text\"), "
+        "input[placeholder=\"exact placeholder\"], text=\"exact visible text\", "
+        ".className patterns from the source code provided. "
+        "Never use #id selectors unless you see them explicitly in the source code provided.\n"
         "Return ONLY valid JSON: {\"test_cases\": [...]}"
     )
 
@@ -681,6 +691,15 @@ async def run_qa_endpoint(issue_key: str, body: RunQABody):
         new_status    = ""
         elapsed       = 0.0
 
+        # ── Stage: set QA In Progress immediately (before anything else) ───────
+        yield evt({"stage": "setting_qa_in_progress", "status": "running"})
+        try:
+            await asyncio.to_thread(_jira.update_ticket_status, issue_key, "QA In Progress")
+            yield evt({"stage": "setting_qa_in_progress", "status": "done"})
+        except Exception as e:
+            yield evt({"stage": "setting_qa_in_progress", "status": "error", "message": str(e)})
+            # Non-fatal — continue with the run
+
         # ── Stage: fetch ticket ────────────────────────────────────────────────
         yield evt({"stage": "analysing_ticket", "status": "running"})
         try:
@@ -701,15 +720,6 @@ async def run_qa_endpoint(issue_key: str, body: RunQABody):
             yield evt({"stage": "done", "error": str(e)})
             return
         yield evt({"stage": "analysing_ticket", "status": "done"})
-
-        # ── Stage: set QA In Progress immediately ──────────────────────────────
-        yield evt({"stage": "setting_qa_in_progress", "status": "running"})
-        try:
-            await asyncio.to_thread(_jira.update_ticket_status, issue_key, "QA In Progress")
-            yield evt({"stage": "setting_qa_in_progress", "status": "done"})
-        except Exception as e:
-            yield evt({"stage": "setting_qa_in_progress", "status": "error", "message": str(e)})
-            # Non-fatal — continue with the run
 
         # ── Stage: switch branches (local only) ────────────────────────────────
         run_env = body.env  # may be overridden to 'staging' if repos unavailable

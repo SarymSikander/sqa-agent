@@ -222,91 +222,109 @@ def run_tests(portal, env):
             _log(f"Navigate to target: {target_url}", "ok", f"Expected path: {expected}")
             t0 = time.time()
             page.goto(target_url, timeout=60000, wait_until="domcontentloaded")
-            page.wait_for_timeout(2000)
-            _screenshot(page, f"After auth — {portal}")
+            page.wait_for_timeout(8000)
+            current_url = page.url
 
-            page.wait_for_timeout(2000)
-            load_time_ms = int((time.time() - t0) * 1000)
-            current_url  = page.url
-            _log(f"Page settled at {current_url}", "ok", f"Total load time: {load_time_ms}ms")
+            # ── Re-injection retry if still on /login ────────────────────────
+            if "/login" in current_url:
+                _log("Still on /login after 8s — attempting auth re-injection", "warn", current_url)
+                with open(auth_file) as _rf:
+                    _retry_data = json.load(_rf)
+                _retry_val = None
+                for _origin in _retry_data.get("origins", []):
+                    for _item in _origin.get("localStorage", []):
+                        if _item["name"] == "auth-storage":
+                            _retry_val = _item["value"]
+                            break
+                if _retry_val:
+                    page.evaluate(f"localStorage.setItem('auth-storage', JSON.stringify({_retry_val}))")
+                    _log("Re-injected auth-storage via evaluate", "ok")
+                    page.reload(wait_until="domcontentloaded")
+                    page.wait_for_timeout(8000)
+                    current_url = page.url
 
-            if expected and expected in current_url:
-                status  = "PASS"
-                message = f"Logged in successfully. Landed on: {current_url}"
-                _log(f"URL check PASS — '{expected}' present in URL", "pass", current_url)
-            elif "/login" in current_url:
+            if "/login" in current_url:
                 status  = "FAIL"
-                message = f"Redirected to login — session may be expired. URL: {current_url}"
-                _log("URL check FAIL — redirected to /login (session expired?)", "fail", current_url)
+                message = f"Session expired — run: python3 tools/auth_setup.py {portal} {env}"
+                _log("Session expired after re-injection attempt", "fail", current_url)
+                _screenshot(page, f"session_expired_{portal}")
             else:
-                status  = "FAIL"
-                message = f"Unexpected URL after auth (expected '{expected}'). URL: {current_url}"
-                _log(f"URL check FAIL — unexpected path", "fail",
-                     f"Got: {current_url} | Expected: {expected}")
+                _screenshot(page, f"After auth — {portal}")
+                load_time_ms = int((time.time() - t0) * 1000)
+                _log(f"Page settled at {current_url}", "ok", f"Total load time: {load_time_ms}ms")
 
-            # ── Settled-state screenshot (labelled with pass/fail) ────────────────
-            _screenshot(page, f"Feature page — {status}")
+                if expected and expected in current_url:
+                    status  = "PASS"
+                    message = f"Logged in successfully. Landed on: {current_url}"
+                    _log(f"URL check PASS — '{expected}' present in URL", "pass", current_url)
+                else:
+                    status  = "FAIL"
+                    message = f"Unexpected URL after auth (expected '{expected}'). URL: {current_url}"
+                    _log("URL check FAIL — unexpected path", "fail",
+                         f"Got: {current_url} | Expected: {expected}")
 
-            # ── Nav element checks ────────────────────────────────────────────────
-            if status == "PASS":
-                _log("Checking navigation / shell elements", "ok")
-                for selector in _NAV_SELECTORS:
+                # ── Settled-state screenshot (labelled with pass/fail) ────────────────
+                _screenshot(page, f"Feature page — {status}")
+
+                # ── Nav element checks ────────────────────────────────────────────────
+                if status == "PASS":
+                    _log("Checking navigation / shell elements", "ok")
+                    for selector in _NAV_SELECTORS:
+                        try:
+                            found = bool(page.query_selector(selector))
+                            if found:
+                                nav_elements_found.append(selector)
+                            _log(f"Nav selector: {selector}",
+                                 "found" if found else "not_found")
+                        except Exception:
+                            pass
+
+                # ── Feature-specific evidence ─────────────────────────────────────────
+                _log(f"Checking {portal} feature-specific selectors", "ok")
+                for selector, desc in _FEATURE_SELECTORS.get(portal, []):
                     try:
-                        found = bool(page.query_selector(selector))
-                        if found:
-                            nav_elements_found.append(selector)
-                        _log(f"Nav selector: {selector}",
-                             "found" if found else "not_found")
-                    except Exception:
-                        pass
+                        el    = page.query_selector(selector)
+                        found = bool(el)
+                        detail = None
+                        if found and el:
+                            for attr in ("min", "max", "type", "name", "value"):
+                                try:
+                                    val = el.get_attribute(attr)
+                                    if val is not None:
+                                        detail = (detail or "") + f"{attr}={val} "
+                                except Exception:
+                                    pass
+                        feature_evidence.append({
+                            "selector":    selector,
+                            "description": desc,
+                            "found":       found,
+                            "detail":      (detail.strip() if detail else None) or
+                                           ("Element present" if found else "Element not found"),
+                        })
+                        _log(f"Feature check — {desc}",
+                             "found" if found else "not_found", selector)
+                    except Exception as ex:
+                        _log(f"Feature check — {desc}", "error", str(ex))
 
-            # ── Feature-specific evidence ─────────────────────────────────────────
-            _log(f"Checking {portal} feature-specific selectors", "ok")
-            for selector, desc in _FEATURE_SELECTORS.get(portal, []):
+                # ── Console error summary ─────────────────────────────────────────────
+                if console_errors:
+                    _log(f"{len(console_errors)} JS console error(s) captured", "warn",
+                         " | ".join(console_errors[:3]))
+                else:
+                    _log("No JS console errors", "ok")
+
+                # ── Final full-page screenshot (backwards-compat field) ───────────────
+                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                screenshot_path = os.path.join(
+                    SCREENSHOTS_DIR, f"{portal}_{env}_{status}_{timestamp}.png"
+                )
                 try:
-                    el    = page.query_selector(selector)
-                    found = bool(el)
-                    detail = None
-                    if found and el:
-                        # capture meaningful attributes as evidence
-                        for attr in ("min", "max", "type", "name", "value"):
-                            try:
-                                val = el.get_attribute(attr)
-                                if val is not None:
-                                    detail = (detail or "") + f"{attr}={val} "
-                            except Exception:
-                                pass
-                    feature_evidence.append({
-                        "selector":    selector,
-                        "description": desc,
-                        "found":       found,
-                        "detail":      (detail.strip() if detail else None) or
-                                       (f"Element present" if found else "Element not found"),
-                    })
-                    _log(f"Feature check — {desc}",
-                         "found" if found else "not_found", selector)
-                except Exception as ex:
-                    _log(f"Feature check — {desc}", "error", str(ex))
-
-            # ── Console error summary ─────────────────────────────────────────────
-            if console_errors:
-                _log(f"{len(console_errors)} JS console error(s) captured", "warn",
-                     " | ".join(console_errors[:3]))
-            else:
-                _log("No JS console errors", "ok")
-
-            # ── Final full-page screenshot (backwards-compat field) ───────────────
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            screenshot_path = os.path.join(
-                SCREENSHOTS_DIR, f"{portal}_{env}_{status}_{timestamp}.png"
-            )
-            try:
-                page.screenshot(path=screenshot_path, full_page=True, timeout=15000)
-                _log("Full-page screenshot saved", "ok", os.path.basename(screenshot_path))
-                print(f"Screenshot saved: {screenshot_path}")
-            except Exception:
-                _log("Full-page screenshot skipped", "warn")
-                screenshot_path = None
+                    page.screenshot(path=screenshot_path, full_page=True, timeout=15000)
+                    _log("Full-page screenshot saved", "ok", os.path.basename(screenshot_path))
+                    print(f"Screenshot saved: {screenshot_path}")
+                except Exception:
+                    _log("Full-page screenshot skipped", "warn")
+                    screenshot_path = None
 
             browser.close()
 
@@ -445,12 +463,47 @@ def run_qa_test_cases(portal: str, env: str, test_cases: list) -> dict:
             first_path = (test_cases[0].get("url_path") or "/") if test_cases else "/"
             t0 = time.time()
             page.goto(base_url + first_path, timeout=60000, wait_until="domcontentloaded")
-            page.wait_for_timeout(2000)
-            current_url  = page.url
+            page.wait_for_timeout(8000)
+            current_url = page.url
+
+            # ── Re-injection retry if still on /login ────────────────────────
+            if "/login" in current_url:
+                _log("Still on /login after 8s — attempting auth re-injection", "warn", current_url)
+                with open(auth_file) as _rf:
+                    _retry_data = json.load(_rf)
+                _retry_val = None
+                for _origin in _retry_data.get("origins", []):
+                    for _item in _origin.get("localStorage", []):
+                        if _item["name"] == "auth-storage":
+                            _retry_val = _item["value"]
+                            break
+                if _retry_val:
+                    page.evaluate(f"localStorage.setItem('auth-storage', JSON.stringify({_retry_val}))")
+                    _log("Re-injected auth-storage via evaluate", "ok")
+                    page.reload(wait_until="domcontentloaded")
+                    page.wait_for_timeout(8000)
+                    current_url = page.url
+
             load_time_ms = int((time.time() - t0) * 1000)
             _log(f"Initial navigation → {first_path}", "ok", current_url)
 
+            # ── Auth check: fail fast if session expired ──────────────────────
+            auth_ok = "/login" not in current_url
+            if not auth_ok:
+                err_msg = f"Session expired — run: python3 tools/auth_setup.py {portal} {env}"
+                _log("Auth session check", "fail", err_msg)
+                feature_evidence.append({
+                    "selector":    "N/A",
+                    "description": "Auth session check",
+                    "found":       False,
+                    "detail":      f"Redirected to {current_url} — session expired",
+                })
+                overall_status = "FAIL"
+                _take_screenshot(page, f"auth_expired_{portal}_{env}")
+
             for tc in test_cases:
+                if not auth_ok:
+                    break
                 tc_name = tc.get("test_name", "Unnamed test")
                 _log(f"── Test case: {tc_name} ──", "ok")
                 tc_pass = True
@@ -603,10 +656,15 @@ def run_qa_test_cases(portal: str, env: str, test_cases: list) -> dict:
         overall_status = "FAIL"
         _log("No steps executed — result forced to FAIL", "fail")
 
-    message = (
-        f"Executed {steps_executed} step(s) across {len(test_cases)} test case(s). "
-        f"Evidence: {len(feature_evidence)} selector(s) checked."
-    )
+    # Build human-readable message
+    auth_ev = next((e for e in feature_evidence if e.get("description") == "Auth session check" and not e.get("found")), None)
+    if auth_ev:
+        message = f"Session expired — run: python3 tools/auth_setup.py {portal} {env}"
+    else:
+        message = (
+            f"Executed {steps_executed} step(s) across {len(test_cases)} test case(s). "
+            f"Evidence: {len(feature_evidence)} selector(s) checked."
+        )
     result = {
         "status":             overall_status,
         "message":            message,
