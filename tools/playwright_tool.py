@@ -214,16 +214,24 @@ def run_tests(portal, env):
             page.on("console", _capture_console)
 
             if auth_storage_value:
+                print(f"[AUTH DEBUG] {portal}/{env} — injecting auth-storage (len={len(auth_storage_value)}):\n{auth_storage_value}")
                 page.add_init_script(f"""
                     localStorage.setItem('auth-storage', {json.dumps(auth_storage_value)});
                 """)
                 _log("Injected auth-storage via localStorage init script", "ok")
+            else:
+                print(f"[AUTH DEBUG] {portal}/{env} — auth_storage_value is None/empty, no init script registered")
 
             _log(f"Navigate to target: {target_url}", "ok", f"Expected path: {expected}")
             t0 = time.time()
             page.goto(target_url, timeout=60000, wait_until="domcontentloaded")
             page.wait_for_timeout(8000)
             current_url = page.url
+            try:
+                _ls = page.evaluate("() => JSON.stringify(localStorage)")
+                print(f"[AUTH DEBUG] {portal}/{env} — localStorage after initial navigation:\n{_ls}")
+            except Exception as _le:
+                print(f"[AUTH DEBUG] {portal}/{env} — could not read localStorage: {_le}")
 
             # ── Re-injection retry if still on /login ────────────────────────
             if "/login" in current_url and auth_storage_value:
@@ -233,6 +241,7 @@ def run_tests(portal, env):
                     ctx2 = browser.new_context()
                     page = ctx2.new_page()
                     page.on("console", _capture_console)
+                    print(f"[AUTH DEBUG] {portal}/{env} — retry: injecting auth-storage on fresh context (len={len(auth_storage_value)}):\n{auth_storage_value}")
                     page.add_init_script(
                         f"localStorage.setItem('auth-storage', {json.dumps(auth_storage_value)});"
                     )
@@ -240,6 +249,11 @@ def run_tests(portal, env):
                     page.goto(target_url, timeout=60000, wait_until="domcontentloaded")
                     page.wait_for_timeout(8000)
                     current_url = page.url
+                    try:
+                        _ls2 = page.evaluate("() => JSON.stringify(localStorage)")
+                        print(f"[AUTH DEBUG] {portal}/{env} — localStorage after retry navigation:\n{_ls2}")
+                    except Exception as _le2:
+                        print(f"[AUTH DEBUG] {portal}/{env} — could not read localStorage after retry: {_le2}")
                     _log(f"Fresh context navigation settled at {current_url}", "ok")
                 except Exception as _re:
                     _log("Fresh context retry failed", "warn", str(_re))
@@ -455,10 +469,13 @@ def run_qa_test_cases(portal: str, env: str, test_cases: list) -> dict:
             page.on("console", _capture_console)
 
             if auth_storage_value:
+                print(f"[AUTH DEBUG] {portal}/{env} — injecting auth-storage (len={len(auth_storage_value)}):\n{auth_storage_value}")
                 page.add_init_script(
                     f"localStorage.setItem('auth-storage', {json.dumps(auth_storage_value)});"
                 )
                 _log("Injected auth-storage", "ok")
+            else:
+                print(f"[AUTH DEBUG] {portal}/{env} — auth_storage_value is None/empty, no init script registered")
 
             # Warm-up navigation to first test case's path
             first_path = (test_cases[0].get("url_path") or "/") if test_cases else "/"
@@ -466,6 +483,11 @@ def run_qa_test_cases(portal: str, env: str, test_cases: list) -> dict:
             page.goto(base_url + first_path, timeout=60000, wait_until="domcontentloaded")
             page.wait_for_timeout(8000)
             current_url = page.url
+            try:
+                _ls = page.evaluate("() => JSON.stringify(localStorage)")
+                print(f"[AUTH DEBUG] {portal}/{env} — localStorage after initial navigation:\n{_ls}")
+            except Exception as _le:
+                print(f"[AUTH DEBUG] {portal}/{env} — could not read localStorage: {_le}")
 
             # ── Re-injection retry if still on /login ────────────────────────
             if "/login" in current_url and auth_storage_value:
@@ -475,6 +497,7 @@ def run_qa_test_cases(portal: str, env: str, test_cases: list) -> dict:
                     ctx2 = browser.new_context()
                     page = ctx2.new_page()
                     page.on("console", _capture_console)
+                    print(f"[AUTH DEBUG] {portal}/{env} — retry: injecting auth-storage on fresh context (len={len(auth_storage_value)}):\n{auth_storage_value}")
                     page.add_init_script(
                         f"localStorage.setItem('auth-storage', {json.dumps(auth_storage_value)});"
                     )
@@ -482,6 +505,11 @@ def run_qa_test_cases(portal: str, env: str, test_cases: list) -> dict:
                     page.goto(base_url + first_path, timeout=60000, wait_until="domcontentloaded")
                     page.wait_for_timeout(8000)
                     current_url = page.url
+                    try:
+                        _ls2 = page.evaluate("() => JSON.stringify(localStorage)")
+                        print(f"[AUTH DEBUG] {portal}/{env} — localStorage after retry navigation:\n{_ls2}")
+                    except Exception as _le2:
+                        print(f"[AUTH DEBUG] {portal}/{env} — could not read localStorage after retry: {_le2}")
                     _log(f"Fresh context navigation settled at {current_url}", "ok")
                 except Exception as _re:
                     _log("Fresh context retry failed", "warn", str(_re))
