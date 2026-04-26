@@ -226,22 +226,23 @@ def run_tests(portal, env):
             current_url = page.url
 
             # ── Re-injection retry if still on /login ────────────────────────
-            if "/login" in current_url:
-                _log("Still on /login after 8s — attempting auth re-injection", "warn", current_url)
-                with open(auth_file) as _rf:
-                    _retry_data = json.load(_rf)
-                _retry_val = None
-                for _origin in _retry_data.get("origins", []):
-                    for _item in _origin.get("localStorage", []):
-                        if _item["name"] == "auth-storage":
-                            _retry_val = _item["value"]
-                            break
-                if _retry_val:
-                    page.evaluate(f"localStorage.setItem('auth-storage', JSON.stringify({_retry_val}))")
-                    _log("Re-injected auth-storage via evaluate", "ok")
-                    page.reload(wait_until="domcontentloaded")
+            if "/login" in current_url and auth_storage_value:
+                _log("Still on /login — retrying with fresh context + pre-nav init script", "warn", current_url)
+                try:
+                    page.close()
+                    ctx2 = browser.new_context()
+                    page = ctx2.new_page()
+                    page.on("console", _capture_console)
+                    page.add_init_script(
+                        f"localStorage.setItem('auth-storage', {json.dumps(auth_storage_value)});"
+                    )
+                    _log("Pre-nav init script registered on fresh context", "ok")
+                    page.goto(target_url, timeout=60000, wait_until="domcontentloaded")
                     page.wait_for_timeout(8000)
                     current_url = page.url
+                    _log(f"Fresh context navigation settled at {current_url}", "ok")
+                except Exception as _re:
+                    _log("Fresh context retry failed", "warn", str(_re))
 
             if "/login" in current_url:
                 status  = "FAIL"
@@ -467,22 +468,23 @@ def run_qa_test_cases(portal: str, env: str, test_cases: list) -> dict:
             current_url = page.url
 
             # ── Re-injection retry if still on /login ────────────────────────
-            if "/login" in current_url:
-                _log("Still on /login after 8s — attempting auth re-injection", "warn", current_url)
-                with open(auth_file) as _rf:
-                    _retry_data = json.load(_rf)
-                _retry_val = None
-                for _origin in _retry_data.get("origins", []):
-                    for _item in _origin.get("localStorage", []):
-                        if _item["name"] == "auth-storage":
-                            _retry_val = _item["value"]
-                            break
-                if _retry_val:
-                    page.evaluate(f"localStorage.setItem('auth-storage', JSON.stringify({_retry_val}))")
-                    _log("Re-injected auth-storage via evaluate", "ok")
-                    page.reload(wait_until="domcontentloaded")
+            if "/login" in current_url and auth_storage_value:
+                _log("Still on /login — retrying with fresh context + pre-nav init script", "warn", current_url)
+                try:
+                    page.close()
+                    ctx2 = browser.new_context()
+                    page = ctx2.new_page()
+                    page.on("console", _capture_console)
+                    page.add_init_script(
+                        f"localStorage.setItem('auth-storage', {json.dumps(auth_storage_value)});"
+                    )
+                    _log("Pre-nav init script registered on fresh context", "ok")
+                    page.goto(base_url + first_path, timeout=60000, wait_until="domcontentloaded")
                     page.wait_for_timeout(8000)
                     current_url = page.url
+                    _log(f"Fresh context navigation settled at {current_url}", "ok")
+                except Exception as _re:
+                    _log("Fresh context retry failed", "warn", str(_re))
 
             load_time_ms = int((time.time() - t0) * 1000)
             _log(f"Initial navigation → {first_path}", "ok", current_url)

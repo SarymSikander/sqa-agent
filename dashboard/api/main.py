@@ -137,6 +137,10 @@ class PRReviewBody(BaseModel):
     repo: str
     pr_number: int
 
+class AuthRefreshBody(BaseModel):
+    portal: str
+    env: str
+
 class RunQABody(BaseModel):
     env: str
     frontend_branch: str
@@ -195,6 +199,41 @@ def health():
     app_contents = _os.listdir("/app") if _os.path.exists("/app") else None
     auth_contents = _os.listdir("/app/auth") if _os.path.exists("/app/auth") else None
     return {"status": "ok", "app_dir": app_contents, "auth_dir": auth_contents}
+
+# ── /auth ─────────────────────────────────────────────────────────────────────
+
+@app.post("/auth/refresh")
+async def auth_refresh(body: AuthRefreshBody):
+    portal = body.portal.lower()
+    env    = body.env.lower()
+    if portal not in {"seller", "admin", "agency"}:
+        raise HTTPException(status_code=400, detail="portal must be seller, admin, or agency")
+    if env not in {"local", "staging", "production"}:
+        raise HTTPException(status_code=400, detail="env must be local, staging, or production")
+    auth_path = _HERE / "auth" / f"{portal}_{env}.json"
+    if not auth_path.exists():
+        raise HTTPException(status_code=404, detail=f"Auth file not found: {portal}_{env}.json")
+    try:
+        return {"portal": portal, "env": env, "auth": json.loads(auth_path.read_text())}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/auth/status")
+def auth_status():
+    auth_dir = _HERE / "auth"
+    sessions = []
+    for portal in ("seller", "admin", "agency"):
+        for env in ("staging", "production"):
+            path   = auth_dir / f"{portal}_{env}.json"
+            exists = path.exists()
+            sessions.append({
+                "portal":   portal,
+                "env":      env,
+                "file":     f"{portal}_{env}.json",
+                "exists":   exists,
+                "modified": datetime.fromtimestamp(path.stat().st_mtime).isoformat() if exists else None,
+            })
+    return {"sessions": sessions}
 
 # ── /tests ────────────────────────────────────────────────────────────────────
 
