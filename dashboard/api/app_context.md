@@ -1701,3 +1701,59 @@ Inbound webhooks at `/webhooks/*`:
 ---
 
 *End of Zambeel Platform Documentation*
+
+## UI Selector Reference — Admin Portal (OMS)
+
+### Commission Models (/orders-management/commission-models)
+- Page title: 'Commission Models'
+- Create button text: '+ New Model'
+- Empty state button: 'Create First Model'
+- Modal title: 'Create Commission Model'
+- Field label: 'Model Name*' — placeholder: 'Enter model name'
+- Field label: 'Value* (%)' — number input
+- Field label: 'Country*' — dropdown
+- Field label: 'Type*' — dropdown options: '% of Revenue', 'Flat per Order'
+- Add rule button: '+ Add Rule'
+- Save button: 'Save Model'
+- Cancel button: 'Cancel'
+- Table has Edit button per row
+- Alert text: 'Each country can only appear once inside the same model.'
+
+### Orders (/orders-management/orders)
+- Search placeholder: 'Search orders'
+- Tabs: 'All Orders', 'Confirmation Pending', 'Approved', 'Dispatching in Process', 'In Delivery', 'Undelivered', 'Delivered', 'Return in Transit', 'Return', 'Cancelled'
+- Filter button: 'Filter'
+- Actions dropdown button: 'Actions'
+- Actions include: 'Update Statuses', 'Upload Orders', 'Approve', 'Cancel', 'Update Tag', 'Update Remarks', 'Assign Courier'
+- Empty state: 'No orders found'
+
+### Agency Registrations (/orders-management/agency-registrations)
+- Page title: 'Agency Registrations'
+- Tabs: 'All', 'Pending', 'Approved', 'OnHold', 'Rejected'
+- Row action button: 'Review'
+- Approve button: 'Approve Agency'
+- Hold button: 'Put on Hold'
+- Reject button: 'Confirm Reject'
+- Commission model selector: 'Select commission model'
+
+### Gold Subscriptions (/orders-management/gold-subscriptions)
+- Search options: 'Email', 'Phone', 'User ID'
+- Buttons: 'Search', 'Clear'
+- Tabs: 'All users', 'Gold users'
+- User action: 'View Details', 'Give Gold Access', 'Extend Gold Access', 'Remove Gold Access'
+
+### Agents (/orders-management/agents)
+- Search placeholder: 'Search by Name, Email or Country'
+- Create button: 'Create Agent'
+- Modal fields: 'Full Name' (placeholder: 'John Doe'), 'Email', 'Phone Number', 'Country', 'Team'
+
+### IMPORTANT: React Playwright Selector Rules
+Since this is a React/Tailwind app with NO IDs on elements, always use these selector patterns:
+- Buttons: button:has-text('exact button text') or role=button[name='text']
+- Inputs by label: input[placeholder='exact placeholder text']
+- Inputs by nearby label text: label:has-text('Label Text') + input
+- Navigation: a:has-text('Menu Item Text')
+- Modals: div[role='dialog'] or .modal
+- Tables: table or [role='grid']
+- Form submission: button:has-text('Save Model'), button:has-text('Confirm')
+- Never use #id selectors — this React app does not use element IDs

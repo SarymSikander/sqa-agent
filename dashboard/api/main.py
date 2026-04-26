@@ -511,6 +511,12 @@ def generate_test_cases(ticket_key, title, description):
     print(f"[generate_test_cases] selectors_context ({len(selectors_context)} chars)")
 
     prompt = (
+        "CRITICAL: This React app has NO element IDs. Use ONLY these selector formats:\n"
+        "- button:has-text(\"exact text\") for buttons\n"
+        "- input[placeholder=\"exact placeholder\"] for inputs\n"
+        "- text=\"exact visible text\" for any element by its text\n"
+        "- div[role=\"dialog\"] for modals\n"
+        "- Never use #id selectors. Use the REAL UI ELEMENTS section below.\n\n"
         "You are an expert QA engineer for Zambeel, a B2B e-commerce platform.\n"
         "You write Playwright test scripts in Python that actually execute in a browser.\n\n"
         f"Ticket: {ticket_key}\n"
