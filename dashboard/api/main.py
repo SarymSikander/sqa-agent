@@ -843,9 +843,23 @@ async def run_qa_endpoint(issue_key: str, body: RunQABody):
             portals = [body.portal] if (body.portal and body.portal != "all") else ["seller", "admin", "agency"]
             print(f"\n[run_tests] No test cases — login-only for portals={portals}")
 
+        # ── Pre-loop debug dump ───────────────────────────────────────────────
+        print(f"\n[run_qa DEBUG] ── test_cases generated: {len(test_cases)}")
+        print(f"[run_qa DEBUG] ── portals to run: {portals}")
+        print(f"[run_qa DEBUG] ── execution path: {'run_qa_test_cases' if test_cases else 'run_tests (fallback — no test cases)'}")
+        for _i, _tc in enumerate(test_cases):
+            print(f"[run_qa DEBUG]    tc[{_i}] portal={_tc.get('portal')} name={_tc.get('test_name')} "
+                  f"url={_tc.get('url_path')} steps={len(_tc.get('steps') or [])}")
+        if not test_cases:
+            print("[run_qa DEBUG]    (full test_cases list is empty)")
+        else:
+            print(f"[run_qa DEBUG]    full test_cases: {json.dumps(test_cases, indent=2)}")
+        print(f"[run_qa DEBUG] ────────────────────────────────────────────────\n")
+
         for portal in portals:
             yield f": keepalive\n\n"
-            print(f"\n[run_tests] Running portal={portal} env={run_env}")
+            print(f"\n[run_tests] Running portal={portal} env={run_env} "
+                  f"path={'run_qa_test_cases' if test_cases else 'run_tests fallback'}")
             try:
                 if test_cases:
                     portal_tcs = [tc for tc in test_cases if tc.get("portal", "seller").lower() == portal]
