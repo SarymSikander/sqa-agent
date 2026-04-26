@@ -1661,6 +1661,43 @@
   </div>
 </div>
 
+<!-- ── Upload Session Modal ──────────────────────────────────────────────────── -->
+<div id="upload-session-modal" class="modal-overlay" onclick="if(event.target===this)closeUploadSessionModal()">
+  <div class="modal-box" style="max-width:480px">
+    <div class="modal-header">
+      <div class="modal-title">↑ Upload Auth Session</div>
+      <div class="modal-close" onclick="closeUploadSessionModal()">✕</div>
+    </div>
+    <div class="modal-body" style="display:flex;flex-direction:column;gap:0">
+      <div class="rqa-field">
+        <label>Portal</label>
+        <select id="upload-session-portal">
+          <option value="seller">Seller</option>
+          <option value="admin">Admin</option>
+          <option value="agency">Agency</option>
+        </select>
+      </div>
+      <div class="rqa-field">
+        <label>Environment</label>
+        <select id="upload-session-env">
+          <option value="staging">Staging</option>
+          <option value="production">Production</option>
+        </select>
+      </div>
+      <div class="rqa-field">
+        <label>Auth JSON Content</label>
+        <textarea id="upload-session-content" placeholder='Paste the contents of auth/seller_staging.json here…' style="min-height:160px;font-family:'JetBrains Mono',monospace;font-size:11.5px;resize:vertical"></textarea>
+      </div>
+      <div class="rqa-actions">
+        <button class="btn btn-secondary" onclick="closeUploadSessionModal()">Cancel</button>
+        <button class="btn btn-primary" id="upload-session-btn" onclick="submitUploadSession()">
+          <div class="spin"></div><span class="label">↑ Upload</span>
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- ── Jira Detail Panel ─────────────────────────────────────────────────────── -->
 <div id="jira-panel-overlay" class="panel-overlay" onclick="closeJiraPanel()"></div>
 <div id="jira-panel" class="slide-panel">
@@ -1675,8 +1712,11 @@
     <div class="skel-line skeleton" style="height:14px;width:50%"></div>
   </div>
   <div class="panel-footer" id="jira-panel-footer">
-    <button class="btn btn-primary w100" id="jira-run-qa-btn" onclick="openRunQAModal()" style="justify-content:center;margin-bottom:12px">
+    <button class="btn btn-primary w100" id="jira-run-qa-btn" onclick="openRunQAModal()" style="justify-content:center;margin-bottom:8px">
       <div class="spin"></div><span class="label">▶ Run QA</span>
+    </button>
+    <button class="btn btn-secondary w100" onclick="openUploadSessionModal()" style="justify-content:center;margin-bottom:12px">
+      ↑ Upload Session
     </button>
     <div style="height:1px;background:var(--border);margin-bottom:12px"></div>
     <label>Add Comment</label>
@@ -2876,6 +2916,41 @@ function _showQAReport() {
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// ── Upload Session Modal ──────────────────────────────────────────────────────
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+function openUploadSessionModal() {
+  document.getElementById('upload-session-modal').classList.add('open');
+}
+function closeUploadSessionModal() {
+  document.getElementById('upload-session-modal').classList.remove('open');
+  document.getElementById('upload-session-content').value = '';
+}
+async function submitUploadSession() {
+  const portal = document.getElementById('upload-session-portal').value;
+  const env    = document.getElementById('upload-session-env').value;
+  const raw    = document.getElementById('upload-session-content').value.trim();
+  if (!raw) { toast('Paste the auth JSON content first', 'error'); return; }
+  let auth_content;
+  try { auth_content = JSON.parse(raw); } catch (e) { toast('Invalid JSON: ' + e.message, 'error'); return; }
+  btnLoad('upload-session-btn', true);
+  try {
+    const r = await fetch(`${API_BASE}/auth/upload`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ portal, env, auth_content }),
+    });
+    const data = await r.json();
+    if (!r.ok) throw new Error(data.detail || 'Upload failed');
+    toast(`Session saved: ${data.file}`, 'success');
+    closeUploadSessionModal();
+  } catch (e) {
+    toast(e.message, 'error');
+  } finally {
+    btnLoad('upload-session-btn', false);
+  }
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // ── PR Detail Panel ───────────────────────────────────────────────────────────
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 let _prCurrent = null;
@@ -2979,8 +3054,9 @@ document.addEventListener('DOMContentLoaded', () => {
   // Escape closes panels/modals/lightbox
   document.addEventListener('keydown', e => {
     if (e.key !== 'Escape') return;
-    if (document.getElementById('run-qa-modal').classList.contains('open')) { closeRunQAModal(); return; }
-    if (document.getElementById('jira-panel').classList.contains('open'))   { closeJiraPanel();  return; }
+    if (document.getElementById('run-qa-modal').classList.contains('open'))        { closeRunQAModal();          return; }
+    if (document.getElementById('upload-session-modal').classList.contains('open')) { closeUploadSessionModal(); return; }
+    if (document.getElementById('jira-panel').classList.contains('open'))           { closeJiraPanel();           return; }
     if (document.getElementById('pr-panel').classList.contains('open'))     { closePRPanel();    return; }
     if (document.getElementById('lightbox').classList.contains('open'))     { closeLightbox();   return; }
   });

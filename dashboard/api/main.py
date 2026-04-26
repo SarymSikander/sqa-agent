@@ -5,7 +5,7 @@ import time
 import requests
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
+from typing import Any, Optional
 
 from openai import OpenAI
 
@@ -141,6 +141,11 @@ class AuthRefreshBody(BaseModel):
     portal: str
     env: str
 
+class AuthUploadBody(BaseModel):
+    portal: str
+    env: str
+    auth_content: Any
+
 class RunQABody(BaseModel):
     env: str
     frontend_branch: str
@@ -217,6 +222,24 @@ async def auth_refresh(body: AuthRefreshBody):
         return {"portal": portal, "env": env, "auth": json.loads(auth_path.read_text())}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/auth/upload")
+async def auth_upload(body: AuthUploadBody):
+    portal = body.portal.lower()
+    env    = body.env.lower()
+    if portal not in {"seller", "admin", "agency"}:
+        raise HTTPException(status_code=400, detail="portal must be seller, admin, or agency")
+    if env not in {"local", "staging", "production"}:
+        raise HTTPException(status_code=400, detail="env must be local, staging, or production")
+    auth_dir = _HERE / "auth"
+    auth_dir.mkdir(exist_ok=True)
+    auth_path = auth_dir / f"{portal}_{env}.json"
+    try:
+        auth_path.write_text(json.dumps(body.auth_content, indent=2))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    print(f"[auth/upload] Saved {auth_path.name} ({auth_path.stat().st_size} bytes)")
+    return {"success": True, "file": f"{portal}_{env}.json", "portal": portal, "env": env}
 
 @app.get("/auth/status")
 def auth_status():
