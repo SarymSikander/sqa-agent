@@ -17,7 +17,8 @@
       "Bash(pkill -f \"uvicorn main:app\")",
       "Bash(git init *)",
       "Bash(git *)",
-      "Bash(grep -v \"^$\")"
+      "Bash(grep -v \"^$\")",
+      "Bash(GIT_ASKPASS=/usr/bin/true git *)"
     ]
   }
 }

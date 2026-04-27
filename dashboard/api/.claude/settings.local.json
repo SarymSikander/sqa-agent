@@ -1,7 +1,23 @@
 {
   "permissions": {
     "allow": [
-      "Bash(curl *)"
+      "Bash(pip install *)",
+      "Bash(python *)",
+      "Bash(python3 *)",
+      "Bash(pip3 install *)",
+      "Bash(curl *)",
+      "Bash(lsof -ti:5173)",
+      "Bash(plutil -lint /Users/sarimsikandar/Library/LaunchAgents/com.zambeel.sqa.daily.plist)",
+      "Bash(launchctl load *)",
+      "Bash(launchctl list *)",
+      "Skill(claude-api)",
+      "Bash(/Users/sarimsikandar/Desktop/sqa-agent/venv/bin/uvicorn main:app --port 8000)",
+      "Bash(kill %1)",
+      "Bash(wait)",
+      "Bash(pkill -f \"uvicorn main:app\")",
+      "Bash(git init *)",
+      "Bash(git *)",
+      "Bash(grep -v \"^$\")"
     ]
   }
 }
