@@ -7,3 +7,4 @@ gitpython
 openai
 playwright
 mysql-connector-python
+openai
