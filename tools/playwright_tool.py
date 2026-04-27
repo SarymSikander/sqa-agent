@@ -1,11 +1,7 @@
-import json
 import os
 import subprocess
 import time
-import urllib.error
-import urllib.request
 from datetime import datetime
-from urllib.parse import urlparse
 from dotenv import load_dotenv
 from playwright.sync_api import sync_playwright
 
@@ -18,7 +14,6 @@ PRODUCTION_URL = os.getenv("PRODUCTION_URL")
 FRONTEND_REPO_PATH = os.getenv("FRONTEND_REPO_PATH")
 FRONTEND_DEV_CMD   = os.getenv("FRONTEND_DEV_CMD", "npm run dev")
 
-AUTH_DIR        = os.path.join(os.path.dirname(__file__), "..", "auth")
 SCREENSHOTS_DIR = os.path.join(os.path.dirname(__file__), "..", "screenshots")
 os.makedirs(SCREENSHOTS_DIR, exist_ok=True)
 
@@ -67,112 +62,21 @@ _FEATURE_SELECTORS = {
 }
 
 
-def get_auth_file(portal, env):
-    path = os.path.join(AUTH_DIR, f"{portal}_{env}.json")
-    if not os.path.exists(path):
-        raise FileNotFoundError(
-            f"Auth session not found: {path}\n"
-            f"Run this first:  python tools/auth_setup.py {portal} {env}"
-        )
-    return path
-
-
-def _load_auth_token(auth_file):
-    """Return (auth_data, authToken) from auth-storage in origins[0].localStorage.
-
-    Handles both the full Playwright storage format {cookies, origins: [...]}
-    and the uploaded format {origins: [...]} (no cookies key).
-    The auth-storage value may be a JSON string (standard) or already a dict.
-    """
-    with open(auth_file) as f:
-        auth_data = json.load(f)
-    try:
-        ls = auth_data["origins"][0]["localStorage"]
-        for item in ls:
-            if item.get("name") == "auth-storage":
-                val = item["value"]
-                inner = json.loads(val) if isinstance(val, str) else val
-                token = (inner.get("state") or {}).get("authToken")
-                if token:
-                    return auth_data, token
-    except (KeyError, IndexError, ValueError, TypeError):
-        pass
-    return auth_data, None
-
-
-_LOGIN_URLS = {
-    "local":      "http://localhost:3000/api/auth/login",
-    "staging":    "https://staging.myzambeel.com/api/auth/login",
-    "production": "https://portal.myzambeel.com/api/auth/login",
-}
-
-
-_ENV_SUFFIX = {
-    "staging":    "STAGING",
-    "production": "PRODUCTION",
-    "local":      "LOCAL",
-}
-
-
-def api_login(portal, env):
-    """POST portal+env credentials to the login API and return the JWT token.
-
-    Env var naming: {PORTAL}_{SUFFIX}_EMAIL / {PORTAL}_{SUFFIX}_PASSWORD
-      staging    → ADMIN_STAGING_EMAIL    / ADMIN_STAGING_PASSWORD
-      production → ADMIN_PRODUCTION_EMAIL / ADMIN_PRODUCTION_PASSWORD
-      local      → ADMIN_LOCAL_EMAIL      / ADMIN_LOCAL_PASSWORD
-    Prints the HTTP response status and body for debugging.
-    Returns the JWT token string, or None if login fails.
-    """
-    portal_up  = portal.upper()
-    env_suffix = _ENV_SUFFIX.get(env, env.upper())
-    email      = os.getenv(f"{portal_up}_{env_suffix}_EMAIL", "").strip()
-    password   = os.getenv(f"{portal_up}_{env_suffix}_PASSWORD", "").strip()
-
-    if not email or not password:
-        print(f"[api_login] {portal}/{env} — credentials not set "
-              f"({portal_up}_{env_suffix}_EMAIL / {portal_up}_{env_suffix}_PASSWORD "
-              f"missing or empty in .env)")
-        return None
-
-    login_url = _LOGIN_URLS.get(env)
-    if not login_url:
-        print(f"[api_login] {portal}/{env} — no login URL configured for env '{env}'")
-        return None
-
-    payload = json.dumps({"email": email, "password": password}).encode()
-    req = urllib.request.Request(
-        login_url,
-        data=payload,
-        headers={"Content-Type": "application/json"},
-        method="POST",
-    )
-    print(f"[api_login] POST {login_url}  user={email}")
-    try:
-        with urllib.request.urlopen(req, timeout=15) as resp:
-            http_status = resp.status
-            body        = resp.read().decode()
-        print(f"[api_login] {portal}/{env} — HTTP {http_status}")
-        print(f"[api_login] response body: {body[:500]}")
-        data  = json.loads(body)
-        token = (data.get("token")
-                 or data.get("authToken")
-                 or data.get("accessToken")
-                 or data.get("access_token"))
-        if token:
-            print(f"[api_login] {portal}/{env} — token extracted (len={len(token)})")
-            return token
-        print(f"[api_login] {portal}/{env} — no token field in response "
-              f"(keys={list(data.keys())})")
-        return None
-    except urllib.error.HTTPError as e:
-        body = e.read().decode()
-        print(f"[api_login] {portal}/{env} — HTTP {e.code} {e.reason}")
-        print(f"[api_login] error body: {body[:500]}")
-        return None
-    except Exception as e:
-        print(f"[api_login] {portal}/{env} — request error: {e}")
-        return None
+def login_to_portal(page, portal, env):
+    """Fill the login form with credentials from .env and wait until off /login."""
+    base_url  = "https://staging.myzambeel.com" if env == "staging" else "https://portal.myzambeel.com"
+    email_key = f"{portal.upper()}_{env.upper()}_EMAIL"
+    pass_key  = f"{portal.upper()}_{env.upper()}_PASSWORD"
+    email     = os.getenv(email_key, "").strip()
+    password  = os.getenv(pass_key, "").strip()
+    print(f"[LOGIN] {portal}/{env} — email={email}")
+    page.goto(f"{base_url}/login")
+    page.wait_for_selector('input[type="email"], input[type="text"]', timeout=15000)
+    page.fill('input[type="email"], input[type="text"]', email)
+    page.fill('input[type="password"]', password)
+    page.click('button[type="submit"]')
+    page.wait_for_url(lambda url: "/login" not in url, timeout=30000)
+    print(f"[LOGIN] success — landed on {page.url}")
 
 
 def start_local_server():
@@ -219,58 +123,27 @@ def run_tests(portal, env):
             "screenshot_path": None, "screenshots": [], "execution_log": [], "feature_evidence": [],
         })
 
-    # ── Acquire JWT: programmatic API login, fallback to saved auth file ─────
-    portal_up  = portal.upper()
-    env_suffix = _ENV_SUFFIX.get(env, env.upper())
-    print(f"[AUTH] Using api_login for {portal}/{env}")
-    print(f"[AUTH] email env var: {os.getenv(f'{portal_up}_{env_suffix}_EMAIL', 'NOT FOUND')}")
-    auth_token = api_login(portal, env)
-    print(f"[AUTH] api_login result: {auth_token[:20] if auth_token else None}")
-    if auth_token is None:
-        try:
-            auth_file = get_auth_file(portal, env)
-            _, auth_token = _load_auth_token(auth_file)
-            if auth_token:
-                print(f"[AUTH] {portal}/{env} — falling back to saved auth file")
-        except FileNotFoundError:
-            print(f"[AUTH] {portal}/{env} — no saved auth file found either")
-    if auth_token is None:
-        _msg = (f"No auth token for {portal}/{env}. "
-                f"Set {portal.upper()}_EMAIL + {portal.upper()}_PASSWORD in .env "
-                f"or run: python tools/auth_setup.py {portal} {env}")
-        return ("FAIL", {
-            "status": "FAIL", "message": _msg, "url": None,
-            "console_errors": [], "nav_elements_found": [], "load_time_ms": 0,
-            "screenshot_path": None, "screenshots": [],
-            "execution_log": [{"step": "Acquire auth token", "result": "fail", "detail": _msg}],
-            "feature_evidence": [],
-        })
-    print(f"[AUTH] {portal}/{env} — token acquired (len={len(auth_token)})")
-
-    local_process = None
-    if env == "local":
-        local_process = start_local_server()
-
     success_slugs = {
         "admin":  "/orders-management/dashboard",
         "seller": "/get-started",
         "agency": "/get-started",
     }
-    expected   = success_slugs.get(portal, "")
-    base_url   = url.rstrip("/").split("/login")[0]
-    target_url = base_url + expected
+    expected = success_slugs.get(portal, "")
 
-    # mutable accumulators
-    screenshots       = []
-    execution_log     = []
-    feature_evidence  = []
-    console_errors    = []
+    local_process = None
+    if env == "local":
+        local_process = start_local_server()
+
+    screenshots        = []
+    execution_log      = []
+    feature_evidence   = []
+    console_errors     = []
     nav_elements_found = []
-    load_time_ms      = 0
-    current_url       = target_url
-    screenshot_path   = None
-    status            = "FAIL"
-    message           = "Test did not complete"
+    load_time_ms       = 0
+    current_url        = url
+    screenshot_path    = None
+    status             = "FAIL"
+    message            = "Test did not complete"
 
     def _log(step, result="ok", detail=None):
         execution_log.append({"step": step, "result": result, "detail": detail})
@@ -293,122 +166,57 @@ def run_tests(portal, env):
 
     try:
         with sync_playwright() as p:
-
-            # ── Step 1: capture the login page (unauthenticated) ─────────────────
-            _log("Launch browser (no auth) to capture login page", "ok", "Headless Chromium")
-            browser_pre = p.chromium.launch(headless=True)
-            try:
-                ctx_pre  = browser_pre.new_context()
-                page_pre = ctx_pre.new_page()
-                _log(f"Navigate to base URL: {base_url}", "ok")
-                page_pre.goto(base_url, timeout=30000, wait_until="domcontentloaded")
-                page_pre.wait_for_timeout(2000)
-                _log(f"Login page loaded: {page_pre.url}", "ok")
-                _screenshot(page_pre, "Login page")
-            except Exception as e:
-                _log("Login page capture failed", "warn", str(e))
-            finally:
-                browser_pre.close()
-
-            # ── Step 2: authenticated test ────────────────────────────────────────
-            _log(f"Launch authenticated browser for {portal}/{env}", "ok",
-                 f"Auth: {portal}_{env}.json (JWT token only — no session state)")
             browser = p.chromium.launch(headless=True)
             context = browser.new_context()
-
-            # ── Set auth token as cookie ──────────────────────────────────────────
-            if auth_token:
-                parsed_url = urlparse(base_url)
-                context.add_cookies([{
-                    "name":     "authToken",
-                    "value":    auth_token,
-                    "domain":   parsed_url.hostname,
-                    "path":     "/",
-                    "httpOnly": False,
-                    "secure":   parsed_url.scheme == "https",
-                    "sameSite": "Lax",
-                }])
-                _log("Auth cookie set", "ok", f"domain={parsed_url.hostname}")
-
-            page = context.new_page()
-
-            # ── Inject token into localStorage before page scripts run ────────────
-            if auth_token:
-                auth_storage_payload = json.dumps({"state": {"authToken": auth_token}})
-                page.add_init_script(
-                    f"window.localStorage.setItem('auth-storage', {json.dumps(auth_storage_payload)});"
-                )
-                _log("localStorage init script registered", "ok", "auth-storage injected pre-load")
+            page    = context.new_page()
 
             def _capture_console(msg):
                 if msg.type == "error":
                     console_errors.append(msg.text)
             page.on("console", _capture_console)
 
-            # ── Bearer token route interception (all requests) ────────────────────
-            if auth_token:
-                def _bearer_handler(route, request):
-                    route.continue_(headers={**request.headers, "Authorization": f"Bearer {auth_token}"})
-                page.route("**/*", _bearer_handler)
-                print(f"[AUTH] {portal}/{env} — **/* interceptor active, injecting Bearer token on every request")
-                _log("Bearer token route interceptor registered for **/*", "ok",
-                     f"token len={len(auth_token)}")
-            else:
-                print(f"[AUTH] {portal}/{env} — no authToken, route interceptor not registered")
-                _log("No authToken found in auth JSON — proceeding without Bearer injection", "warn")
-
-            _log(f"Navigate to target: {target_url}", "ok", f"Expected path: {expected}")
+            _log(f"Logging in as {portal}/{env}", "ok")
             t0 = time.time()
-            page.goto(target_url, timeout=60000, wait_until="domcontentloaded")
-            # Wait for networkidle so the Zustand store has time to rehydrate from
-            # localStorage before the route guard checks auth state.
-            _log("Waiting for networkidle — Zustand rehydration", "ok")
             try:
-                page.wait_for_load_state("networkidle", timeout=30000)
-            except Exception:
-                _log("networkidle timeout — continuing", "warn")
-            page.wait_for_timeout(3000)
-            current_url = page.url
-            print(f"[AUTH] {portal}/{env} — URL after initial wait: {current_url}")
+                login_to_portal(page, portal, env)
+            except Exception as e:
+                _log("login_to_portal failed", "fail", str(e))
+                _screenshot(page, "login_failed")
+                status  = "FAIL"
+                message = f"Login failed: {e}"
+                browser.close()
+                return ("FAIL", {
+                    "status": "FAIL", "message": message, "url": page.url,
+                    "console_errors": console_errors, "nav_elements_found": [],
+                    "load_time_ms": 0, "screenshot_path": None,
+                    "screenshots": screenshots, "execution_log": execution_log,
+                    "feature_evidence": [],
+                })
 
-            # ── Force-navigate if still on /login ────────────────────────────────
-            if "/login" in current_url:
-                _log("Still on /login — forcing JS navigation to target", "warn", current_url)
-                _screenshot(page, f"pre_force_nav_{portal}")
-                page.evaluate(f"window.location.href = '{target_url}'")
-                _log("JS navigation triggered, waiting for networkidle", "ok")
-                try:
-                    page.wait_for_load_state("networkidle", timeout=30000)
-                except Exception:
-                    _log("networkidle timeout after force-nav — continuing", "warn")
-                page.wait_for_timeout(3000)
-                current_url = page.url
-                print(f"[AUTH] {portal}/{env} — URL after force-nav: {current_url}")
+            current_url  = page.url
+            load_time_ms = int((time.time() - t0) * 1000)
+            _log(f"Post-login URL: {current_url}", "ok", f"load={load_time_ms}ms")
+            _screenshot(page, "After login")
 
             if "/login" in current_url:
                 status  = "FAIL"
-                message = f"Auth failed after force-nav — run: python3 tools/auth_setup.py {portal} {env}"
-                _log("Still on /login after force-nav", "fail", current_url)
-                _screenshot(page, f"auth_failed_{portal}")
+                message = "Still on login page after login attempt"
+                _log("Auth failed — still on /login", "fail", current_url)
+                _screenshot(page, "auth_failed")
             else:
-                _screenshot(page, f"After auth — {portal}")
-                load_time_ms = int((time.time() - t0) * 1000)
-                _log(f"Page settled at {current_url}", "ok", f"Total load time: {load_time_ms}ms")
-
                 if expected and expected in current_url:
                     status  = "PASS"
                     message = f"Logged in successfully. Landed on: {current_url}"
                     _log(f"URL check PASS — '{expected}' present in URL", "pass", current_url)
                 else:
                     status  = "FAIL"
-                    message = f"Unexpected URL after auth (expected '{expected}'). URL: {current_url}"
+                    message = f"Unexpected URL after login (expected '{expected}'). URL: {current_url}"
                     _log("URL check FAIL — unexpected path", "fail",
                          f"Got: {current_url} | Expected: {expected}")
 
-                # ── Settled-state screenshot (labelled with pass/fail) ────────────────
                 _screenshot(page, f"Feature page — {status}")
 
-                # ── Nav element checks ────────────────────────────────────────────────
+                # ── Nav element checks ────────────────────────────────────────────
                 if status == "PASS":
                     _log("Checking navigation / shell elements", "ok")
                     for selector in _NAV_SELECTORS:
@@ -421,7 +229,7 @@ def run_tests(portal, env):
                         except Exception:
                             pass
 
-                # ── Feature-specific evidence ─────────────────────────────────────────
+                # ── Feature-specific evidence ─────────────────────────────────────
                 _log(f"Checking {portal} feature-specific selectors", "ok")
                 for selector, desc in _FEATURE_SELECTORS.get(portal, []):
                     try:
@@ -448,14 +256,14 @@ def run_tests(portal, env):
                     except Exception as ex:
                         _log(f"Feature check — {desc}", "error", str(ex))
 
-                # ── Console error summary ─────────────────────────────────────────────
+                # ── Console error summary ─────────────────────────────────────────
                 if console_errors:
                     _log(f"{len(console_errors)} JS console error(s) captured", "warn",
                          " | ".join(console_errors[:3]))
                 else:
                     _log("No JS console errors", "ok")
 
-                # ── Final full-page screenshot (backwards-compat field) ───────────────
+                # ── Final full-page screenshot ────────────────────────────────────
                 timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
                 screenshot_path = os.path.join(
                     SCREENSHOTS_DIR, f"{portal}_{env}_{status}_{timestamp}.png"
@@ -529,34 +337,6 @@ def run_qa_test_cases(portal: str, env: str, test_cases: list) -> dict:
             "feature_evidence": [], "steps_executed": 0,
         }
 
-    # ── Acquire JWT: programmatic API login, fallback to saved auth file ─────
-    portal_up  = portal.upper()
-    env_suffix = _ENV_SUFFIX.get(env, env.upper())
-    print(f"[AUTH] Using api_login for {portal}/{env}")
-    print(f"[AUTH] email env var: {os.getenv(f'{portal_up}_{env_suffix}_EMAIL', 'NOT FOUND')}")
-    auth_token = api_login(portal, env)
-    print(f"[AUTH] api_login result: {auth_token[:20] if auth_token else None}")
-    if auth_token is None:
-        try:
-            auth_file = get_auth_file(portal, env)
-            _, auth_token = _load_auth_token(auth_file)
-            if auth_token:
-                print(f"[AUTH] {portal}/{env} — falling back to saved auth file")
-        except FileNotFoundError:
-            print(f"[AUTH] {portal}/{env} — no saved auth file found either")
-    if auth_token is None:
-        _msg = (f"No auth token for {portal}/{env}. "
-                f"Set {portal.upper()}_EMAIL + {portal.upper()}_PASSWORD in .env "
-                f"or run: python tools/auth_setup.py {portal} {env}")
-        return {
-            "status": "FAIL", "message": _msg, "url": None,
-            "console_errors": [], "nav_elements_found": [], "load_time_ms": 0,
-            "screenshot_path": None, "screenshots": [],
-            "execution_log": [{"step": "Acquire auth token", "result": "fail", "detail": _msg}],
-            "feature_evidence": [], "steps_executed": 0,
-        }
-    print(f"[AUTH] {portal}/{env} — token acquired (len={len(auth_token)})")
-
     local_process = None
     if env == "local":
         local_process = start_local_server()
@@ -595,89 +375,42 @@ def run_qa_test_cases(portal: str, env: str, test_cases: list) -> dict:
         with sync_playwright() as p:
             browser = p.chromium.launch(headless=True)
             context = browser.new_context()
-
-            # ── Set auth token as cookie ──────────────────────────────────────────
-            if auth_token:
-                parsed_url = urlparse(base_url)
-                context.add_cookies([{
-                    "name":     "authToken",
-                    "value":    auth_token,
-                    "domain":   parsed_url.hostname,
-                    "path":     "/",
-                    "httpOnly": False,
-                    "secure":   parsed_url.scheme == "https",
-                    "sameSite": "Lax",
-                }])
-                _log("Auth cookie set", "ok", f"domain={parsed_url.hostname}")
-
-            page = context.new_page()
-
-            # ── Inject token into localStorage before page scripts run ────────────
-            if auth_token:
-                auth_storage_payload = json.dumps({"state": {"authToken": auth_token}})
-                page.add_init_script(
-                    f"window.localStorage.setItem('auth-storage', {json.dumps(auth_storage_payload)});"
-                )
-                _log("localStorage init script registered", "ok", "auth-storage injected pre-load")
+            page    = context.new_page()
 
             def _capture_console(msg):
                 if msg.type == "error":
                     console_errors.append(msg.text)
             page.on("console", _capture_console)
 
-            # ── Bearer token route interception (all requests) ────────────────────
-            if auth_token:
-                def _bearer_handler(route, request):
-                    route.continue_(headers={**request.headers, "Authorization": f"Bearer {auth_token}"})
-                page.route("**/*", _bearer_handler)
-                print(f"[AUTH] {portal}/{env} — **/* interceptor active, injecting Bearer token on every request")
-                _log("Bearer token route interceptor registered for **/*", "ok",
-                     f"token len={len(auth_token)}")
-            else:
-                print(f"[AUTH] {portal}/{env} — no authToken, route interceptor not registered")
-                _log("No authToken found in auth JSON — proceeding without Bearer injection", "warn")
-
-            # Warm-up navigation to first test case's path
-            first_path = (test_cases[0].get("url_path") or "/") if test_cases else "/"
-            nav_target = base_url + first_path
+            _log(f"Logging in as {portal}/{env}", "ok")
             t0 = time.time()
-            page.goto(nav_target, timeout=60000, wait_until="domcontentloaded")
-            _log("Waiting for networkidle — Zustand rehydration", "ok")
             try:
-                page.wait_for_load_state("networkidle", timeout=30000)
-            except Exception:
-                _log("networkidle timeout — continuing", "warn")
-            page.wait_for_timeout(3000)
-            current_url = page.url
-            print(f"[AUTH] {portal}/{env} — URL after initial wait: {current_url}")
+                login_to_portal(page, portal, env)
+            except Exception as e:
+                _log("login_to_portal failed", "fail", str(e))
+                overall_status = "FAIL"
+                _take_screenshot(page, f"login_failed_{portal}_{env}")
+                browser.close()
+                return {
+                    "status": "FAIL", "message": f"Login failed: {e}", "url": page.url,
+                    "console_errors": console_errors, "nav_elements_found": [],
+                    "load_time_ms": 0, "screenshot_path": None,
+                    "screenshots": screenshots, "execution_log": execution_log,
+                    "feature_evidence": [], "steps_executed": 0,
+                }
 
-            # ── Force-navigate if still on /login ────────────────────────────────
-            if "/login" in current_url:
-                _log("Still on /login — forcing JS navigation to target", "warn", current_url)
-                _take_screenshot(page, f"pre_force_nav_{portal}_{env}")
-                page.evaluate(f"window.location.href = '{nav_target}'")
-                _log("JS navigation triggered, waiting for networkidle", "ok")
-                try:
-                    page.wait_for_load_state("networkidle", timeout=30000)
-                except Exception:
-                    _log("networkidle timeout after force-nav — continuing", "warn")
-                page.wait_for_timeout(3000)
-                current_url = page.url
-                print(f"[AUTH] {portal}/{env} — URL after force-nav: {current_url}")
-
+            current_url  = page.url
             load_time_ms = int((time.time() - t0) * 1000)
-            _log(f"Initial navigation → {first_path}", "ok", current_url)
+            _log(f"Post-login URL: {current_url}", "ok")
 
-            # ── Auth check: fail fast if auth failed ──────────────────────────
             auth_ok = "/login" not in current_url
             if not auth_ok:
-                err_msg = f"Auth failed after force-nav — run: python3 tools/auth_setup.py {portal} {env}"
-                _log("Auth check failed", "fail", err_msg)
+                _log("Auth failed — still on /login", "fail", current_url)
                 feature_evidence.append({
                     "selector":    "N/A",
-                    "description": "Auth session check",
+                    "description": "Auth check",
                     "found":       False,
-                    "detail":      f"Still on {current_url} after force-nav",
+                    "detail":      f"Still on {current_url} after login attempt",
                 })
                 overall_status = "FAIL"
                 _take_screenshot(page, f"auth_failed_{portal}_{env}")
@@ -689,7 +422,6 @@ def run_qa_test_cases(portal: str, env: str, test_cases: list) -> dict:
                 _log(f"── Test case: {tc_name} ──", "ok")
                 tc_pass = True
 
-                # Navigate to test case URL
                 url_path = tc.get("url_path") or "/"
                 try:
                     page.goto(base_url + url_path, timeout=30000, wait_until="domcontentloaded")
@@ -700,7 +432,6 @@ def run_qa_test_cases(portal: str, env: str, test_cases: list) -> dict:
                     _log(f"NAVIGATE to {url_path}", "fail", str(e))
                     tc_pass = False
 
-                # Execute each step
                 for step_str in (tc.get("steps") or []):
                     step_str = step_str.strip()
                     if not step_str:
@@ -736,22 +467,21 @@ def run_qa_test_cases(portal: str, env: str, test_cases: list) -> dict:
                             steps_executed += 1
 
                         elif step_str.startswith("ASSERT_EXISTS:"):
-                            sel = step_str[14:].strip()
+                            sel   = step_str[14:].strip()
                             found = bool(page.query_selector(sel))
-                            if found:
-                                _log(f"ASSERT_EXISTS: {sel}", "pass")
-                            else:
-                                _log(f"ASSERT_EXISTS: {sel}", "fail", "Element not found")
+                            _log(f"ASSERT_EXISTS: {sel}", "pass" if found else "fail",
+                                 None if found else "Element not found")
+                            if not found:
                                 tc_pass = False
                             steps_executed += 1
 
                         elif step_str.startswith("ASSERT_NOT_EXISTS:"):
-                            sel = step_str[18:].strip()
+                            sel   = step_str[18:].strip()
                             found = bool(page.query_selector(sel))
-                            if not found:
-                                _log(f"ASSERT_NOT_EXISTS: {sel}", "pass")
-                            else:
-                                _log(f"ASSERT_NOT_EXISTS: {sel}", "fail", "Element unexpectedly present")
+                            _log(f"ASSERT_NOT_EXISTS: {sel}",
+                                 "pass" if not found else "fail",
+                                 None if not found else "Element unexpectedly present")
+                            if found:
                                 tc_pass = False
                             steps_executed += 1
 
@@ -774,8 +504,7 @@ def run_qa_test_cases(portal: str, env: str, test_cases: list) -> dict:
                             steps_executed += 1
 
                         elif step_str.startswith("SCREENSHOT:"):
-                            label = step_str[11:].strip()
-                            _take_screenshot(page, label)
+                            _take_screenshot(page, step_str[11:].strip())
                             steps_executed += 1
 
                         else:
@@ -785,7 +514,6 @@ def run_qa_test_cases(portal: str, env: str, test_cases: list) -> dict:
                         _log(f"ERROR — {step_str[:80]}", "fail", str(e))
                         tc_pass = False
 
-                # Check evidence selector
                 ev_sel = tc.get("evidence_selector", "").strip()
                 if ev_sel:
                     try:
@@ -803,16 +531,15 @@ def run_qa_test_cases(portal: str, env: str, test_cases: list) -> dict:
                             "found":       found,
                             "detail":      detail or ("Element found" if found else "Element not found"),
                         })
-                        if found:
-                            _log(f"Evidence PASS: {ev_sel}", "pass", detail)
-                        else:
-                            _log(f"Evidence FAIL: {ev_sel}", "fail", "Selector not found on page")
+                        _log(f"Evidence {'PASS' if found else 'FAIL'}: {ev_sel}",
+                             "pass" if found else "fail",
+                             detail if found else "Selector not found on page")
+                        if not found:
                             tc_pass = False
                     except Exception as e:
                         _log(f"Evidence ERROR: {ev_sel}", "fail", str(e))
                         tc_pass = False
 
-                # Screenshot after each test case
                 _take_screenshot(page, f"{tc_name} — {'PASS' if tc_pass else 'FAIL'}")
 
                 if not tc_pass:
@@ -832,20 +559,21 @@ def run_qa_test_cases(portal: str, env: str, test_cases: list) -> dict:
         if local_process:
             stop_local_server(local_process)
 
-    # Hard guard: zero steps executed → FAIL regardless
     if steps_executed == 0:
         overall_status = "FAIL"
         _log("No steps executed — result forced to FAIL", "fail")
 
-    # Build human-readable message
-    auth_ev = next((e for e in feature_evidence if e.get("description") == "Auth session check" and not e.get("found")), None)
-    if auth_ev:
-        message = f"Session expired — run: python3 tools/auth_setup.py {portal} {env}"
-    else:
-        message = (
-            f"Executed {steps_executed} step(s) across {len(test_cases)} test case(s). "
-            f"Evidence: {len(feature_evidence)} selector(s) checked."
-        )
+    auth_ev = next(
+        (e for e in feature_evidence
+         if e.get("description") == "Auth check" and not e.get("found")),
+        None,
+    )
+    message = (
+        f"Login failed — check credentials for {portal}/{env}"
+        if auth_ev else
+        f"Executed {steps_executed} step(s) across {len(test_cases)} test case(s). "
+        f"Evidence: {len(feature_evidence)} selector(s) checked."
+    )
     result = {
         "status":             overall_status,
         "message":            message,
