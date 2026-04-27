@@ -509,8 +509,10 @@ def run_qa_test_cases(portal: str, env: str, test_cases: list) -> dict:
 
                         elif step_str.startswith("CLICK_OPTION:"):
                             val = step_str[13:].strip()
-                            page.select_option("select", label=val)
-                            _log(f"CLICK_OPTION: {val}", "pass")
+                            _type_keywords = ("revenue", "order")
+                            _sel = "select >> nth=1" if any(kw in val.lower() for kw in _type_keywords) else "select >> nth=0"
+                            page.select_option(_sel, label=val)
+                            _log(f"CLICK_OPTION: {val} (via {_sel})", "pass")
                             steps_executed += 1
 
                         else:
