@@ -144,7 +144,7 @@ class AuthRefreshBody(BaseModel):
 class AuthUploadBody(BaseModel):
     portal: str
     env: str
-    auth_content: Any
+    auth_storage_value: str
 
 class RunQABody(BaseModel):
     env: str
@@ -223,6 +223,12 @@ async def auth_refresh(body: AuthRefreshBody):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+_ENV_ORIGINS = {
+    "local":      "http://localhost:5173",
+    "staging":    "https://staging.myzambeel.com",
+    "production": "https://portal.myzambeel.com",
+}
+
 @app.post("/auth/upload")
 async def auth_upload(body: AuthUploadBody):
     portal = body.portal.lower()
@@ -231,11 +237,24 @@ async def auth_upload(body: AuthUploadBody):
         raise HTTPException(status_code=400, detail="portal must be seller, admin, or agency")
     if env not in {"local", "staging", "production"}:
         raise HTTPException(status_code=400, detail="env must be local, staging, or production")
+    try:
+        inner = json.loads(body.auth_storage_value)
+        if not (inner.get("state") or {}).get("authToken"):
+            raise HTTPException(status_code=400, detail="auth_storage_value must contain state.authToken")
+    except json.JSONDecodeError as e:
+        raise HTTPException(status_code=400, detail=f"Invalid JSON in auth_storage_value: {e}")
+    auth_doc = {
+        "cookies": [],
+        "origins": [{
+            "origin": _ENV_ORIGINS[env],
+            "localStorage": [{"name": "auth-storage", "value": body.auth_storage_value}],
+        }],
+    }
     auth_dir = _HERE / "auth"
     auth_dir.mkdir(exist_ok=True)
     auth_path = auth_dir / f"{portal}_{env}.json"
     try:
-        auth_path.write_text(json.dumps(body.auth_content, indent=2))
+        auth_path.write_text(json.dumps(auth_doc, indent=2))
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
     print(f"[auth/upload] Saved {auth_path.name} ({auth_path.stat().st_size} bytes)")

@@ -76,19 +76,19 @@ def get_auth_file(portal, env):
 
 
 def _load_auth_token(auth_file):
-    """Return (auth_data, authToken) extracted from state.authToken in auth-storage."""
+    """Return (auth_data, authToken) from auth-storage in origins[0].localStorage."""
     with open(auth_file) as f:
         auth_data = json.load(f)
-    for origin in auth_data.get("origins", []):
-        for item in origin.get("localStorage", []):
-            if item["name"] == "auth-storage":
-                try:
-                    inner = json.loads(item["value"])
-                    token = (inner.get("state") or {}).get("authToken")
-                    if token:
-                        return auth_data, token
-                except Exception:
-                    pass
+    try:
+        ls = auth_data["origins"][0]["localStorage"]
+        for item in ls:
+            if item.get("name") == "auth-storage":
+                inner = json.loads(item["value"])
+                token = (inner.get("state") or {}).get("authToken")
+                if token:
+                    return auth_data, token
+    except (KeyError, IndexError, ValueError, TypeError):
+        pass
     return auth_data, None
 
 
