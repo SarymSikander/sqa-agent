@@ -270,15 +270,36 @@ def run_tests(portal, env):
             _log(f"Navigate to target: {target_url}", "ok", f"Expected path: {expected}")
             t0 = time.time()
             page.goto(target_url, timeout=60000, wait_until="domcontentloaded")
-            page.wait_for_timeout(8000)
+            # Wait for networkidle so the Zustand store has time to rehydrate from
+            # localStorage before the route guard checks auth state.
+            _log("Waiting for networkidle — Zustand rehydration", "ok")
+            try:
+                page.wait_for_load_state("networkidle", timeout=30000)
+            except Exception:
+                _log("networkidle timeout — continuing", "warn")
+            page.wait_for_timeout(3000)
             current_url = page.url
-            print(f"[AUTH] {portal}/{env} — URL after navigation: {current_url}")
+            print(f"[AUTH] {portal}/{env} — URL after initial wait: {current_url}")
+
+            # ── Force-navigate if still on /login ────────────────────────────────
+            if "/login" in current_url:
+                _log("Still on /login — forcing JS navigation to target", "warn", current_url)
+                _screenshot(page, f"pre_force_nav_{portal}")
+                page.evaluate(f"window.location.href = '{target_url}'")
+                _log("JS navigation triggered, waiting for networkidle", "ok")
+                try:
+                    page.wait_for_load_state("networkidle", timeout=30000)
+                except Exception:
+                    _log("networkidle timeout after force-nav — continuing", "warn")
+                page.wait_for_timeout(3000)
+                current_url = page.url
+                print(f"[AUTH] {portal}/{env} — URL after force-nav: {current_url}")
 
             if "/login" in current_url:
                 status  = "FAIL"
-                message = f"Session expired — run: python3 tools/auth_setup.py {portal} {env}"
-                _log("Session expired after re-injection attempt", "fail", current_url)
-                _screenshot(page, f"session_expired_{portal}")
+                message = f"Auth failed after force-nav — run: python3 tools/auth_setup.py {portal} {env}"
+                _log("Still on /login after force-nav", "fail", current_url)
+                _screenshot(page, f"auth_failed_{portal}")
             else:
                 _screenshot(page, f"After auth — {portal}")
                 load_time_ms = int((time.time() - t0) * 1000)
@@ -516,28 +537,48 @@ def run_qa_test_cases(portal: str, env: str, test_cases: list) -> dict:
 
             # Warm-up navigation to first test case's path
             first_path = (test_cases[0].get("url_path") or "/") if test_cases else "/"
+            nav_target = base_url + first_path
             t0 = time.time()
-            page.goto(base_url + first_path, timeout=60000, wait_until="domcontentloaded")
-            page.wait_for_timeout(8000)
+            page.goto(nav_target, timeout=60000, wait_until="domcontentloaded")
+            _log("Waiting for networkidle — Zustand rehydration", "ok")
+            try:
+                page.wait_for_load_state("networkidle", timeout=30000)
+            except Exception:
+                _log("networkidle timeout — continuing", "warn")
+            page.wait_for_timeout(3000)
             current_url = page.url
-            print(f"[AUTH] {portal}/{env} — URL after navigation: {current_url}")
+            print(f"[AUTH] {portal}/{env} — URL after initial wait: {current_url}")
+
+            # ── Force-navigate if still on /login ────────────────────────────────
+            if "/login" in current_url:
+                _log("Still on /login — forcing JS navigation to target", "warn", current_url)
+                _take_screenshot(page, f"pre_force_nav_{portal}_{env}")
+                page.evaluate(f"window.location.href = '{nav_target}'")
+                _log("JS navigation triggered, waiting for networkidle", "ok")
+                try:
+                    page.wait_for_load_state("networkidle", timeout=30000)
+                except Exception:
+                    _log("networkidle timeout after force-nav — continuing", "warn")
+                page.wait_for_timeout(3000)
+                current_url = page.url
+                print(f"[AUTH] {portal}/{env} — URL after force-nav: {current_url}")
 
             load_time_ms = int((time.time() - t0) * 1000)
             _log(f"Initial navigation → {first_path}", "ok", current_url)
 
-            # ── Auth check: fail fast if session expired ──────────────────────
+            # ── Auth check: fail fast if auth failed ──────────────────────────
             auth_ok = "/login" not in current_url
             if not auth_ok:
-                err_msg = f"Session expired — run: python3 tools/auth_setup.py {portal} {env}"
-                _log("Auth session check", "fail", err_msg)
+                err_msg = f"Auth failed after force-nav — run: python3 tools/auth_setup.py {portal} {env}"
+                _log("Auth check failed", "fail", err_msg)
                 feature_evidence.append({
                     "selector":    "N/A",
                     "description": "Auth session check",
                     "found":       False,
-                    "detail":      f"Redirected to {current_url} — session expired",
+                    "detail":      f"Still on {current_url} after force-nav",
                 })
                 overall_status = "FAIL"
-                _take_screenshot(page, f"auth_expired_{portal}_{env}")
+                _take_screenshot(page, f"auth_failed_{portal}_{env}")
 
             for tc in test_cases:
                 if not auth_ok:
