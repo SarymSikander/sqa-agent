@@ -2,6 +2,8 @@ import json
 import os
 import subprocess
 import time
+import urllib.error
+import urllib.request
 from datetime import datetime
 from urllib.parse import urlparse
 from dotenv import load_dotenv
@@ -98,6 +100,62 @@ def _load_auth_token(auth_file):
     return auth_data, None
 
 
+_LOGIN_API = {
+    "local":      "http://localhost:3000/api/auth/login",
+    "staging":    "https://staging.myzambeel.com/api/auth/login",
+    "production": "https://portal.myzambeel.com/api/auth/login",
+}
+
+
+def _fetch_auth_token(portal, env):
+    """POST portal credentials from .env to the login API and return the JWT token.
+
+    Reads {PORTAL}_EMAIL / {PORTAL}_PASSWORD first, then falls back to the
+    per-env variants {PORTAL}_{ENV}_EMAIL / {PORTAL}_{ENV}_PASSWORD.
+    """
+    portal_up = portal.upper()
+    env_up    = env.upper()
+    email    = (os.getenv(f"{portal_up}_EMAIL")
+                or os.getenv(f"{portal_up}_{env_up}_EMAIL"))
+    password = (os.getenv(f"{portal_up}_PASSWORD")
+                or os.getenv(f"{portal_up}_{env_up}_PASSWORD"))
+    if not email or not password:
+        print(f"[AUTH] {portal}/{env} — credentials not configured "
+              f"({portal_up}_EMAIL / {portal_up}_PASSWORD not set in .env)")
+        return None
+    login_url = _LOGIN_API.get(env)
+    if not login_url:
+        print(f"[AUTH] {portal}/{env} — no login API URL for env '{env}'")
+        return None
+    payload = json.dumps({"email": email, "password": password}).encode()
+    req = urllib.request.Request(
+        login_url,
+        data=payload,
+        headers={"Content-Type": "application/json"},
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            data = json.loads(resp.read())
+        token = (data.get("token")
+                 or data.get("authToken")
+                 or data.get("accessToken")
+                 or data.get("access_token"))
+        if token:
+            print(f"[AUTH] {portal}/{env} — API login OK, token len={len(token)}")
+            return token
+        print(f"[AUTH] {portal}/{env} — API login: no token field in response "
+              f"(keys={list(data.keys())})")
+        return None
+    except urllib.error.HTTPError as e:
+        print(f"[AUTH] {portal}/{env} — API login HTTP {e.code}: "
+              f"{e.read().decode()[:200]}")
+        return None
+    except Exception as e:
+        print(f"[AUTH] {portal}/{env} — API login error: {e}")
+        return None
+
+
 def start_local_server():
     print(f"Starting dev server: {FRONTEND_DEV_CMD} in {FRONTEND_REPO_PATH}")
     cmd = FRONTEND_DEV_CMD.split()
@@ -142,24 +200,32 @@ def run_tests(portal, env):
             "screenshot_path": None, "screenshots": [], "execution_log": [], "feature_evidence": [],
         })
 
-    try:
-        auth_file = get_auth_file(portal, env)
-    except FileNotFoundError as e:
+    # ── Acquire JWT: programmatic API login, fallback to saved auth file ─────
+    auth_token = _fetch_auth_token(portal, env)
+    if auth_token is None:
+        try:
+            auth_file = get_auth_file(portal, env)
+            _, auth_token = _load_auth_token(auth_file)
+            if auth_token:
+                print(f"[AUTH] {portal}/{env} — using saved auth file (API credentials not set)")
+        except FileNotFoundError:
+            pass
+    if auth_token is None:
+        _msg = (f"No auth token for {portal}/{env}. "
+                f"Set {portal.upper()}_EMAIL + {portal.upper()}_PASSWORD in .env "
+                f"or run: python tools/auth_setup.py {portal} {env}")
         return ("FAIL", {
-            "status": "FAIL", "message": str(e), "url": None,
+            "status": "FAIL", "message": _msg, "url": None,
             "console_errors": [], "nav_elements_found": [], "load_time_ms": 0,
             "screenshot_path": None, "screenshots": [],
-            "execution_log": [{"step": "Load auth session", "result": "fail", "detail": str(e)}],
+            "execution_log": [{"step": "Acquire auth token", "result": "fail", "detail": _msg}],
             "feature_evidence": [],
         })
+    print(f"[AUTH] {portal}/{env} — token acquired (len={len(auth_token)})")
 
     local_process = None
     if env == "local":
         local_process = start_local_server()
-
-    _, auth_token = _load_auth_token(auth_file)
-    print(f"[AUTH] {portal}/{env} — authToken {'found' if auth_token else 'NOT FOUND'}"
-          + (f" (len={len(auth_token)})" if auth_token else ""))
 
     success_slugs = {
         "admin":  "/orders-management/dashboard",
@@ -439,16 +505,28 @@ def run_qa_test_cases(portal: str, env: str, test_cases: list) -> dict:
             "feature_evidence": [], "steps_executed": 0,
         }
 
-    try:
-        auth_file = get_auth_file(portal, env)
-    except FileNotFoundError as e:
+    # ── Acquire JWT: programmatic API login, fallback to saved auth file ─────
+    auth_token = _fetch_auth_token(portal, env)
+    if auth_token is None:
+        try:
+            auth_file = get_auth_file(portal, env)
+            _, auth_token = _load_auth_token(auth_file)
+            if auth_token:
+                print(f"[AUTH] {portal}/{env} — using saved auth file (API credentials not set)")
+        except FileNotFoundError:
+            pass
+    if auth_token is None:
+        _msg = (f"No auth token for {portal}/{env}. "
+                f"Set {portal.upper()}_EMAIL + {portal.upper()}_PASSWORD in .env "
+                f"or run: python tools/auth_setup.py {portal} {env}")
         return {
-            "status": "FAIL", "message": str(e), "url": None,
+            "status": "FAIL", "message": _msg, "url": None,
             "console_errors": [], "nav_elements_found": [], "load_time_ms": 0,
             "screenshot_path": None, "screenshots": [],
-            "execution_log": [{"step": "Load auth session", "result": "fail", "detail": str(e)}],
+            "execution_log": [{"step": "Acquire auth token", "result": "fail", "detail": _msg}],
             "feature_evidence": [], "steps_executed": 0,
         }
+    print(f"[AUTH] {portal}/{env} — token acquired (len={len(auth_token)})")
 
     local_process = None
     if env == "local":
@@ -487,11 +565,6 @@ def run_qa_test_cases(portal: str, env: str, test_cases: list) -> dict:
     try:
         with sync_playwright() as p:
             browser = p.chromium.launch(headless=True)
-
-            _, auth_token = _load_auth_token(auth_file)
-            print(f"[AUTH] {portal}/{env} — authToken {'found' if auth_token else 'NOT FOUND'}"
-                  + (f" (len={len(auth_token)})" if auth_token else ""))
-
             context = browser.new_context()
 
             # ── Set auth token as cookie ──────────────────────────────────────────
