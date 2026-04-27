@@ -591,7 +591,14 @@ def generate_test_cases(ticket_key, title, description):
     print(f"[generate_test_cases] selectors_context ({len(selectors_context)} chars)")
 
     prompt = (
-        "CRITICAL SELECTOR RULES FOR ZAMBEEL COMMISSION MODELS PAGE: The create button text is EXACTLY \"+ New Model\" — never use \"Create New Commission Model\" or \"Create\". The modal title is \"Create Commission Model\". Input placeholders are \"Enter model name\" and a number input with no placeholder. Save button text is EXACTLY \"Save Model\". These are the ONLY correct selectors for this page.\n\n"
+        "CRITICAL SELECTOR RULES FOR ZAMBEEL COMMISSION MODELS PAGE: The create button text is EXACTLY \"+ New Model\" — never use \"Create New Commission Model\" or \"Create\". The modal title is \"Create Commission Model\". Input placeholders are \"Enter model name\" and a number input with no placeholder. Save button text is EXACTLY \"Save Model\". These are the ONLY correct selectors for this page. "
+        "The Create Commission Model form requires these fields to be filled before Save Model becomes enabled: "
+        "1) Model Name (input placeholder \"Enter model name\"), "
+        "2) Country dropdown (click text=\"Country*\" then click a country option like text=\"Saudi Arabia\"), "
+        "3) Commission Type dropdown (click text=\"Type*\" then click text=\"% of Revenue\" or text=\"Flat per Order\"), "
+        "4) Value number input (input[type=\"number\"]). "
+        "The Save Model button stays DISABLED until all required fields are filled. "
+        "Always include Country and Type selection steps before clicking Save Model.\n\n"
         "CRITICAL: This React app has NO element IDs. Use ONLY these selector formats:\n"
         "- button:has-text(\"exact text\") for buttons\n"
         "- input[placeholder=\"exact placeholder\"] for inputs\n"
