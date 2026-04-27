@@ -220,15 +220,20 @@ def run_tests(portal, env):
         })
 
     # ── Acquire JWT: programmatic API login, fallback to saved auth file ─────
+    portal_up  = portal.upper()
+    env_suffix = _ENV_SUFFIX.get(env, env.upper())
+    print(f"[AUTH] Using api_login for {portal}/{env}")
+    print(f"[AUTH] email env var: {os.getenv(f'{portal_up}_{env_suffix}_EMAIL', 'NOT FOUND')}")
     auth_token = api_login(portal, env)
+    print(f"[AUTH] api_login result: {auth_token[:20] if auth_token else None}")
     if auth_token is None:
         try:
             auth_file = get_auth_file(portal, env)
             _, auth_token = _load_auth_token(auth_file)
             if auth_token:
-                print(f"[AUTH] {portal}/{env} — using saved auth file (API credentials not set)")
+                print(f"[AUTH] {portal}/{env} — falling back to saved auth file")
         except FileNotFoundError:
-            pass
+            print(f"[AUTH] {portal}/{env} — no saved auth file found either")
     if auth_token is None:
         _msg = (f"No auth token for {portal}/{env}. "
                 f"Set {portal.upper()}_EMAIL + {portal.upper()}_PASSWORD in .env "
@@ -525,15 +530,20 @@ def run_qa_test_cases(portal: str, env: str, test_cases: list) -> dict:
         }
 
     # ── Acquire JWT: programmatic API login, fallback to saved auth file ─────
+    portal_up  = portal.upper()
+    env_suffix = _ENV_SUFFIX.get(env, env.upper())
+    print(f"[AUTH] Using api_login for {portal}/{env}")
+    print(f"[AUTH] email env var: {os.getenv(f'{portal_up}_{env_suffix}_EMAIL', 'NOT FOUND')}")
     auth_token = api_login(portal, env)
+    print(f"[AUTH] api_login result: {auth_token[:20] if auth_token else None}")
     if auth_token is None:
         try:
             auth_file = get_auth_file(portal, env)
             _, auth_token = _load_auth_token(auth_file)
             if auth_token:
-                print(f"[AUTH] {portal}/{env} — using saved auth file (API credentials not set)")
+                print(f"[AUTH] {portal}/{env} — falling back to saved auth file")
         except FileNotFoundError:
-            pass
+            print(f"[AUTH] {portal}/{env} — no saved auth file found either")
     if auth_token is None:
         _msg = (f"No auth token for {portal}/{env}. "
                 f"Set {portal.upper()}_EMAIL + {portal.upper()}_PASSWORD in .env "
