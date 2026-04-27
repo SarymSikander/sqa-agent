@@ -107,22 +107,31 @@ _LOGIN_URLS = {
 }
 
 
+_ENV_SUFFIX = {
+    "staging":    "STG",
+    "production": "PROD",
+    "local":      "LOCAL",
+}
+
+
 def api_login(portal, env):
     """POST portal+env credentials to the login API and return the JWT token.
 
-    Reads {PORTAL}_{ENV}_EMAIL and {PORTAL}_{ENV}_PASSWORD from .env —
-    e.g. ADMIN_STAGING_EMAIL / ADMIN_STAGING_PASSWORD for admin/staging.
+    Env var naming: {PORTAL}_{SUFFIX}_EMAIL / {PORTAL}_{SUFFIX}_PASSWORD
+      staging    → ADMIN_STG_EMAIL   / ADMIN_STG_PASSWORD
+      production → ADMIN_PROD_EMAIL  / ADMIN_PROD_PASSWORD
+      local      → ADMIN_LOCAL_EMAIL / ADMIN_LOCAL_PASSWORD
     Prints the HTTP response status and body for debugging.
     Returns the JWT token string, or None if login fails.
     """
-    portal_up = portal.upper()
-    env_up    = env.upper()
-    email     = os.getenv(f"{portal_up}_{env_up}_EMAIL", "").strip()
-    password  = os.getenv(f"{portal_up}_{env_up}_PASSWORD", "").strip()
+    portal_up  = portal.upper()
+    env_suffix = _ENV_SUFFIX.get(env, env.upper())
+    email      = os.getenv(f"{portal_up}_{env_suffix}_EMAIL", "").strip()
+    password   = os.getenv(f"{portal_up}_{env_suffix}_PASSWORD", "").strip()
 
     if not email or not password:
         print(f"[api_login] {portal}/{env} — credentials not set "
-              f"({portal_up}_{env_up}_EMAIL / {portal_up}_{env_up}_PASSWORD "
+              f"({portal_up}_{env_suffix}_EMAIL / {portal_up}_{env_suffix}_PASSWORD "
               f"missing or empty in .env)")
         return None
 
