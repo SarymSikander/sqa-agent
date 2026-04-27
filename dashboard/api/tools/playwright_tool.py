@@ -108,8 +108,8 @@ _LOGIN_URLS = {
 
 
 _ENV_SUFFIX = {
-    "staging":    "STG",
-    "production": "PROD",
+    "staging":    "STAGING",
+    "production": "PRODUCTION",
     "local":      "LOCAL",
 }
 
@@ -118,9 +118,9 @@ def api_login(portal, env):
     """POST portal+env credentials to the login API and return the JWT token.
 
     Env var naming: {PORTAL}_{SUFFIX}_EMAIL / {PORTAL}_{SUFFIX}_PASSWORD
-      staging    → ADMIN_STG_EMAIL   / ADMIN_STG_PASSWORD
-      production → ADMIN_PROD_EMAIL  / ADMIN_PROD_PASSWORD
-      local      → ADMIN_LOCAL_EMAIL / ADMIN_LOCAL_PASSWORD
+      staging    → ADMIN_STAGING_EMAIL    / ADMIN_STAGING_PASSWORD
+      production → ADMIN_PRODUCTION_EMAIL / ADMIN_PRODUCTION_PASSWORD
+      local      → ADMIN_LOCAL_EMAIL      / ADMIN_LOCAL_PASSWORD
     Prints the HTTP response status and body for debugging.
     Returns the JWT token string, or None if login fails.
     """
