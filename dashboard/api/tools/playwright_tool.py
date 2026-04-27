@@ -509,9 +509,30 @@ def run_qa_test_cases(portal: str, env: str, test_cases: list) -> dict:
 
                         elif step_str.startswith("CLICK_OPTION:"):
                             val = step_str[13:].strip()
-                            page.wait_for_timeout(5000)
-                            page.get_by_role("option", name=val).first.click()
-                            _log(f"CLICK_OPTION: {val}", "pass")
+                            page.wait_for_timeout(2000)
+                            _take_screenshot(page, f"dropdown_open_before_{val}")
+                            clicked = False
+                            _strategies = [
+                                lambda v: page.locator(
+                                    'div[class*="option"], li[class*="option"], '
+                                    '[class*="menu"] div, [class*="dropdown"] li'
+                                ).filter(has_text=v).first.click(timeout=5000),
+                                lambda v: page.locator(f':text-is("{v}")').first.click(timeout=5000),
+                                lambda v: page.locator(f'[class*="menu"] *:has-text("{v}")').first.click(timeout=5000),
+                                lambda v: page.get_by_role("option", name=v).first.click(timeout=5000),
+                            ]
+                            for _strat in _strategies:
+                                try:
+                                    _strat(val)
+                                    clicked = True
+                                    break
+                                except Exception:
+                                    pass
+                            if clicked:
+                                _log(f"CLICK_OPTION: {val}", "pass")
+                            else:
+                                _log(f"CLICK_OPTION: {val}", "fail", "No strategy matched the option")
+                                tc_pass = False
                             steps_executed += 1
 
                         else:
