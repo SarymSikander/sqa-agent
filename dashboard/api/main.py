@@ -591,6 +591,7 @@ def generate_test_cases(ticket_key, title, description):
     print(f"[generate_test_cases] selectors_context ({len(selectors_context)} chars)")
 
     prompt = (
+        "CRITICAL SELECTOR RULES FOR ZAMBEEL COMMISSION MODELS PAGE: The create button text is EXACTLY \"+ New Model\" — never use \"Create New Commission Model\" or \"Create\". The modal title is \"Create Commission Model\". Input placeholders are \"Enter model name\" and a number input with no placeholder. Save button text is EXACTLY \"Save Model\". These are the ONLY correct selectors for this page.\n\n"
         "CRITICAL: This React app has NO element IDs. Use ONLY these selector formats:\n"
         "- button:has-text(\"exact text\") for buttons\n"
         "- input[placeholder=\"exact placeholder\"] for inputs\n"
