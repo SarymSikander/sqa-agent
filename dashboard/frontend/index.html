@@ -2918,6 +2918,22 @@ function _showQAReport() {
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // ── Upload Session Modal ──────────────────────────────────────────────────────
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+function sanitizeJson(raw) {
+  return (raw || '')
+    .replace(/^﻿/, '')         // strip BOM
+    .trim()
+    .replace(/,(\s*[}\]])/g, '$1'); // trailing commas before } or ]
+}
+
+(function () {
+  const ta = document.getElementById('upload-session-content');
+  if (ta) ta.addEventListener('paste', e => {
+    e.preventDefault();
+    const text = (e.clipboardData || window.clipboardData).getData('text');
+    ta.value = sanitizeJson(text);
+  });
+})();
+
 function openUploadSessionModal() {
   document.getElementById('upload-session-modal').classList.add('open');
 }
@@ -2928,10 +2944,10 @@ function closeUploadSessionModal() {
 async function submitUploadSession() {
   const portal = document.getElementById('upload-session-portal').value;
   const env    = document.getElementById('upload-session-env').value;
-  const raw    = document.getElementById('upload-session-content').value.trim();
+  const raw    = sanitizeJson(document.getElementById('upload-session-content').value);
   if (!raw) { toast('Paste the auth JSON content first', 'error'); return; }
   let auth_content;
-  try { auth_content = JSON.parse(raw); } catch (e) { toast('Invalid JSON: ' + e.message, 'error'); return; }
+  try { auth_content = JSON.parse(raw); } catch (e) { toast('Invalid JSON — ' + e.message, 'error'); return; }
   btnLoad('upload-session-btn', true);
   try {
     const r = await fetch(`${API_BASE}/auth/upload`, {
