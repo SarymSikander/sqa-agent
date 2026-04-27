@@ -1,4 +1,5 @@
 import os
+import re
 import subprocess
 import time
 from datetime import datetime
@@ -513,6 +514,8 @@ def run_qa_test_cases(portal: str, env: str, test_cases: list) -> dict:
                             _take_screenshot(page, f"dropdown_open_before_{val}")
                             clicked = False
                             _strategies = [
+                                lambda v: page.locator('div').filter(has_text=re.compile(f'^{re.escape(v)}$')).last.click(timeout=5000),
+                                lambda v: [page.keyboard.press('ArrowDown'), page.wait_for_timeout(500), page.locator('[class*="option"][class*="focus"], [class*="option"]:focus, [class*="focused"]').filter(has_text=v).first.click(timeout=3000)][-1],
                                 lambda v: page.locator(
                                     'div[class*="option"], li[class*="option"], '
                                     '[class*="menu"] div, [class*="dropdown"] li'
