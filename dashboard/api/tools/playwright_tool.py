@@ -3,6 +3,7 @@ import os
 import subprocess
 import time
 from datetime import datetime
+from urllib.parse import urlparse
 from dotenv import load_dotenv
 from playwright.sync_api import sync_playwright
 
@@ -74,6 +75,23 @@ def get_auth_file(portal, env):
     return path
 
 
+def _load_auth_token(auth_file):
+    """Return (auth_data, authToken) extracted from state.authToken in auth-storage."""
+    with open(auth_file) as f:
+        auth_data = json.load(f)
+    for origin in auth_data.get("origins", []):
+        for item in origin.get("localStorage", []):
+            if item["name"] == "auth-storage":
+                try:
+                    inner = json.loads(item["value"])
+                    token = (inner.get("state") or {}).get("authToken")
+                    if token:
+                        return auth_data, token
+                except Exception:
+                    pass
+    return auth_data, None
+
+
 def start_local_server():
     print(f"Starting dev server: {FRONTEND_DEV_CMD} in {FRONTEND_REPO_PATH}")
     cmd = FRONTEND_DEV_CMD.split()
@@ -133,14 +151,9 @@ def run_tests(portal, env):
     if env == "local":
         local_process = start_local_server()
 
-    with open(auth_file) as f:
-        auth_data = json.load(f)
-    auth_storage_value = None
-    for origin in auth_data.get("origins", []):
-        for item in origin.get("localStorage", []):
-            if item["name"] == "auth-storage":
-                auth_storage_value = item["value"]
-                break
+    _, auth_token = _load_auth_token(auth_file)
+    print(f"[AUTH] {portal}/{env} — authToken {'found' if auth_token else 'NOT FOUND'}"
+          + (f" (len={len(auth_token)})" if auth_token else ""))
 
     success_slugs = {
         "admin":  "/orders-management/dashboard",
@@ -203,60 +216,57 @@ def run_tests(portal, env):
 
             # ── Step 2: authenticated test ────────────────────────────────────────
             _log(f"Launch authenticated browser for {portal}/{env}", "ok",
-                 f"Auth: {portal}_{env}.json")
+                 f"Auth: {portal}_{env}.json (JWT token only — no session state)")
             browser = p.chromium.launch(headless=True)
-            context = browser.new_context(storage_state=auth_file)
-            page    = context.new_page()
+            context = browser.new_context()
+
+            # ── Set auth token as cookie ──────────────────────────────────────────
+            if auth_token:
+                parsed_url = urlparse(base_url)
+                context.add_cookies([{
+                    "name":     "authToken",
+                    "value":    auth_token,
+                    "domain":   parsed_url.hostname,
+                    "path":     "/",
+                    "httpOnly": False,
+                    "secure":   parsed_url.scheme == "https",
+                    "sameSite": "Lax",
+                }])
+                _log("Auth cookie set", "ok", f"domain={parsed_url.hostname}")
+
+            page = context.new_page()
+
+            # ── Inject token into localStorage before page scripts run ────────────
+            if auth_token:
+                auth_storage_payload = json.dumps({"state": {"authToken": auth_token}})
+                page.add_init_script(
+                    f"window.localStorage.setItem('auth-storage', {json.dumps(auth_storage_payload)});"
+                )
+                _log("localStorage init script registered", "ok", "auth-storage injected pre-load")
 
             def _capture_console(msg):
                 if msg.type == "error":
                     console_errors.append(msg.text)
             page.on("console", _capture_console)
 
-            if auth_storage_value:
-                print(f"[AUTH DEBUG] {portal}/{env} — injecting auth-storage (len={len(auth_storage_value)}):\n{auth_storage_value}")
-                page.add_init_script(f"""
-                    localStorage.setItem('auth-storage', {json.dumps(auth_storage_value)});
-                """)
-                _log("Injected auth-storage via localStorage init script", "ok")
+            # ── Bearer token route interception (all requests) ────────────────────
+            if auth_token:
+                def _bearer_handler(route, request):
+                    route.continue_(headers={**request.headers, "Authorization": f"Bearer {auth_token}"})
+                page.route("**/*", _bearer_handler)
+                print(f"[AUTH] {portal}/{env} — **/* interceptor active, injecting Bearer token on every request")
+                _log("Bearer token route interceptor registered for **/*", "ok",
+                     f"token len={len(auth_token)}")
             else:
-                print(f"[AUTH DEBUG] {portal}/{env} — auth_storage_value is None/empty, no init script registered")
+                print(f"[AUTH] {portal}/{env} — no authToken, route interceptor not registered")
+                _log("No authToken found in auth JSON — proceeding without Bearer injection", "warn")
 
             _log(f"Navigate to target: {target_url}", "ok", f"Expected path: {expected}")
             t0 = time.time()
             page.goto(target_url, timeout=60000, wait_until="domcontentloaded")
             page.wait_for_timeout(8000)
             current_url = page.url
-            try:
-                _ls = page.evaluate("() => JSON.stringify(localStorage)")
-                print(f"[AUTH DEBUG] {portal}/{env} — localStorage after initial navigation:\n{_ls}")
-            except Exception as _le:
-                print(f"[AUTH DEBUG] {portal}/{env} — could not read localStorage: {_le}")
-
-            # ── Re-injection retry if still on /login ────────────────────────
-            if "/login" in current_url and auth_storage_value:
-                _log("Still on /login — retrying with fresh context + pre-nav init script", "warn", current_url)
-                try:
-                    page.close()
-                    ctx2 = browser.new_context()
-                    page = ctx2.new_page()
-                    page.on("console", _capture_console)
-                    print(f"[AUTH DEBUG] {portal}/{env} — retry: injecting auth-storage on fresh context (len={len(auth_storage_value)}):\n{auth_storage_value}")
-                    page.add_init_script(
-                        f"localStorage.setItem('auth-storage', {json.dumps(auth_storage_value)});"
-                    )
-                    _log("Pre-nav init script registered on fresh context", "ok")
-                    page.goto(target_url, timeout=60000, wait_until="domcontentloaded")
-                    page.wait_for_timeout(8000)
-                    current_url = page.url
-                    try:
-                        _ls2 = page.evaluate("() => JSON.stringify(localStorage)")
-                        print(f"[AUTH DEBUG] {portal}/{env} — localStorage after retry navigation:\n{_ls2}")
-                    except Exception as _le2:
-                        print(f"[AUTH DEBUG] {portal}/{env} — could not read localStorage after retry: {_le2}")
-                    _log(f"Fresh context navigation settled at {current_url}", "ok")
-                except Exception as _re:
-                    _log("Fresh context retry failed", "warn", str(_re))
+            print(f"[AUTH] {portal}/{env} — URL after navigation: {current_url}")
 
             if "/login" in current_url:
                 status  = "FAIL"
@@ -451,31 +461,52 @@ def run_qa_test_cases(portal: str, env: str, test_cases: list) -> dict:
         with sync_playwright() as p:
             browser = p.chromium.launch(headless=True)
 
-            with open(auth_file) as f:
-                auth_data = json.load(f)
-            auth_storage_value = None
-            for origin in auth_data.get("origins", []):
-                for item in origin.get("localStorage", []):
-                    if item["name"] == "auth-storage":
-                        auth_storage_value = item["value"]
-                        break
+            _, auth_token = _load_auth_token(auth_file)
+            print(f"[AUTH] {portal}/{env} — authToken {'found' if auth_token else 'NOT FOUND'}"
+                  + (f" (len={len(auth_token)})" if auth_token else ""))
 
-            context = browser.new_context(storage_state=auth_file)
-            page    = context.new_page()
+            context = browser.new_context()
+
+            # ── Set auth token as cookie ──────────────────────────────────────────
+            if auth_token:
+                parsed_url = urlparse(base_url)
+                context.add_cookies([{
+                    "name":     "authToken",
+                    "value":    auth_token,
+                    "domain":   parsed_url.hostname,
+                    "path":     "/",
+                    "httpOnly": False,
+                    "secure":   parsed_url.scheme == "https",
+                    "sameSite": "Lax",
+                }])
+                _log("Auth cookie set", "ok", f"domain={parsed_url.hostname}")
+
+            page = context.new_page()
+
+            # ── Inject token into localStorage before page scripts run ────────────
+            if auth_token:
+                auth_storage_payload = json.dumps({"state": {"authToken": auth_token}})
+                page.add_init_script(
+                    f"window.localStorage.setItem('auth-storage', {json.dumps(auth_storage_payload)});"
+                )
+                _log("localStorage init script registered", "ok", "auth-storage injected pre-load")
 
             def _capture_console(msg):
                 if msg.type == "error":
                     console_errors.append(msg.text)
             page.on("console", _capture_console)
 
-            if auth_storage_value:
-                print(f"[AUTH DEBUG] {portal}/{env} — injecting auth-storage (len={len(auth_storage_value)}):\n{auth_storage_value}")
-                page.add_init_script(
-                    f"localStorage.setItem('auth-storage', {json.dumps(auth_storage_value)});"
-                )
-                _log("Injected auth-storage", "ok")
+            # ── Bearer token route interception (all requests) ────────────────────
+            if auth_token:
+                def _bearer_handler(route, request):
+                    route.continue_(headers={**request.headers, "Authorization": f"Bearer {auth_token}"})
+                page.route("**/*", _bearer_handler)
+                print(f"[AUTH] {portal}/{env} — **/* interceptor active, injecting Bearer token on every request")
+                _log("Bearer token route interceptor registered for **/*", "ok",
+                     f"token len={len(auth_token)}")
             else:
-                print(f"[AUTH DEBUG] {portal}/{env} — auth_storage_value is None/empty, no init script registered")
+                print(f"[AUTH] {portal}/{env} — no authToken, route interceptor not registered")
+                _log("No authToken found in auth JSON — proceeding without Bearer injection", "warn")
 
             # Warm-up navigation to first test case's path
             first_path = (test_cases[0].get("url_path") or "/") if test_cases else "/"
@@ -483,36 +514,7 @@ def run_qa_test_cases(portal: str, env: str, test_cases: list) -> dict:
             page.goto(base_url + first_path, timeout=60000, wait_until="domcontentloaded")
             page.wait_for_timeout(8000)
             current_url = page.url
-            try:
-                _ls = page.evaluate("() => JSON.stringify(localStorage)")
-                print(f"[AUTH DEBUG] {portal}/{env} — localStorage after initial navigation:\n{_ls}")
-            except Exception as _le:
-                print(f"[AUTH DEBUG] {portal}/{env} — could not read localStorage: {_le}")
-
-            # ── Re-injection retry if still on /login ────────────────────────
-            if "/login" in current_url and auth_storage_value:
-                _log("Still on /login — retrying with fresh context + pre-nav init script", "warn", current_url)
-                try:
-                    page.close()
-                    ctx2 = browser.new_context()
-                    page = ctx2.new_page()
-                    page.on("console", _capture_console)
-                    print(f"[AUTH DEBUG] {portal}/{env} — retry: injecting auth-storage on fresh context (len={len(auth_storage_value)}):\n{auth_storage_value}")
-                    page.add_init_script(
-                        f"localStorage.setItem('auth-storage', {json.dumps(auth_storage_value)});"
-                    )
-                    _log("Pre-nav init script registered on fresh context", "ok")
-                    page.goto(base_url + first_path, timeout=60000, wait_until="domcontentloaded")
-                    page.wait_for_timeout(8000)
-                    current_url = page.url
-                    try:
-                        _ls2 = page.evaluate("() => JSON.stringify(localStorage)")
-                        print(f"[AUTH DEBUG] {portal}/{env} — localStorage after retry navigation:\n{_ls2}")
-                    except Exception as _le2:
-                        print(f"[AUTH DEBUG] {portal}/{env} — could not read localStorage after retry: {_le2}")
-                    _log(f"Fresh context navigation settled at {current_url}", "ok")
-                except Exception as _re:
-                    _log("Fresh context retry failed", "warn", str(_re))
+            print(f"[AUTH] {portal}/{env} — URL after navigation: {current_url}")
 
             load_time_ms = int((time.time() - t0) * 1000)
             _log(f"Initial navigation → {first_path}", "ok", current_url)
