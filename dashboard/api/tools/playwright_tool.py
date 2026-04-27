@@ -110,18 +110,19 @@ _LOGIN_API = {
 def _fetch_auth_token(portal, env):
     """POST portal credentials from .env to the login API and return the JWT token.
 
-    Reads {PORTAL}_EMAIL / {PORTAL}_PASSWORD first, then falls back to the
-    per-env variants {PORTAL}_{ENV}_EMAIL / {PORTAL}_{ENV}_PASSWORD.
+    Reads {PORTAL}_{ENV}_EMAIL / {PORTAL}_{ENV}_PASSWORD first (per-env),
+    then falls back to {PORTAL}_EMAIL / {PORTAL}_PASSWORD (generic).
+    Values are stripped of surrounding whitespace.
     """
     portal_up = portal.upper()
     env_up    = env.upper()
-    email    = (os.getenv(f"{portal_up}_EMAIL")
-                or os.getenv(f"{portal_up}_{env_up}_EMAIL"))
-    password = (os.getenv(f"{portal_up}_PASSWORD")
-                or os.getenv(f"{portal_up}_{env_up}_PASSWORD"))
+    email    = (os.getenv(f"{portal_up}_{env_up}_EMAIL", "").strip()
+                or os.getenv(f"{portal_up}_EMAIL", "").strip())
+    password = (os.getenv(f"{portal_up}_{env_up}_PASSWORD", "").strip()
+                or os.getenv(f"{portal_up}_PASSWORD", "").strip())
     if not email or not password:
         print(f"[AUTH] {portal}/{env} — credentials not configured "
-              f"({portal_up}_EMAIL / {portal_up}_PASSWORD not set in .env)")
+              f"({portal_up}_{env_up}_EMAIL / {portal_up}_{env_up}_PASSWORD not set in .env)")
         return None
     login_url = _LOGIN_API.get(env)
     if not login_url:
