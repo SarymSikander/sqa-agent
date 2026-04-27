@@ -507,6 +507,13 @@ def run_qa_test_cases(portal: str, env: str, test_cases: list) -> dict:
                             _take_screenshot(page, step_str[11:].strip())
                             steps_executed += 1
 
+                        elif step_str.startswith("CLICK_OPTION:"):
+                            val = step_str[13:].strip()
+                            page.wait_for_timeout(5000)
+                            page.get_by_role("option", name=val).first.click()
+                            _log(f"CLICK_OPTION: {val}", "pass")
+                            steps_executed += 1
+
                         else:
                             _log(f"UNKNOWN step (skipped): {step_str[:80]}", "skip")
 
