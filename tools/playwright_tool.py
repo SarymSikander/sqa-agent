@@ -76,14 +76,20 @@ def get_auth_file(portal, env):
 
 
 def _load_auth_token(auth_file):
-    """Return (auth_data, authToken) from auth-storage in origins[0].localStorage."""
+    """Return (auth_data, authToken) from auth-storage in origins[0].localStorage.
+
+    Handles both the full Playwright storage format {cookies, origins: [...]}
+    and the uploaded format {origins: [...]} (no cookies key).
+    The auth-storage value may be a JSON string (standard) or already a dict.
+    """
     with open(auth_file) as f:
         auth_data = json.load(f)
     try:
         ls = auth_data["origins"][0]["localStorage"]
         for item in ls:
             if item.get("name") == "auth-storage":
-                inner = json.loads(item["value"])
+                val = item["value"]
+                inner = json.loads(val) if isinstance(val, str) else val
                 token = (inner.get("state") or {}).get("authToken")
                 if token:
                     return auth_data, token

@@ -244,7 +244,6 @@ async def auth_upload(body: AuthUploadBody):
     except json.JSONDecodeError as e:
         raise HTTPException(status_code=400, detail=f"Invalid JSON in auth_storage_value: {e}")
     auth_doc = {
-        "cookies": [],
         "origins": [{
             "origin": _ENV_ORIGINS[env],
             "localStorage": [{"name": "auth-storage", "value": body.auth_storage_value}],
