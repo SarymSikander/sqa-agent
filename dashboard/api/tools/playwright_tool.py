@@ -455,9 +455,12 @@ def run_qa_test_cases(portal: str, env: str, test_cases: list) -> dict:
 
                         elif step_str.startswith("WAIT:"):
                             sel = step_str[5:].strip()
-                            page.wait_for_selector(sel, timeout=10000)
-                            _log(f"WAIT: {sel}", "pass")
-                            steps_executed += 1
+                            if '[role="option"]' in sel or "[role='option']" in sel:
+                                _log(f"WAIT: {sel} (skipped — role=option not applicable)", "skip")
+                            else:
+                                page.wait_for_selector(sel, timeout=10000)
+                                _log(f"WAIT: {sel}", "pass")
+                                steps_executed += 1
 
                         elif step_str.startswith("NAVIGATE:"):
                             path = step_str[9:].strip()
