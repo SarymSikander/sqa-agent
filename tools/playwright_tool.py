@@ -100,34 +100,37 @@ def _load_auth_token(auth_file):
     return auth_data, None
 
 
-_LOGIN_API = {
+_LOGIN_URLS = {
     "local":      "http://localhost:3000/api/auth/login",
     "staging":    "https://staging.myzambeel.com/api/auth/login",
     "production": "https://portal.myzambeel.com/api/auth/login",
 }
 
 
-def _fetch_auth_token(portal, env):
-    """POST portal credentials from .env to the login API and return the JWT token.
+def api_login(portal, env):
+    """POST portal+env credentials to the login API and return the JWT token.
 
-    Reads {PORTAL}_{ENV}_EMAIL / {PORTAL}_{ENV}_PASSWORD first (per-env),
-    then falls back to {PORTAL}_EMAIL / {PORTAL}_PASSWORD (generic).
-    Values are stripped of surrounding whitespace.
+    Reads {PORTAL}_{ENV}_EMAIL and {PORTAL}_{ENV}_PASSWORD from .env —
+    e.g. ADMIN_STAGING_EMAIL / ADMIN_STAGING_PASSWORD for admin/staging.
+    Prints the HTTP response status and body for debugging.
+    Returns the JWT token string, or None if login fails.
     """
     portal_up = portal.upper()
     env_up    = env.upper()
-    email    = (os.getenv(f"{portal_up}_{env_up}_EMAIL", "").strip()
-                or os.getenv(f"{portal_up}_EMAIL", "").strip())
-    password = (os.getenv(f"{portal_up}_{env_up}_PASSWORD", "").strip()
-                or os.getenv(f"{portal_up}_PASSWORD", "").strip())
+    email     = os.getenv(f"{portal_up}_{env_up}_EMAIL", "").strip()
+    password  = os.getenv(f"{portal_up}_{env_up}_PASSWORD", "").strip()
+
     if not email or not password:
-        print(f"[AUTH] {portal}/{env} — credentials not configured "
-              f"({portal_up}_{env_up}_EMAIL / {portal_up}_{env_up}_PASSWORD not set in .env)")
+        print(f"[api_login] {portal}/{env} — credentials not set "
+              f"({portal_up}_{env_up}_EMAIL / {portal_up}_{env_up}_PASSWORD "
+              f"missing or empty in .env)")
         return None
-    login_url = _LOGIN_API.get(env)
+
+    login_url = _LOGIN_URLS.get(env)
     if not login_url:
-        print(f"[AUTH] {portal}/{env} — no login API URL for env '{env}'")
+        print(f"[api_login] {portal}/{env} — no login URL configured for env '{env}'")
         return None
+
     payload = json.dumps({"email": email, "password": password}).encode()
     req = urllib.request.Request(
         login_url,
@@ -135,25 +138,31 @@ def _fetch_auth_token(portal, env):
         headers={"Content-Type": "application/json"},
         method="POST",
     )
+    print(f"[api_login] POST {login_url}  user={email}")
     try:
         with urllib.request.urlopen(req, timeout=15) as resp:
-            data = json.loads(resp.read())
+            http_status = resp.status
+            body        = resp.read().decode()
+        print(f"[api_login] {portal}/{env} — HTTP {http_status}")
+        print(f"[api_login] response body: {body[:500]}")
+        data  = json.loads(body)
         token = (data.get("token")
                  or data.get("authToken")
                  or data.get("accessToken")
                  or data.get("access_token"))
         if token:
-            print(f"[AUTH] {portal}/{env} — API login OK, token len={len(token)}")
+            print(f"[api_login] {portal}/{env} — token extracted (len={len(token)})")
             return token
-        print(f"[AUTH] {portal}/{env} — API login: no token field in response "
+        print(f"[api_login] {portal}/{env} — no token field in response "
               f"(keys={list(data.keys())})")
         return None
     except urllib.error.HTTPError as e:
-        print(f"[AUTH] {portal}/{env} — API login HTTP {e.code}: "
-              f"{e.read().decode()[:200]}")
+        body = e.read().decode()
+        print(f"[api_login] {portal}/{env} — HTTP {e.code} {e.reason}")
+        print(f"[api_login] error body: {body[:500]}")
         return None
     except Exception as e:
-        print(f"[AUTH] {portal}/{env} — API login error: {e}")
+        print(f"[api_login] {portal}/{env} — request error: {e}")
         return None
 
 
@@ -202,7 +211,7 @@ def run_tests(portal, env):
         })
 
     # ── Acquire JWT: programmatic API login, fallback to saved auth file ─────
-    auth_token = _fetch_auth_token(portal, env)
+    auth_token = api_login(portal, env)
     if auth_token is None:
         try:
             auth_file = get_auth_file(portal, env)
@@ -507,7 +516,7 @@ def run_qa_test_cases(portal: str, env: str, test_cases: list) -> dict:
         }
 
     # ── Acquire JWT: programmatic API login, fallback to saved auth file ─────
-    auth_token = _fetch_auth_token(portal, env)
+    auth_token = api_login(portal, env)
     if auth_token is None:
         try:
             auth_file = get_auth_file(portal, env)
