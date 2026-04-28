@@ -454,7 +454,7 @@ def run_qa_test_cases(portal: str, env: str, test_cases: list) -> dict:
                         elif step_str.startswith("FILL:"):
                             parts = step_str[5:].split("|", 1)
                             sel   = parts[0].strip()
-                            val   = parts[1].strip() if len(parts) > 1 else ""
+                            val   = parts[1].strip().strip("'\"") if len(parts) > 1 else ""
                             page.wait_for_selector(sel, timeout=8000)
                             page.fill(sel, val)
                             _log(f"FILL: {sel} → '{val}'", "pass")
@@ -518,8 +518,8 @@ def run_qa_test_cases(portal: str, env: str, test_cases: list) -> dict:
                             steps_executed += 1
 
                         elif step_str.startswith("CLICK_OPTION:"):
-                            val = step_str[len("CLICK_OPTION:"):].strip()
-                            page.locator("select").filter(has=page.locator(f'option:has-text("{val}")')).select_option(label=val)
+                            val = step_str[len("CLICK_OPTION:"):].strip().strip("'\"")
+                            page.locator("select").filter(has=page.locator(f'option:has-text("{val}")')).first.select_option(label=val)
                             _log(f"CLICK_OPTION: {val}", "pass")
                             steps_executed += 1
 

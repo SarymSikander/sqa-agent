@@ -608,7 +608,10 @@ def generate_test_cases(ticket_key, title, description):
         "14. CRITICAL HAPPY FLOW — Save Model button enables as soon as Country is selected. Type and Value fields are NOT required to enable Save Model. Do NOT add steps that check Save is still disabled after filling only some fields.\n"
         "15. There is NO confirmation message or toast after clicking Save Model. Never assert text='Commission model saved successfully.' or any success toast. After Save Model is clicked and the modal closes, assert the model name appears in the listing table: ASSERT_EXISTS: text='<the model name you filled in>'.\n"
         "16. Currency is auto-populated when Country is selected — never add a step to fill or click the Currency field.\n"
-        "17. The correct happy flow steps are: NAVIGATE → CLICK + New Model → WAIT modal → FILL model name → CLICK_OPTION country → CLICK Save Model → ASSERT_EXISTS model name in table.\n\n"
+        "17. The correct happy flow steps are: NAVIGATE → CLICK + New Model → WAIT modal → FILL model name → CLICK_OPTION country → CLICK Save Model → ASSERT_EXISTS model name in table.\n"
+        "18. Never wrap FILL values or CLICK_OPTION values in quotes in the step string. Write FILL: selector | ModelName not FILL: selector | 'ModelName'. Write CLICK_OPTION: Saudi Arabia not CLICK_OPTION: 'Saudi Arabia'.\n"
+        "19. Never use ASSERT_NOT_EXISTS to check that a dropdown option is absent — option text like 'Flat Rate' may appear anywhere in the page body and cause false failures. Only use ASSERT_EXISTS to confirm options that ARE present.\n"
+        "20. To verify Save Model button is enabled after country selection, use ASSERT_EXISTS: button.bg-indigo-600:has-text('Save Model') — do not use :not(:disabled) or any pseudo-class.\n\n"
         "CRITICAL: This React app has NO element IDs. Use ONLY these selector formats:\n"
         "- button:has-text(\"exact text\") for buttons\n"
         "- input[placeholder=\"exact placeholder\"] for inputs\n"
@@ -763,6 +766,14 @@ def generate_test_cases(ticket_key, title, description):
             ('CLICK_OPTION: SAR', ''),
             ('CLICK_OPTION: AED', ''),
             ('CLICK_OPTION: PKR', ''),
+            # Invalid enabled-state selector — use class-based check instead
+            ("ASSERT_EXISTS: button:has-text('Save Model') :not(:disabled)", "ASSERT_EXISTS: button.bg-indigo-600:has-text('Save Model')"),
+            ('ASSERT_EXISTS: button:has-text("Save Model") :not(:disabled)', 'ASSERT_EXISTS: button.bg-indigo-600:has-text("Save Model")'),
+            # ASSERT_NOT_EXISTS on option text is unreliable — the text may appear in the page body
+            ("ASSERT_NOT_EXISTS: text='Flat Rate'", ''),
+            ('ASSERT_NOT_EXISTS: text="Flat Rate"', ''),
+            ("ASSERT_NOT_EXISTS: text='Percentage'", ''),
+            ('ASSERT_NOT_EXISTS: text="Percentage"', ''),
             # Invalid Playwright syntax GPT-4o generates
             ('| disabled', ''),
             ('| not_exists', ''),
