@@ -599,7 +599,8 @@ def generate_test_cases(ticket_key, title, description):
         "5. Country options for Zambeel are only: Bahrain, Iraq, Kuwait, Oman, Pakistan, Qatar, Saudi Arabia, UAE.\n"
         "6. After clicking Save and the modal closes, wait for the listing to update before asserting.\n"
         "7. Keep test cases simple — test what the ticket describes, not edge cases around UI state.\n"
-        "8. Never generate a test case that checks if Save Model button is disabled after BOTH Country AND Type have been selected — at that point the number input auto-fills with 0 which is valid, so the button will be enabled. Only check disabled state when Country OR Type is still unselected.\n\n"
+        "8. Never generate a test case that checks if Save Model button is disabled after BOTH Country AND Type have been selected — at that point the number input auto-fills with 0 which is valid, so the button will be enabled. Only check disabled state when Country OR Type is still unselected.\n"
+        "9. The number input for commission value has NO placeholder text — always use input[type=\"number\"] never input[placeholder=\"...\"] for the value field.\n\n"
         "CRITICAL: This React app has NO element IDs. Use ONLY these selector formats:\n"
         "- button:has-text(\"exact text\") for buttons\n"
         "- input[placeholder=\"exact placeholder\"] for inputs\n"
@@ -691,6 +692,15 @@ def generate_test_cases(ticket_key, title, description):
             # Country dropdown needs asterisk
             ('CLICK: text="Country"', 'CLICK: text="Country*"'),
             ("CLICK: text='Country'", "CLICK: text='Country*'"),
+            # Wrong placeholder for commission value input
+            ('input[placeholder=\'Enter commission amount\']', 'input[type=\'number\']'),
+            ('input[placeholder="Enter commission amount"]', 'input[type="number"]'),
+            # Invalid className pseudo-method GPT-4o generates for disabled state
+            ('button:has-text(\'Save Model\').className(\'disabled\')', 'button.bg-indigo-300:has-text(\'Save Model\')'),
+            ('button:has-text("Save Model").className("disabled")', 'button.bg-indigo-300:has-text("Save Model")'),
+            # ASSERT_TEXT on dialog — dialog spans full page, use ASSERT_EXISTS
+            ('ASSERT_TEXT: div[role=\'dialog\']', 'ASSERT_EXISTS: div[role=\'dialog\']'),
+            ('ASSERT_TEXT: div[role="dialog"]', 'ASSERT_EXISTS: div[role="dialog"]'),
             # Invalid Playwright syntax GPT-4o generates
             ('| disabled', ''),
             ('| not_exists', ''),
