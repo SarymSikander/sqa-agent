@@ -676,6 +676,33 @@ def generate_test_cases(ticket_key, title, description):
             tc.setdefault("evidence_selector", "")
             valid.append(tc)
 
+        ZAMBEEL_SELECTOR_FIXES = [
+            # Commission Models page — wrong button text
+            ('button:has-text("Create Commission Model")', 'button:has-text("+ New Model")'),
+            ("button:has-text('Create Commission Model')", "button:has-text('+ New Model')"),
+            # Generic save button — always needs 'Model' suffix on this page
+            ('button:has-text("Save")', 'button:has-text("Save Model")'),
+            ("button:has-text('Save')", "button:has-text('Save Model')"),
+            # Wrong input placeholders
+            ('input[placeholder="Model Name"]', 'input[placeholder="Enter model name"]'),
+            ("input[placeholder='Model Name']", "input[placeholder='Enter model name']"),
+            ('input[placeholder="Amount"]', 'input[type="number"]'),
+            ("input[placeholder='Amount']", "input[type='number']"),
+            # Country dropdown needs asterisk
+            ('CLICK: text="Country"', 'CLICK: text="Country*"'),
+            ("CLICK: text='Country'", "CLICK: text='Country*'"),
+            # Invalid Playwright syntax GPT-4o generates
+            ('| disabled', ''),
+            ('| not_exists', ''),
+        ]
+
+        # Apply Zambeel selector fixes to all generated test case steps
+        for tc in valid:
+            tc['steps'] = [
+                next((s.replace(wrong, right) for wrong, right in ZAMBEEL_SELECTOR_FIXES if wrong in s), s)
+                for s in tc.get('steps', [])
+            ]
+
         print(f"[generate_test_cases] Parsed {len(valid)} valid test cases")
         return valid
 
