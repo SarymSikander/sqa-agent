@@ -600,7 +600,11 @@ def generate_test_cases(ticket_key, title, description):
         "6. After clicking Save and the modal closes, wait for the listing to update before asserting.\n"
         "7. Keep test cases simple — test what the ticket describes, not edge cases around UI state.\n"
         "8. Never generate a test case that checks if Save Model button is disabled after BOTH Country AND Type have been selected — at that point the number input auto-fills with 0 which is valid, so the button will be enabled. Only check disabled state when Country OR Type is still unselected.\n"
-        "9. The number input for commission value has NO placeholder text — always use input[type=\"number\"] never input[placeholder=\"...\"] for the value field.\n\n"
+        "9. The number input for commission value has NO placeholder text — always use input[type=\"number\"] never input[placeholder=\"...\"] for the value field.\n"
+        "10. Model name input placeholder is EXACTLY 'Enter model name' — never 'Enter Name', 'Name', or 'Model Name'.\n"
+        "11. After CLICK: button:has-text('+ New Model'), always add WAIT: input[placeholder='Enter model name'] before any other modal steps.\n"
+        "12. Never click a Country or Type dropdown trigger — use CLICK_OPTION: value directly. The selects are native HTML and select_option works without opening them.\n"
+        "13. Commission Type values are ONLY '% of Revenue' or 'Flat per Order' — never 'Flat Rate', 'Percentage', or any other value.\n\n"
         "CRITICAL: This React app has NO element IDs. Use ONLY these selector formats:\n"
         "- button:has-text(\"exact text\") for buttons\n"
         "- input[placeholder=\"exact placeholder\"] for inputs\n"
@@ -684,17 +688,57 @@ def generate_test_cases(ticket_key, title, description):
             # Generic save button — always needs 'Model' suffix on this page
             ('button:has-text("Save")', 'button:has-text("Save Model")'),
             ("button:has-text('Save')", "button:has-text('Save Model')"),
-            # Wrong input placeholders
+            # Wrong model name input placeholders
             ('input[placeholder="Model Name"]', 'input[placeholder="Enter model name"]'),
             ("input[placeholder='Model Name']", "input[placeholder='Enter model name']"),
+            ('input[placeholder="Enter Name"]', 'input[placeholder="Enter model name"]'),
+            ("input[placeholder='Enter Name']", "input[placeholder='Enter model name']"),
+            ('input[placeholder="Name"]', 'input[placeholder="Enter model name"]'),
+            ("input[placeholder='Name']", "input[placeholder='Enter model name']"),
+            # Wrong placeholder for commission value input
             ('input[placeholder="Amount"]', 'input[type="number"]'),
             ("input[placeholder='Amount']", "input[type='number']"),
-            # Country dropdown needs asterisk
-            ('CLICK: text="Country"', 'CLICK: text="Country*"'),
-            ("CLICK: text='Country'", "CLICK: text='Country*'"),
-            # Wrong placeholder for commission value input
             ('input[placeholder=\'Enter commission amount\']', 'input[type=\'number\']'),
             ('input[placeholder="Enter commission amount"]', 'input[type="number"]'),
+            # Remove dialog-scoped Country/Type trigger clicks — use CLICK_OPTION directly
+            ("CLICK: div[role='dialog'] >> text='Country*'", ''),
+            ('CLICK: div[role="dialog"] >> text="Country*"', ''),
+            ("CLICK: div[role='dialog'] >> text='Country'", ''),
+            ('CLICK: div[role="dialog"] >> text="Country"', ''),
+            ("CLICK: div[role='dialog'] >> text='Type*'", ''),
+            ('CLICK: div[role="dialog"] >> text="Type*"', ''),
+            ("CLICK: div[role='dialog'] >> text='Type'", ''),
+            ('CLICK: div[role="dialog"] >> text="Type"', ''),
+            ("CLICK: text='Country*'", ''),
+            ('CLICK: text="Country*"', ''),
+            ("CLICK: text='Type*'", ''),
+            ('CLICK: text="Type*"', ''),
+            # Convert country CLICK steps to CLICK_OPTION (background table cells intercept clicks)
+            ("CLICK: text='Saudi Arabia'", 'CLICK_OPTION: Saudi Arabia'),
+            ('CLICK: text="Saudi Arabia"', 'CLICK_OPTION: Saudi Arabia'),
+            ("CLICK: text='Pakistan'", 'CLICK_OPTION: Pakistan'),
+            ('CLICK: text="Pakistan"', 'CLICK_OPTION: Pakistan'),
+            ("CLICK: text='UAE'", 'CLICK_OPTION: UAE'),
+            ('CLICK: text="UAE"', 'CLICK_OPTION: UAE'),
+            ("CLICK: text='Kuwait'", 'CLICK_OPTION: Kuwait'),
+            ('CLICK: text="Kuwait"', 'CLICK_OPTION: Kuwait'),
+            ("CLICK: text='Bahrain'", 'CLICK_OPTION: Bahrain'),
+            ('CLICK: text="Bahrain"', 'CLICK_OPTION: Bahrain'),
+            ("CLICK: text='Iraq'", 'CLICK_OPTION: Iraq'),
+            ('CLICK: text="Iraq"', 'CLICK_OPTION: Iraq'),
+            ("CLICK: text='Qatar'", 'CLICK_OPTION: Qatar'),
+            ('CLICK: text="Qatar"', 'CLICK_OPTION: Qatar'),
+            ("CLICK: text='Oman'", 'CLICK_OPTION: Oman'),
+            ('CLICK: text="Oman"', 'CLICK_OPTION: Oman'),
+            # Convert type CLICK steps to CLICK_OPTION + fix wrong type names
+            ("CLICK: text='% of Revenue'", 'CLICK_OPTION: % of Revenue'),
+            ('CLICK: text="% of Revenue"', 'CLICK_OPTION: % of Revenue'),
+            ("CLICK: text='Flat per Order'", 'CLICK_OPTION: Flat per Order'),
+            ('CLICK: text="Flat per Order"', 'CLICK_OPTION: Flat per Order'),
+            ("CLICK: text='Percentage'", 'CLICK_OPTION: % of Revenue'),
+            ('CLICK: text="Percentage"', 'CLICK_OPTION: % of Revenue'),
+            ("CLICK: text='Flat Rate'", 'CLICK_OPTION: Flat per Order'),
+            ('CLICK: text="Flat Rate"', 'CLICK_OPTION: Flat per Order'),
             # Invalid className pseudo-method GPT-4o generates for disabled state
             ('button:has-text(\'Save Model\').className(\'disabled\')', 'button.bg-indigo-300:has-text(\'Save Model\')'),
             ('button:has-text("Save Model").className("disabled")', 'button.bg-indigo-300:has-text("Save Model")'),

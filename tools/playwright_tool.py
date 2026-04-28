@@ -447,6 +447,9 @@ def run_qa_test_cases(portal: str, env: str, test_cases: list) -> dict:
                                 page.wait_for_timeout(2000)
                                 page.wait_for_load_state("networkidle")
                                 _log("Post-save wait: networkidle", "ok")
+                            if "+ new model" in sel.lower() or "new model" in sel.lower():
+                                page.wait_for_selector("input[placeholder='Enter model name']", timeout=8000)
+                                _log("Post-modal wait: modal input visible", "ok")
 
                         elif step_str.startswith("FILL:"):
                             parts = step_str[5:].split("|", 1)
