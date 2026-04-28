@@ -611,7 +611,9 @@ def generate_test_cases(ticket_key, title, description):
         "17. The correct happy flow steps are: NAVIGATE → CLICK + New Model → WAIT modal → FILL model name → CLICK_OPTION country → CLICK Save Model → ASSERT_EXISTS model name in table.\n"
         "18. Never wrap FILL values or CLICK_OPTION values in quotes in the step string. Write FILL: selector | ModelName not FILL: selector | 'ModelName'. Write CLICK_OPTION: Saudi Arabia not CLICK_OPTION: 'Saudi Arabia'.\n"
         "19. Never use ASSERT_NOT_EXISTS to check that a dropdown option is absent — option text like 'Flat Rate' may appear anywhere in the page body and cause false failures. Only use ASSERT_EXISTS to confirm options that ARE present.\n"
-        "20. To verify Save Model button is enabled after country selection, use ASSERT_EXISTS: button.bg-indigo-600:has-text('Save Model') — do not use :not(:disabled) or any pseudo-class.\n\n"
+        "20. To verify Save Model button is enabled after country selection, use ASSERT_EXISTS: button.bg-indigo-600:has-text('Save Model') — do not use :not(:disabled) or any pseudo-class.\n"
+        "21. Never generate a test case for 'prevent duplicate country' by selecting the same country twice on the same select — that is a no-op. To add a second country row you must first CLICK: button:has-text('+ Add Rule'). Do not generate duplicate-country tests unless you can confirm the exact validation message from context.\n"
+        "22. Never guess validation or error message text. Only use ASSERT_EXISTS for text that is explicitly stated in the ticket description or acceptance criteria. Do not invent messages like 'Each country can only appear once inside the same model.'\n\n"
         "CRITICAL: This React app has NO element IDs. Use ONLY these selector formats:\n"
         "- button:has-text(\"exact text\") for buttons\n"
         "- input[placeholder=\"exact placeholder\"] for inputs\n"
@@ -774,6 +776,11 @@ def generate_test_cases(ticket_key, title, description):
             ('ASSERT_NOT_EXISTS: text="Flat Rate"', ''),
             ("ASSERT_NOT_EXISTS: text='Percentage'", ''),
             ('ASSERT_NOT_EXISTS: text="Percentage"', ''),
+            # Fabricated duplicate-country validation messages — strip them
+            ("ASSERT_EXISTS: text='Each country can only appear once inside the same model.'", ''),
+            ('ASSERT_EXISTS: text="Each country can only appear once inside the same model."', ''),
+            ("ASSERT_EXISTS: text='Duplicate country'", ''),
+            ('ASSERT_EXISTS: text="Duplicate country"', ''),
             # Invalid Playwright syntax GPT-4o generates
             ('| disabled', ''),
             ('| not_exists', ''),
