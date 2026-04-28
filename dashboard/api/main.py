@@ -604,7 +604,11 @@ def generate_test_cases(ticket_key, title, description):
         "10. Model name input placeholder is EXACTLY 'Enter model name' — never 'Enter Name', 'Name', or 'Model Name'.\n"
         "11. After CLICK: button:has-text('+ New Model'), always add WAIT: input[placeholder='Enter model name'] before any other modal steps.\n"
         "12. Never click a Country or Type dropdown trigger — use CLICK_OPTION: value directly. The selects are native HTML and select_option works without opening them.\n"
-        "13. Commission Type values are ONLY '% of Revenue' or 'Flat per Order' — never 'Flat Rate', 'Percentage', or any other value.\n\n"
+        "13. Commission Type values are ONLY '% of Revenue' or 'Flat per Order' — never 'Flat Rate', 'Percentage', or any other value.\n"
+        "14. CRITICAL HAPPY FLOW — Save Model button enables as soon as Country is selected. Type and Value fields are NOT required to enable Save Model. Do NOT add steps that check Save is still disabled after filling only some fields.\n"
+        "15. There is NO confirmation message or toast after clicking Save Model. Never assert text='Commission model saved successfully.' or any success toast. After Save Model is clicked and the modal closes, assert the model name appears in the listing table: ASSERT_EXISTS: text='<the model name you filled in>'.\n"
+        "16. Currency is auto-populated when Country is selected — never add a step to fill or click the Currency field.\n"
+        "17. The correct happy flow steps are: NAVIGATE → CLICK + New Model → WAIT modal → FILL model name → CLICK_OPTION country → CLICK Save Model → ASSERT_EXISTS model name in table.\n\n"
         "CRITICAL: This React app has NO element IDs. Use ONLY these selector formats:\n"
         "- button:has-text(\"exact text\") for buttons\n"
         "- input[placeholder=\"exact placeholder\"] for inputs\n"
@@ -745,6 +749,20 @@ def generate_test_cases(ticket_key, title, description):
             # ASSERT_TEXT on dialog — dialog spans full page, use ASSERT_EXISTS
             ('ASSERT_TEXT: div[role=\'dialog\']', 'ASSERT_EXISTS: div[role=\'dialog\']'),
             ('ASSERT_TEXT: div[role="dialog"]', 'ASSERT_EXISTS: div[role="dialog"]'),
+            # No confirmation/success toast exists — remove these false assertions
+            ("ASSERT_EXISTS: text='Commission model saved successfully.'", ''),
+            ('ASSERT_EXISTS: text="Commission model saved successfully."', ''),
+            ("ASSERT_EXISTS: text='Model saved successfully.'", ''),
+            ('ASSERT_EXISTS: text="Model saved successfully."', ''),
+            ("ASSERT_EXISTS: text='Saved successfully.'", ''),
+            ('ASSERT_EXISTS: text="Saved successfully."', ''),
+            ("ASSERT_EXISTS: text='Success'", ''),
+            ('ASSERT_EXISTS: text="Success"', ''),
+            # Currency field is auto-populated — remove manual currency steps
+            ("CLICK_OPTION: USD", ''),
+            ('CLICK_OPTION: SAR', ''),
+            ('CLICK_OPTION: AED', ''),
+            ('CLICK_OPTION: PKR', ''),
             # Invalid Playwright syntax GPT-4o generates
             ('| disabled', ''),
             ('| not_exists', ''),
