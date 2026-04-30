@@ -71,18 +71,37 @@ ASSERT_TEXT OnHold
 
 ```python
 NAVIGATE /orders-management/orders
+ASSERT_TEXT Orders Management
 ASSERT_VISIBLE input[placeholder='Search orders']
 CLICK button:has-text('Confirmation Pending')
 ASSERT_TEXT Confirmation Pending
+CLICK button:has-text('Shipped')        # verified tab name — NOT 'In Delivery'
+ASSERT_TEXT Shipped
 FILL input[placeholder='Search orders'] | TEST-ORDER-001
 # Assert table updates (or empty state)
+```
+
+## Pattern 4b: Order Filter Modal
+
+```python
+NAVIGATE /orders-management/orders
+CLICK button:has-text('Filter')
+ASSERT_TEXT Filters
+FILL input[placeholder='Order ID (comma-separated for multiple)'] | 12345
+FILL input[placeholder='Customer Name'] | Test Customer
+CLICK_OPTION button:has-text('Select Store') | My Test Store
+CLICK button:has-text('Apply filter')    # verified — NOT 'Apply Filters'
+# Assert filtered results load
+CLICK button:has-text('Filter')
+CLICK button:has-text('Clear all filters')   # verified — NOT 'Reset'
 ```
 
 ## Pattern 5: Ticket View and Status Update
 
 ```python
 NAVIGATE /orders-management/ticketing
-ASSERT_VISIBLE input[placeholder='Search tickets, stores, orders...']
+ASSERT_TEXT Ticketing Management
+ASSERT_VISIBLE input[placeholder='Search by store name...']
 CLICK button:has-text('View')    # first ticket in table
 # Modal opens
 ASSERT_VISIBLE button:has-text('Update Ticket')
@@ -142,23 +161,48 @@ CLICK button:has-text('Create')
 7. Use `CLICK_OPTION` for all Flowbite Select/Dropdown components — they are not native `<select>` elements
 8. After drawer closes, always assert the drawer is no longer visible before asserting list changes
 
-## Selector Quick Reference (OMS)
+## Selector Quick Reference (OMS — verified from screenshots)
 
-| Element | Selector |
-|---------|----------|
-| Commission Models page | `h1:has-text('Commission Models')` |
-| New Model button | `button:has-text('+ New Model')` |
-| Model name input | `input[placeholder='Enter model name']` |
-| Add rule button | `button:has-text('+ Add Rule')` |
-| Currency input | `input[placeholder='AED']` |
-| Save model button | `button:has-text('Save Model')` |
-| Review button (registrations) | `button:has-text('Review')` |
-| Approve button | `button:has-text('Approve Agency')` |
-| Confirm approve | `button:has-text('Confirm Approve')` |
-| Hold textarea | `textarea[placeholder='Explain what needs to be fixed...']` |
-| Reject textarea | `textarea[placeholder='Reason for rejection...']` |
-| Confirm reject | `button:has-text('Confirm Reject')` |
-| OMS search | `input[placeholder='Search orders']` |
-| Ticket search | `input[placeholder='Search tickets, stores, orders...']` |
-| Update ticket | `button:has-text('Update Ticket')` |
-| Resolution notes | `textarea[placeholder='Add notes about the resolution...']` |
+| Element | Selector | Notes |
+|---------|----------|-------|
+| Orders page title | `h1:has-text('Orders Management')` | NOT 'Orders' |
+| Orders search | `input[placeholder='Search orders']` | |
+| Shipped tab | `button:has-text('Shipped')` | NOT 'In Delivery' |
+| Dispatching tab | `button:has-text('Dispatching In Process')` | Capital I |
+| Filter button | `button:has-text('Filter')` | |
+| Apply filter | `button:has-text('Apply filter')` | lowercase 'f' |
+| Clear filters | `button:has-text('Clear all filters')` | NOT 'Reset' |
+| Edit Order (modal) | `button:has-text('Edit Order')` | |
+| Approve Order (modal) | `button:has-text('Approve Order')` | |
+| Cancel Order (modal) | `button:has-text('Cancel Order')` | |
+| Dispatch search | `input[placeholder='Search orders...']` | 3 dots |
+| Generate tracking | `button:has-text('Generate Tracking ID')` | |
+| Download combined | `button:has-text('Download Combined Doc')` | |
+| Stores page title | `h1:has-text('Integrated Stores')` | NOT 'Stores Settings' |
+| Stores search | `input[placeholder='Search by Store Name or URL']` | |
+| Ticketing page title | `h1:has-text('Ticketing Management')` | OMS only |
+| Ticketing search | `input[placeholder='Search by store name...']` | |
+| Create ticket | `button:has-text('+ Create New Ticket')` | |
+| Gold sub page title | `h1:has-text('Gold Subscription Management')` | |
+| Gold sub search | `input[placeholder='Enter user email']` | |
+| Inventory page title | `h1:has-text('Inventory Movements')` | |
+| Add movement | `button:has-text('+ Add Inventory Movement')` | NOT 'Create' |
+| Inventory search | `input[placeholder='Search Movement ID']` | |
+| Ticker page title | `h1:has-text('Global Ticker Configuration')` | |
+| Ticker save | `button:has-text('Update Global Ticker')` | NOT 'Save' |
+| Agency reg page title | `h1:has-text('Agency Registrations')` | |
+| Agency reg review | `button:has-text('Review')` | |
+| Approve agency | `button:has-text('Approve Agency')` | |
+| Confirm approve | `button:has-text('Confirm Approve')` | |
+| Hold textarea | `textarea[placeholder='Explain what needs to be fixed...']` | |
+| Reject textarea | `textarea[placeholder='Reason for rejection...']` | |
+| Confirm reject | `button:has-text('Confirm Reject')` | |
+| Commission page title | `h1:has-text('Commission Models')` | |
+| New model | `button:has-text('+ New Model')` | |
+| Model name input | `input[placeholder='Enter model name']` | |
+| Edit model | `button:has-text('✏ Edit')` | includes emoji |
+| Add rule | `button:has-text('+ Add Rule')` | |
+| Currency input | `input[placeholder='AED']` | |
+| Save model | `button:has-text('Save Model')` | |
+| Update ticket | `button:has-text('Update Ticket')` | |
+| Resolution notes | `textarea[placeholder='Add notes about the resolution...']` | |
