@@ -26,7 +26,7 @@ a:has-text('Tags Management')        → /orders-management/tags-management
 a:has-text('Purchase Orders')        → /orders-management/purchase-orders
 a:has-text('Return Orders')          → /orders-management/return-orders
 a:has-text('Ticketing')              → /orders-management/ticketing
-a:has-text('Gold Subscription')      → /orders-management/gold-subscriptions
+a:has-text('Gold Subscriptions')     → /orders-management/gold-subscriptions
 a:has-text('Inventory Movements')    → /orders-management/inventory-movements
 a:has-text('Ticker Config')          → /orders-management/ticker-config
 a:has-text('Agency Registrations')   → /orders-management/agency-registrations
@@ -66,7 +66,7 @@ button:has-text('Dispatching In Process')
 button:has-text('Shipped')
 button:has-text('Undelivered')
 button:has-text('Delivered')
-button:has-text('Return In Transit')
+button:has-text('Return in Transit')
 button:has-text('Return')
 button:has-text('Cancelled')
 ```

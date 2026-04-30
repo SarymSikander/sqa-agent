@@ -45,7 +45,7 @@ Saudi Arabia (KSA) | United Arab Emirates (UAE) | Kuwait | Qatar | Pakistan | Om
 **Status tabs (confirmed exact text, left → right):**
 ```
 All Orders | Confirmation Pending | Approved | Dispatching In Process |
-Shipped | Undelivered | Delivered | Return In Transit | Return | Cancelled
+Shipped | Undelivered | Delivered | Return in Transit | Return | Cancelled
 ```
 > ⚠️ Tab 5 is **Shipped** — NOT 'In Delivery'. Updated from previous documentation.
 > ⚠️ Tab 4 is **Dispatching In Process** (capital I in 'In').

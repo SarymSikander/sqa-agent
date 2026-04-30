@@ -51,7 +51,7 @@ After successful login, Admin/Agent lands on: `/orders-management/dashboard`
 | Purchase Orders | `/orders-management/purchase-orders` | Admin only |
 | Return Orders | `/orders-management/return-orders` | Admin only |
 | Ticketing | `/orders-management/ticketing` | Admin + Agent |
-| Gold Subscription | `/orders-management/gold-subscriptions` | Admin only |
+| Gold Subscriptions | `/orders-management/gold-subscriptions` | Admin only |
 | Inventory Movements | `/orders-management/inventory-movements` | Admin only |
 | Ticker Config | `/orders-management/ticker-config` | Admin only |
 | Agency Registrations | `/orders-management/agency-registrations` | Admin only |
