@@ -36,23 +36,86 @@ REPORTS_DIR = _HERE / "reports"
 SCREENSHOTS_DIR.mkdir(exist_ok=True)
 REPORTS_DIR.mkdir(exist_ok=True)
 
-# Load app context for Claude prompts — prefer local copy, fall back to repo root
-_APP_CONTEXT_PATH = Path(__file__).resolve().parent / "app_context.md"
-if not _APP_CONTEXT_PATH.exists():
-    _APP_CONTEXT_PATH = Path(__file__).resolve().parent.parent.parent / "app_context.md"
+# Load knowledge base — concatenate all knowledge/*.md files, fall back to app_context.md
+def _load_knowledge_base() -> str:
+    """Load all knowledge base markdown files and concatenate them into one context string."""
+    # Search for knowledge/ directory relative to this file or repo root
+    _candidates = [
+        Path(__file__).resolve().parent / "knowledge",
+        Path(__file__).resolve().parent.parent.parent / "knowledge",
+    ]
+    _knowledge_dir = next((p for p in _candidates if p.is_dir()), None)
 
-_app_context_found = _APP_CONTEXT_PATH.exists()
-_app_context_size  = _APP_CONTEXT_PATH.stat().st_size if _app_context_found else 0
-print(f"[startup] app_context.md found={_app_context_found} path={_APP_CONTEXT_PATH} size={_app_context_size} bytes")
+    chunks: list[str] = []
 
-try:
-    _raw_ctx = _APP_CONTEXT_PATH.read_text()
-    APP_CONTEXT = _raw_ctx
-except Exception as _e:
-    print(f"[startup] Failed to load app_context.md: {_e}")
-    APP_CONTEXT = ""
+    if _knowledge_dir:
+        _order = [
+            "shared/auth.md",
+            "shared/test_rules.md",
+            "shared/api_endpoints.md",
+            "shared/jira_statuses.md",
+            "oms/overview.md",
+            "oms/pages.md",
+            "oms/selectors.md",
+            "oms/flows.md",
+            "oms/test_patterns.md",
+            "seller/overview.md",
+            "seller/pages.md",
+            "seller/selectors.md",
+            "seller/flows.md",
+            "seller/test_patterns.md",
+            "agency/overview.md",
+            "agency/pages.md",
+            "agency/selectors.md",
+            "agency/flows.md",
+            "agency/test_patterns.md",
+        ]
+        loaded, total_bytes = 0, 0
+        for rel in _order:
+            fpath = _knowledge_dir / rel
+            if fpath.exists():
+                try:
+                    text = fpath.read_text()
+                    chunks.append(f"\n\n{'='*60}\n# KNOWLEDGE: {rel}\n{'='*60}\n{text}")
+                    loaded += 1
+                    total_bytes += len(text)
+                except Exception as _e:
+                    print(f"[startup] Failed to load knowledge/{rel}: {_e}")
+        # Pick up any extra files not in the ordered list
+        for fpath in sorted(_knowledge_dir.rglob("*.md")):
+            rel_str = str(fpath.relative_to(_knowledge_dir))
+            if rel_str not in _order and fpath.exists():
+                try:
+                    text = fpath.read_text()
+                    chunks.append(f"\n\n{'='*60}\n# KNOWLEDGE: {rel_str}\n{'='*60}\n{text}")
+                    loaded += 1
+                    total_bytes += len(text)
+                except Exception:
+                    pass
+        print(f"[startup] Knowledge base loaded: {loaded} files, {total_bytes} bytes from {_knowledge_dir}")
+    else:
+        print("[startup] knowledge/ directory not found — falling back to app_context.md")
 
-print(f"[startup] APP_CONTEXT loaded: {len(APP_CONTEXT)} chars")
+    # Always append app_context.md as a final fallback / supplement
+    _app_ctx_candidates = [
+        Path(__file__).resolve().parent / "app_context.md",
+        Path(__file__).resolve().parent.parent.parent / "app_context.md",
+    ]
+    for _p in _app_ctx_candidates:
+        if _p.exists():
+            try:
+                text = _p.read_text()
+                chunks.append(f"\n\n{'='*60}\n# LEGACY app_context.md\n{'='*60}\n{text}")
+                print(f"[startup] app_context.md appended: {len(text)} chars from {_p}")
+            except Exception as _e:
+                print(f"[startup] Failed to load app_context.md: {_e}")
+            break
+
+    return "".join(chunks)
+
+
+APP_CONTEXT = _load_knowledge_base()
+print(f"[startup] APP_CONTEXT total: {len(APP_CONTEXT)} chars")
 
 app.mount("/screenshots", StaticFiles(directory=str(SCREENSHOTS_DIR)), name="screenshots")
 
@@ -591,6 +654,17 @@ def generate_test_cases(ticket_key, title, description):
     print(f"[generate_test_cases] selectors_context ({len(selectors_context)} chars)")
 
     prompt = (
+        "You have access to a COMPLETE KNOWLEDGE BASE about the Zambeel platform extracted directly from source code.\n"
+        "The knowledge base is provided in the 'Relevant app context' section below.\n\n"
+        "KNOWLEDGE BASE USAGE RULES:\n"
+        "- Use knowledge/oms/selectors.md for EXACT OMS selectors — never guess button text.\n"
+        "- Use knowledge/seller/selectors.md for EXACT seller portal selectors.\n"
+        "- Use knowledge/agency/selectors.md for EXACT agency portal selectors.\n"
+        "- Use knowledge/oms/flows.md for step-by-step OMS flows — follow them exactly.\n"
+        "- Use knowledge/seller/flows.md for step-by-step seller flows.\n"
+        "- Use knowledge/agency/flows.md for step-by-step agency flows.\n"
+        "- Use knowledge/shared/test_rules.md for global rules that apply to ALL tests.\n"
+        "- Use knowledge/*/test_patterns.md for proven working test patterns to model your output on.\n\n"
         "CRITICAL SELECTOR RULES FOR ZAMBEEL:\n"
         "1. Never use WAIT: [role='option'] — skip this pattern entirely.\n"
         "2. After clicking a dropdown trigger, go straight to CLICK_OPTION — no waiting needed.\n"
@@ -613,19 +687,19 @@ def generate_test_cases(ticket_key, title, description):
         "19. Never use ASSERT_NOT_EXISTS to check that a dropdown option is absent — option text like 'Flat Rate' may appear anywhere in the page body and cause false failures. Only use ASSERT_EXISTS to confirm options that ARE present.\n"
         "20. To verify Save Model button is enabled after country selection, use ASSERT_EXISTS: button.bg-indigo-600:has-text('Save Model') — do not use :not(:disabled) or any pseudo-class.\n"
         "21. Never generate a test case for 'prevent duplicate country' by selecting the same country twice on the same select — that is a no-op. To add a second country row you must first CLICK: button:has-text('+ Add Rule'). Do not generate duplicate-country tests unless you can confirm the exact validation message from context.\n"
-        "22. Never guess validation or error message text. Only use ASSERT_EXISTS for text that is explicitly stated in the ticket description or acceptance criteria. Do not invent messages like 'Each country can only appear once inside the same model.'\n\n"
+        "22. Never guess validation or error message text. Only use ASSERT_EXISTS for text that is explicitly stated in the ticket description, acceptance criteria, or the knowledge base selectors/flows files.\n\n"
         "CRITICAL: This React app has NO element IDs. Use ONLY these selector formats:\n"
         "- button:has-text(\"exact text\") for buttons\n"
         "- input[placeholder=\"exact placeholder\"] for inputs\n"
         "- text=\"exact visible text\" for any element by its text\n"
         "- div[role=\"dialog\"] for modals\n"
-        "- Never use #id selectors. Use the REAL UI ELEMENTS section below.\n\n"
+        "- Never use #id selectors. All selectors must come from the knowledge base or REAL UI ELEMENTS section below.\n\n"
         "You are an expert QA engineer for Zambeel, a B2B e-commerce platform.\n"
         "You write Playwright test scripts in Python that actually execute in a browser.\n\n"
         f"Ticket: {ticket_key}\n"
         f"Title: {title}\n"
         f"Description: {description}\n\n"
-        f"Relevant app context:\n{relevant_context}\n\n"
+        f"Relevant app context (includes full knowledge base):\n{relevant_context}\n\n"
         f"{selectors_context}\n\n"
         "Generate 3-5 test cases as JSON. Each test case must have:\n"
         "- test_name: string\n"
