@@ -249,30 +249,44 @@
 
 ---
 
-## Agency (Seller-side)
+## Agency — Agency-Side Routes (`/api/agency/*`)
 
-| Method | Path | Auth | Purpose |
-|--------|------|------|---------|
-| POST | `/agency/register` | verifyJWTWithRoles | Start agency registration |
-| POST | `/agency/register/complete` | verifyJWTWithRoles | Complete agency registration |
-| GET | `/agency/cities` | verifyJWTWithRoles | Get cities for country |
-| GET | `/agency/me` | verifyJWTWithRoles | Get current user's agency |
-| PUT | `/agency/settings` | verifyJWTWithRoles | Update agency settings |
-| POST | `/agency/connect` | verifyJWTWithRoles | Connect merchant to agency |
-| GET | `/agency/my-connection` | verifyJWTWithRoles | Get merchant's agency connection |
-| POST | `/agency/my-connection/disconnect` | verifyJWTWithRoles | Disconnect from agency |
-| GET | `/agency/dashboard` | verifyJWTWithRoles | Agency dashboard data |
-| GET | `/agency/merchants` | verifyJWTWithRoles | List agency merchants |
-| PATCH | `/agency/merchants/:id/status` | verifyJWTWithRoles | Accept/reject/disconnect merchant |
-| GET | `/agency/commission` | verifyJWTWithRoles | Commission data |
-| GET | `/agency/invoices` | verifyJWTWithRoles | Agency invoices list |
-| GET | `/agency/invoices/:id/download` | verifyJWTWithRoles | Download agency invoice PDF |
-| GET | `/agency/team-members` | verifyJWTWithRoles | List team members |
-| POST | `/agency/team-members/invite` | verifyJWTWithRoles | Invite team member |
-| DELETE | `/agency/team-members/:id` | verifyJWTWithRoles | Remove team member |
-| POST | `/agency/team-members/invite/preview` | verifyJWTWithRoles | Preview invite |
-| POST | `/agency/team-members/accept` | verifyJWTWithRoles | Accept team invite |
-| POST | `/agency/team-members/decline` | verifyJWTWithRoles | Decline team invite |
+> Source: source code (`/agency/*`) + PRD spec (`/api/agency/*`). Both path forms may appear depending on API base prefix.
+
+| Method | Path (source) | PRD Path | Purpose |
+|--------|--------------|----------|---------|
+| POST | `/agency/register` | `/api/agency/register` | Step 1: Submit agency application |
+| POST | `/agency/register/complete` | — | Step 2: Complete registration (upload confirm) |
+| POST | — | `/api/agency/resubmit` | Resubmit documents after OnHold |
+| GET | `/agency/cities` | — | Get cities list for a country |
+| GET | `/agency/me` | `/api/agency/status` | Get current user's agency status |
+| PUT | `/agency/settings` | `/api/agency/settings` | Update agency profile |
+| GET | `/agency/dashboard` | `/api/agency/dashboard?date_from&date_to` | Dashboard summary + store rows |
+| GET | `/agency/merchants` | `/api/agency/merchants?status&page&limit` | List merchant connections |
+| PATCH | `/agency/merchants/:id/status` | — | Accept/reject/disconnect (combined, source) |
+| POST | — | `/api/agency/merchants/:connectionId/accept` | Accept merchant request (PRD) |
+| POST | — | `/api/agency/merchants/:connectionId/reject` | Reject merchant request (PRD) |
+| GET | — | `/api/agency/merchants/:merchantId/summary` | Merchant drawer commission data (60s stale) |
+| GET | `/agency/commission` | `/api/agency/commission?date_from&date_to` | Commission records + summary |
+| GET | `/agency/invoices` | `/api/agency/invoices?status` | Agency invoices list |
+| GET | `/agency/invoices/:id/download` | — | Download agency invoice PDF (Bearer token) |
+| GET | `/agency/team-members` | `/api/agency/team` | List team members |
+| POST | `/agency/team-members/invite` | `/api/agency/team` | Invite (add) team member |
+| DELETE | `/agency/team-members/:id` | `/api/agency/team/:id` | Remove team member (soft-delete) |
+| POST | `/agency/team-members/invite/preview` | — | Preview invite token (get agency name) |
+| POST | `/agency/team-members/accept` | — | Accept team invite |
+| POST | `/agency/team-members/decline` | — | Decline team invite |
+
+## Agency — Merchant-Side Routes (`/api/merchant/agency/*`)
+
+> These routes are used by the seller (merchant) to manage their agency connection from their Profile page.
+
+| Method | Path (source) | PRD Path | Purpose |
+|--------|--------------|----------|---------|
+| POST | `/agency/connect` | `/api/merchant/agency/connect` | Send connection request to agency |
+| GET | `/agency/my-connection` | `/api/merchant/agency/status` | Get merchant's agency connection status |
+| DELETE | — | `/api/merchant/agency/request` | Cancel pending connection request |
+| POST | `/agency/my-connection/disconnect` | `/api/merchant/agency/disconnect` | Disconnect from agency (with reason) |
 
 ---
 
