@@ -1,6 +1,7 @@
 import asyncio
 import json
 import os
+import shutil
 import time
 import requests
 from datetime import datetime
@@ -1498,20 +1499,34 @@ async def get_api_test_inventory():
     return {"endpoints": items}
 
 
+def _find_npm() -> str:
+    extra = "/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/usr/bin:/bin"
+    augmented = extra + ":" + os.environ.get("PATH", "")
+    found = shutil.which("npm", path=augmented)
+    return found or "npm"
+
+
 @app.post("/api-tests/run")
 async def run_api_tests():
     async def generate():
         def evt(data: dict) -> str:
             return f"data: {json.dumps(data)}\n\n"
 
-        yield evt({"type": "start", "message": "Starting npm test..."})
+        npm_bin = _find_npm()
+        reports_dir = _jest.SUITE_PATH / "reports"
+        reports_dir.mkdir(parents=True, exist_ok=True)
+        results_file = reports_dir / "results.json"
+
+        yield evt({"type": "start", "message": f"Starting npm test via {npm_bin}..."})
         try:
+            sub_env = {**os.environ, "PATH": "/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/usr/bin:/bin:" + os.environ.get("PATH", "")}
             proc = await asyncio.create_subprocess_exec(
-                "npm", "test", "--", "--json",
-                f"--outputFile={_jest.SUITE_PATH / 'reports' / 'results.json'}",
+                npm_bin, "test", "--", "--json", "--forceExit",
+                f"--outputFile={results_file}",
                 cwd=str(_jest.SUITE_PATH),
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.STDOUT,
+                env=sub_env,
             )
             while True:
                 raw = await proc.stdout.readline()
