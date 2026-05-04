@@ -161,6 +161,7 @@ import tools.report_tool     as _report
 import tools.slack_tool      as _slack
 import tools.github_tool     as _github
 import tools.pr_review_tool  as _pr
+import tools.jest_tool       as _jest
 
 # ── Pydantic models ───────────────────────────────────────────────────────────
 
@@ -1413,3 +1414,135 @@ async def review_pr_endpoint(body: PRReviewBody):
     except Exception:
         pass
     return {"repo": body.repo, "pr_number": body.pr_number, "review": review_text}
+
+# ── /api-tests ─────────────────────────────────────────────────────────────────
+
+class CreateJiraBugsBody(BaseModel):
+    project_key: str = "OMS"
+    bugs: list[dict]
+
+@app.get("/api-tests/results")
+async def get_api_test_results():
+    try:
+        data = await asyncio.to_thread(_jest.get_results)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    if data is None:
+        return {"available": False, "message": "No results found. Run the test suite first."}
+    suites = data.get("testResults", [])
+    summary = {
+        "total": 0, "passed": 0, "failed": 0, "skipped": 0,
+        "perf":  {"pass": 0, "fail": 0},
+        "auth":  {"pass": 0, "fail": 0},
+        "valid": {"pass": 0, "fail": 0},
+        "sec":   {"pass": 0, "fail": 0},
+    }
+    failures = []
+    for suite in suites:
+        for t in suite.get("testResults", []):
+            title  = t.get("fullName", "")
+            status = t.get("status", "")
+            summary["total"] += 1
+            if status == "passed":
+                summary["passed"] += 1
+            elif status == "failed":
+                summary["failed"] += 1
+                failures.append({
+                    "title":   title,
+                    "suite":   suite.get("testFilePath", "").split("/")[-1],
+                    "message": (t.get("failureMessages") or [""])[0][:400],
+                })
+            else:
+                summary["skipped"] += 1
+            tag = None
+            if "[PERF]" in title:  tag = "perf"
+            elif "[AUTH]" in title: tag = "auth"
+            elif "[VALID]" in title: tag = "valid"
+            elif "[SEC]" in title:  tag = "sec"
+            if tag:
+                if status == "passed":  summary[tag]["pass"] += 1
+                elif status == "failed": summary[tag]["fail"] += 1
+    return {
+        "available":  True,
+        "summary":    summary,
+        "failures":   failures,
+        "timestamp":  data.get("startTime"),
+    }
+
+
+@app.get("/api-tests/sla")
+async def get_api_test_sla():
+    try:
+        data = await asyncio.to_thread(_jest.get_sla)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    entries = [{"key": k, **v} for k, v in data.items()]
+    return {"entries": entries}
+
+
+@app.get("/api-tests/baseline")
+async def get_api_test_baseline():
+    try:
+        md = await asyncio.to_thread(_jest.get_baseline_log)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    return {"markdown": md}
+
+
+@app.get("/api-tests/inventory")
+async def get_api_test_inventory():
+    try:
+        items = await asyncio.to_thread(_jest.get_inventory)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    return {"endpoints": items}
+
+
+@app.post("/api-tests/run")
+async def run_api_tests():
+    async def generate():
+        def evt(data: dict) -> str:
+            return f"data: {json.dumps(data)}\n\n"
+
+        yield evt({"type": "start", "message": "Starting npm test..."})
+        try:
+            proc = await asyncio.create_subprocess_exec(
+                "npm", "test", "--", "--json",
+                f"--outputFile={_jest.SUITE_PATH / 'reports' / 'results.json'}",
+                cwd=str(_jest.SUITE_PATH),
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.STDOUT,
+            )
+            while True:
+                raw = await proc.stdout.readline()
+                if not raw:
+                    break
+                yield evt({"type": "line", "text": raw.decode(errors="replace").rstrip("\n")})
+            exit_code = await proc.wait()
+            yield evt({"type": "done", "exitCode": exit_code, "passed": exit_code == 0})
+        except Exception as e:
+            yield evt({"type": "error", "message": str(e)})
+
+    return StreamingResponse(
+        generate(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no", "Connection": "keep-alive"},
+    )
+
+
+@app.post("/api-tests/create-jira-bugs")
+async def create_api_test_jira_bugs(body: CreateJiraBugsBody):
+    created, errors = [], []
+    for bug in body.bugs:
+        try:
+            key = await asyncio.to_thread(
+                _jira.create_ticket,
+                body.project_key,
+                bug.get("summary", "API Test Failure"),
+                "Bug",
+                bug.get("description", ""),
+            )
+            created.append({"key": key, "summary": bug.get("summary")})
+        except Exception as e:
+            errors.append({"summary": bug.get("summary"), "error": str(e)})
+    return {"created": created, "errors": errors}

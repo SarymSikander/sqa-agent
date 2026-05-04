@@ -18,7 +18,9 @@
       "Bash(git init *)",
       "Bash(git *)",
       "Bash(grep -v \"^$\")",
-      "Bash(GIT_ASKPASS=/usr/bin/true git *)"
+      "Bash(GIT_ASKPASS=/usr/bin/true git *)",
+      "Bash(brew install *)",
+      "Bash(pdftotext /Users/sarimsikandar/Desktop/Zambeel-Agency.pdf -)"
     ]
   }
 }

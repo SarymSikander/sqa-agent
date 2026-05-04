@@ -1278,6 +1278,9 @@
     <div class="nav-item" data-page="pr-review">
       <span class="nav-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="6" r="2"/><circle cx="6" cy="18" r="2"/><circle cx="18" cy="9" r="2"/><path d="M6 8v8"/><path d="M18 11v3a3 3 0 0 1-3 3H6"/><path d="M15 18l-2 2 2 2"/></svg></span> PR Review
     </div>
+    <div class="nav-item" data-page="api-tests">
+      <span class="nav-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg></span> API Tests
+    </div>
   </nav>
 
   <div class="sidebar-footer">
@@ -1611,6 +1614,112 @@
       </div>
     </section>
 
+    <!-- ── API Tests ────────────────────────────────────────────────────────── -->
+    <section id="page-api-tests" class="page">
+      <div class="page-inner">
+
+        <!-- 1. Header bar -->
+        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:20px">
+          <div>
+            <div style="font-size:18px;font-weight:600;color:var(--text)">API Test Suite</div>
+            <div id="at-last-run" style="font-size:12px;color:var(--text3);margin-top:2px">Last run: —</div>
+          </div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <button class="btn btn-primary btn-sm" id="at-run-btn" onclick="atRunSuite()">
+              <span class="spin" style="display:none"></span> Run Suite
+            </button>
+            <button class="btn btn-secondary btn-sm" onclick="atLoadAll()">Refresh</button>
+          </div>
+        </div>
+
+        <!-- 2. Live terminal (visible during/after run) -->
+        <div id="at-terminal-wrap" style="display:none;margin-bottom:20px">
+          <div style="font-size:12px;font-weight:600;color:var(--text2);margin-bottom:6px;text-transform:uppercase;letter-spacing:.06em">Live Output</div>
+          <div id="at-terminal" style="background:#0d1117;color:#c9d1d9;font-family:'JetBrains Mono',monospace;font-size:12px;line-height:1.6;padding:14px 16px;border-radius:8px;height:280px;overflow-y:auto;white-space:pre-wrap;border:1px solid var(--border)"></div>
+        </div>
+
+        <!-- 3. Dimension stat cards -->
+        <div id="at-cards" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px;margin-bottom:20px">
+          <div class="stat-card" id="at-card-perf">
+            <div class="stat-label">PERF</div>
+            <div class="stat-value" id="at-perf-val">—</div>
+            <div class="stat-sub" id="at-perf-sub"></div>
+          </div>
+          <div class="stat-card" id="at-card-auth">
+            <div class="stat-label">AUTH</div>
+            <div class="stat-value" id="at-auth-val">—</div>
+            <div class="stat-sub" id="at-auth-sub"></div>
+          </div>
+          <div class="stat-card" id="at-card-valid">
+            <div class="stat-label">VALID</div>
+            <div class="stat-value" id="at-valid-val">—</div>
+            <div class="stat-sub" id="at-valid-sub"></div>
+          </div>
+          <div class="stat-card" id="at-card-sec">
+            <div class="stat-label">SEC</div>
+            <div class="stat-value" id="at-sec-val">—</div>
+            <div class="stat-sub" id="at-sec-sub"></div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Total</div>
+            <div class="stat-value" id="at-total-val">—</div>
+            <div class="stat-sub" id="at-total-sub"></div>
+          </div>
+        </div>
+
+        <!-- 4. Failed tests / bugs table -->
+        <div style="margin-bottom:20px">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+            <div style="font-size:13px;font-weight:600;color:var(--text)">Failed Tests</div>
+            <button class="btn btn-danger btn-sm" id="at-jira-btn" onclick="atCreateJiraBugs()" style="display:none">
+              <span class="spin" style="display:none"></span> Create Jira Bugs
+            </button>
+          </div>
+          <div class="tbl-wrap">
+            <table>
+              <thead><tr><th>Suite</th><th>Test</th><th>Error</th></tr></thead>
+              <tbody id="at-failures-body"><tr class="empty-row"><td colspan="3">No data — run the suite or click Refresh</td></tr></tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- 5. SLA table -->
+        <div style="margin-bottom:20px">
+          <div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:8px">SLA Thresholds</div>
+          <div class="tbl-wrap">
+            <table>
+              <thead><tr><th>Key</th><th>p95 Baseline</th><th>Pass</th><th>Warn</th><th>Fail</th><th>Status</th></tr></thead>
+              <tbody id="at-sla-body"><tr class="empty-row"><td colspan="6">Loading…</td></tr></tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- 6. Dead endpoints -->
+        <div style="margin-bottom:20px">
+          <div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:8px">Dead Endpoints</div>
+          <div id="at-dead-list" style="color:var(--text3);font-size:13px">Loading…</div>
+        </div>
+
+        <!-- 7. Test inventory -->
+        <div style="margin-bottom:20px">
+          <div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:8px">Endpoint Inventory</div>
+          <div class="tbl-wrap">
+            <table>
+              <thead><tr><th>TC ID</th><th>Method</th><th>Endpoint</th><th>Priority</th><th>Auth</th><th>Roles</th></tr></thead>
+              <tbody id="at-inventory-body"><tr class="empty-row"><td colspan="6">Loading…</td></tr></tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- 8. Baseline log -->
+        <div style="margin-bottom:8px">
+          <div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:8px">Baseline Log</div>
+          <div id="at-baseline-log" style="background:var(--card);border:1px solid var(--border);border-radius:8px;padding:16px;max-height:320px;overflow-y:auto;font-size:12px;color:var(--text2)">Loading…</div>
+        </div>
+
+      </div>
+    </section>
+
   </main>
 </div><!-- /#app-shell -->
 
@@ -1861,7 +1970,7 @@ function btnLoad(id, on) {
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 const PAGE_LABELS = {
   overview: 'Overview', tests: 'Tests', jira: 'Jira',
-  reports: 'Reports', 'pr-review': 'PR Review',
+  reports: 'Reports', 'pr-review': 'PR Review', 'api-tests': 'API Tests',
 };
 
 function navigate(page) {
@@ -1879,6 +1988,7 @@ function onPageEnter(page) {
   if (page === 'overview')  loadOverview();
   if (page === 'tests')     loadScreenshots();
   if (page === 'reports')   reportsLoad();
+  if (page === 'api-tests') atLoadAll();
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -3097,6 +3207,215 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }, 30000);
 });
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// API Tests
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+let _atFailures = [];
+
+async function atLoadAll() {
+  await Promise.all([atLoadResults(), atLoadSla(), atLoadInventory(), atLoadBaseline()]);
+}
+
+function _atDimCard(id, valId, subId, data, label) {
+  const pass = data ? data.pass : 0;
+  const fail = data ? data.fail : 0;
+  const total = pass + fail;
+  const el = document.getElementById(id);
+  const isOk = fail === 0 && total > 0;
+  const hasFail = fail > 0;
+  el.style.borderColor = hasFail ? 'var(--error)' : (total > 0 ? 'var(--success)' : 'var(--border)');
+  document.getElementById(valId).textContent = total > 0 ? (hasFail ? `${fail} fail` : `${pass} pass`) : '—';
+  document.getElementById(valId).style.color = hasFail ? 'var(--error)' : (total > 0 ? 'var(--success)' : 'var(--text3)');
+  document.getElementById(subId).textContent = total > 0 ? `${pass}/${total}` : '';
+}
+
+async function atLoadResults() {
+  try {
+    const d = await api('/api-tests/results');
+    if (!d.available) {
+      document.getElementById('at-total-val').textContent = '—';
+      document.getElementById('at-total-sub').textContent = d.message || '';
+      _atFailures = [];
+      document.getElementById('at-jira-btn').style.display = 'none';
+      atRenderFailures([]);
+      return;
+    }
+    const s = d.summary;
+    document.getElementById('at-last-run').textContent = d.timestamp
+      ? 'Last run: ' + fmtDate(d.timestamp)
+      : 'Last run: —';
+    document.getElementById('at-total-val').textContent = s.failed > 0 ? `${s.failed} fail` : `${s.passed} pass`;
+    document.getElementById('at-total-val').style.color = s.failed > 0 ? 'var(--error)' : 'var(--success)';
+    document.getElementById('at-total-sub').textContent = `${s.passed}/${s.total}`;
+    _atDimCard('at-card-perf', 'at-perf-val', 'at-perf-sub', s.perf);
+    _atDimCard('at-card-auth', 'at-auth-val', 'at-auth-sub', s.auth);
+    _atDimCard('at-card-valid', 'at-valid-val', 'at-valid-sub', s.valid);
+    _atDimCard('at-card-sec',  'at-sec-val',  'at-sec-sub',  s.sec);
+    _atFailures = d.failures || [];
+    document.getElementById('at-jira-btn').style.display = _atFailures.length ? '' : 'none';
+    atRenderFailures(_atFailures);
+  } catch (e) {
+    document.getElementById('at-total-val').textContent = 'Error';
+    toast('Failed to load test results: ' + e.message, 'error');
+  }
+}
+
+function atRenderFailures(failures) {
+  const tbody = document.getElementById('at-failures-body');
+  if (!failures.length) {
+    tbody.innerHTML = '<tr class="empty-row"><td colspan="3">No failures — all tests passed or suite not yet run</td></tr>';
+    return;
+  }
+  tbody.innerHTML = failures.map(f => `
+    <tr>
+      <td class="td-mono">${esc(f.suite)}</td>
+      <td style="font-size:12px">${esc(f.title)}</td>
+      <td style="font-size:11px;color:var(--error);max-width:320px;white-space:pre-wrap;font-family:monospace">${esc(f.message)}</td>
+    </tr>`).join('');
+}
+
+async function atLoadSla() {
+  try {
+    const d = await api('/api-tests/sla');
+    const entries = d.entries || [];
+    const tbody = document.getElementById('at-sla-body');
+    if (!entries.length) {
+      tbody.innerHTML = '<tr class="empty-row"><td colspan="6">No SLA data found</td></tr>';
+      document.getElementById('at-dead-list').textContent = 'No dead endpoints found.';
+      return;
+    }
+    const dead = entries.filter(e => e.status === 'DEAD');
+    const live = entries.filter(e => e.status !== 'DEAD');
+    tbody.innerHTML = live.map(e => `
+      <tr>
+        <td class="td-mono">${esc(e.key)}</td>
+        <td class="td-mono">${e.p95_baseline != null ? e.p95_baseline + 'ms' : '—'}</td>
+        <td class="td-mono">${e.pass  != null ? e.pass  + 'ms' : '—'}</td>
+        <td class="td-mono">${e.warn  != null ? e.warn  + 'ms' : '—'}</td>
+        <td class="td-mono">${e.fail  != null ? e.fail  + 'ms' : '—'}</td>
+        <td>${e.p95_baseline != null ? '<span class="badge badge-pass">Active</span>' : '<span class="badge badge-neutral">No SLA</span>'}</td>
+      </tr>`).join('') || '<tr class="empty-row"><td colspan="6">No active SLA entries</td></tr>';
+    const deadWrap = document.getElementById('at-dead-list');
+    if (!dead.length) {
+      deadWrap.textContent = 'No dead endpoints.';
+    } else {
+      deadWrap.innerHTML = dead.map(e =>
+        `<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--border)">
+          <span class="badge badge-fail">DEAD</span>
+          <span class="td-mono" style="font-size:12px">${esc(e.key)}</span>
+        </div>`).join('');
+    }
+  } catch (e) {
+    document.getElementById('at-sla-body').innerHTML = '<tr class="empty-row"><td colspan="6">Error loading SLA data</td></tr>';
+  }
+}
+
+async function atLoadInventory() {
+  try {
+    const d = await api('/api-tests/inventory');
+    const eps = d.endpoints || [];
+    const tbody = document.getElementById('at-inventory-body');
+    if (!eps.length) {
+      tbody.innerHTML = '<tr class="empty-row"><td colspan="6">No inventory data found</td></tr>';
+      return;
+    }
+    const priColor = { P0: 'var(--error)', P1: 'var(--warn)', P2: 'var(--text3)' };
+    tbody.innerHTML = eps.map(e => `
+      <tr>
+        <td class="td-mono">${esc(e.id)}</td>
+        <td><span class="badge badge-info">${esc(e.method)}</span></td>
+        <td class="td-mono" style="font-size:12px">${esc(e.path)}</td>
+        <td style="color:${priColor[e.priority]||'var(--text)'};font-weight:600;font-size:12px">${esc(e.priority)}</td>
+        <td>${e.authRequired ? '<span class="badge badge-warn">Auth</span>' : '<span class="badge badge-neutral">Public</span>'}</td>
+        <td style="font-size:11px;color:var(--text3)">${(e.roles||[]).join(', ')||'—'}</td>
+      </tr>`).join('');
+  } catch (e) {
+    document.getElementById('at-inventory-body').innerHTML = '<tr class="empty-row"><td colspan="6">Error loading inventory</td></tr>';
+  }
+}
+
+async function atLoadBaseline() {
+  const el = document.getElementById('at-baseline-log');
+  try {
+    const d = await api('/api-tests/baseline');
+    el.innerHTML = renderMd(d.markdown || '_No baseline log._');
+  } catch (e) {
+    el.textContent = 'Error loading baseline log.';
+  }
+}
+
+async function atRunSuite() {
+  const btn = document.getElementById('at-run-btn');
+  btnLoad('at-run-btn', true);
+  const termWrap = document.getElementById('at-terminal-wrap');
+  const term = document.getElementById('at-terminal');
+  termWrap.style.display = '';
+  term.textContent = '';
+
+  function appendLine(text) {
+    term.textContent += text + '\n';
+    term.scrollTop = term.scrollHeight;
+  }
+
+  try {
+    const res = await fetch(API_BASE + '/api-tests/run', { method: 'POST', headers: { 'Content-Type': 'application/json' } });
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buf = '';
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buf += decoder.decode(value, { stream: true });
+      const parts = buf.split('\n\n');
+      buf = parts.pop();
+      for (const part of parts) {
+        const line = part.replace(/^data: /, '').trim();
+        if (!line) continue;
+        try {
+          const evt = JSON.parse(line);
+          if (evt.type === 'line') appendLine(evt.text);
+          else if (evt.type === 'start') appendLine('▶ ' + evt.message);
+          else if (evt.type === 'done') {
+            appendLine(evt.passed ? '\n✅ All tests passed.' : '\n❌ Tests completed with failures.');
+            await atLoadResults();
+          }
+          else if (evt.type === 'error') appendLine('⚠ Error: ' + evt.message);
+        } catch {}
+      }
+    }
+  } catch (e) {
+    appendLine('⚠ Connection error: ' + e.message);
+    toast('Run failed: ' + e.message, 'error');
+  } finally {
+    btnLoad('at-run-btn', false);
+  }
+}
+
+async function atCreateJiraBugs() {
+  if (!_atFailures.length) return;
+  btnLoad('at-jira-btn', true);
+  const bugs = _atFailures.map(f => ({
+    summary: `[API Test Failure] ${f.suite} — ${f.title.replace(/\[TC_\d+\]\s*/g, '').slice(0, 120)}`,
+    description: `Test: ${f.title}\nSuite: ${f.suite}\n\nError:\n${f.message}`,
+  }));
+  try {
+    const d = await api('/api-tests/create-jira-bugs', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ bugs }),
+    });
+    const created = d.created || [];
+    const errors = d.errors || [];
+    if (created.length) toast(`Created ${created.length} Jira bug(s): ${created.map(c => c.key).join(', ')}`, 'success');
+    if (errors.length) toast(`${errors.length} bug(s) failed to create`, 'error');
+  } catch (e) {
+    toast('Jira bug creation failed: ' + e.message, 'error');
+  } finally {
+    btnLoad('at-jira-btn', false);
+  }
+}
 </script>
 </body>
 </html>
