@@ -1,0 +1,16 @@
+{
+  "name": "zambeel-api-tests",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "test": "jest",
+    "test:ci": "jest --ci --json --outputFile=reports/results.json --forceExit"
+  },
+  "dependencies": {
+    "dotenv": "^16.5.0",
+    "supertest": "^6.3.4"
+  },
+  "devDependencies": {
+    "jest": "^29.7.0"
+  }
+}

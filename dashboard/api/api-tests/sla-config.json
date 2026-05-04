@@ -1,0 +1,9 @@
+{
+  "_comment": "SLA thresholds in ms. Run npm run calibrate to populate from live system.",
+  "health": {
+    "pass": 500,
+    "warn": 1000,
+    "fail": 2000,
+    "p95_baseline": 400
+  }
+}

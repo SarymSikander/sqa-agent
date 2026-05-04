@@ -1,0 +1,12 @@
+[
+  {
+    "id": "TC_001",
+    "method": "GET",
+    "path": "/api/health",
+    "authRequired": false,
+    "roles": [],
+    "category": "health",
+    "priority": "P0",
+    "slaKey": "health"
+  }
+]

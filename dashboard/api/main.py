@@ -1499,11 +1499,10 @@ async def get_api_test_inventory():
     return {"endpoints": items}
 
 
-def _find_npm() -> str:
+def _find_npm() -> str | None:
     extra = "/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/usr/bin:/bin"
     augmented = extra + ":" + os.environ.get("PATH", "")
-    found = shutil.which("npm", path=augmented)
-    return found or "npm"
+    return shutil.which("npm", path=augmented)
 
 
 @app.post("/api-tests/run")
@@ -1513,6 +1512,13 @@ async def run_api_tests():
             return f"data: {json.dumps(data)}\n\n"
 
         npm_bin = _find_npm()
+        if npm_bin is None:
+            yield evt({
+                "type": "unavailable",
+                "message": "API Tests require Node.js/npm which is not available on the cloud server. Run the SQA agent locally to execute API tests.",
+            })
+            return
+
         reports_dir = _jest.SUITE_PATH / "reports"
         reports_dir.mkdir(parents=True, exist_ok=True)
         results_file = reports_dir / "results.json"

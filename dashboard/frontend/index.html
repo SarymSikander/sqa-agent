@@ -1632,7 +1632,18 @@
           </div>
         </div>
 
-        <!-- 2. Live terminal (visible during/after run) -->
+        <!-- 2a. Cloud unavailable notice -->
+        <div id="at-unavailable-notice" style="display:none;margin-bottom:20px;padding:16px 18px;border-radius:8px;border:1px solid var(--warn, #e6a817);background:rgba(230,168,23,.08);display:none">
+          <div style="display:flex;align-items:flex-start;gap:10px">
+            <span style="font-size:20px;line-height:1.2">🖥️</span>
+            <div>
+              <div style="font-weight:600;color:var(--text);margin-bottom:4px">Not available on cloud</div>
+              <div id="at-unavailable-msg" style="font-size:13px;color:var(--text2);line-height:1.5"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 2b. Live terminal (visible during/after run) -->
         <div id="at-terminal-wrap" style="display:none;margin-bottom:20px">
           <div style="font-size:12px;font-weight:600;color:var(--text2);margin-bottom:6px;text-transform:uppercase;letter-spacing:.06em">Live Output</div>
           <div id="at-terminal" style="background:#0d1117;color:#c9d1d9;font-family:'JetBrains Mono',monospace;font-size:12px;line-height:1.6;padding:14px 16px;border-radius:8px;height:280px;overflow-y:auto;white-space:pre-wrap;border:1px solid var(--border)"></div>
@@ -3350,7 +3361,10 @@ async function atRunSuite() {
   const btn = document.getElementById('at-run-btn');
   btnLoad('at-run-btn', true);
   const termWrap = document.getElementById('at-terminal-wrap');
+  const unavailNotice = document.getElementById('at-unavailable-notice');
+  const unavailMsg = document.getElementById('at-unavailable-msg');
   const term = document.getElementById('at-terminal');
+  unavailNotice.style.display = 'none';
   termWrap.style.display = '';
   term.textContent = '';
 
@@ -3382,6 +3396,11 @@ async function atRunSuite() {
             await atLoadResults();
           }
           else if (evt.type === 'error') appendLine('⚠ Error: ' + evt.message);
+          else if (evt.type === 'unavailable') {
+            termWrap.style.display = 'none';
+            unavailMsg.textContent = evt.message;
+            unavailNotice.style.display = '';
+          }
         } catch {}
       }
     }
