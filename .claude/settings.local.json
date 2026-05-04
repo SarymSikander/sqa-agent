@@ -20,7 +20,14 @@
       "Bash(grep -v \"^$\")",
       "Bash(GIT_ASKPASS=/usr/bin/true git *)",
       "Bash(brew install *)",
-      "Bash(pdftotext /Users/sarimsikandar/Desktop/Zambeel-Agency.pdf -)"
+      "Bash(pdftotext /Users/sarimsikandar/Desktop/Zambeel-Agency.pdf -)",
+      "Read(//Users/sarimsikandar/Desktop/**)",
+      "Read(//Users/sarimsikandar/Desktop/api-test-suite/**)",
+      "Bash(npm test *)",
+      "Bash(node -e \"console.log\\('node works'\\)\")",
+      "Bash(npx jest *)",
+      "Read(//opt/homebrew/lib/node_modules/npm/bin/**)",
+      "Read(//usr/local/lib/node_modules/npm/bin/**)"
     ]
   }
 }
