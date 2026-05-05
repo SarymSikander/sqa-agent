@@ -2,10 +2,13 @@ import asyncio
 import json
 import os
 import re
+import secrets
 import shutil
 import time
 import requests
-from datetime import datetime, timezone
+import bcrypt
+import jwt as _jwt
+from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from typing import Any, Optional
 
@@ -15,9 +18,9 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-from fastapi import FastAPI, File, HTTPException, UploadFile
+from fastapi import FastAPI, File, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import StreamingResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
@@ -31,6 +34,55 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# ── Auth config ───────────────────────────────────────────────────────────────
+# SESSION_SECRET: JWT signing key.  Falls back to a random value so local dev
+# works without config — set it explicitly on HF Space for persistence.
+SESSION_SECRET = os.getenv("SESSION_SECRET") or secrets.token_hex(32)
+SESSION_HOURS  = 8
+
+# SQA_USERS: JSON array of {"email": "...", "password": "<bcrypt hash>"}
+# Build a dict keyed by email for O(1) lookup.
+_users_raw = os.getenv("SQA_USERS", "[]")
+try:
+    _USERS: dict[str, dict] = {u["email"]: u for u in json.loads(_users_raw)}
+except Exception:
+    _USERS = {}
+
+# Paths that bypass the auth middleware
+_AUTH_EXEMPT = {
+    ("POST", "/auth/login"),
+    ("GET",  "/health"),
+    # Upload endpoints are called by GitHub Actions (no user session)
+    ("POST", "/api-tests/upload-results"),
+    ("POST", "/api-tests/upload-sla"),
+    ("POST", "/api-tests/upload-inventory"),
+    ("POST", "/api-tests/upload-baseline"),
+}
+
+
+@app.middleware("http")
+async def _auth_middleware(request: Request, call_next):
+    # Always pass CORS pre-flight through
+    if request.method == "OPTIONS":
+        return await call_next(request)
+
+    if (request.method, request.url.path) in _AUTH_EXEMPT:
+        return await call_next(request)
+
+    auth = request.headers.get("Authorization", "")
+    if not auth.startswith("Bearer "):
+        return JSONResponse({"detail": "Not authenticated"}, status_code=401)
+
+    token = auth.removeprefix("Bearer ").strip()
+    try:
+        _jwt.decode(token, SESSION_SECRET, algorithms=["HS256"])
+    except _jwt.ExpiredSignatureError:
+        return JSONResponse({"detail": "Session expired — please sign in again"}, status_code=401)
+    except _jwt.InvalidTokenError:
+        return JSONResponse({"detail": "Invalid token"}, status_code=401)
+
+    return await call_next(request)
 
 _HERE = Path(__file__).resolve().parent
 SCREENSHOTS_DIR = _HERE / "screenshots"
@@ -280,6 +332,52 @@ def health():
     app_contents = _os.listdir("/app") if _os.path.exists("/app") else None
     auth_contents = _os.listdir("/app/auth") if _os.path.exists("/app/auth") else None
     return {"status": "ok", "app_dir": app_contents, "auth_dir": auth_contents}
+
+
+# ── User auth ─────────────────────────────────────────────────────────────────
+
+class LoginBody(BaseModel):
+    email: str
+    password: str
+
+
+@app.post("/auth/login")
+async def login(body: LoginBody):
+    user = _USERS.get(body.email)
+    if not user:
+        raise HTTPException(status_code=401, detail="Invalid email or password")
+    try:
+        match = await asyncio.to_thread(
+            bcrypt.checkpw, body.password.encode(), user["password"].encode()
+        )
+    except Exception:
+        match = False
+    if not match:
+        raise HTTPException(status_code=401, detail="Invalid email or password")
+
+    exp = datetime.now(tz=timezone.utc) + timedelta(hours=SESSION_HOURS)
+    token = _jwt.encode(
+        {"email": body.email, "exp": exp, "iat": datetime.now(tz=timezone.utc)},
+        SESSION_SECRET,
+        algorithm="HS256",
+    )
+    return {"token": token, "user": {"email": body.email}}
+
+
+@app.post("/auth/logout")
+async def logout():
+    return {"success": True}
+
+
+@app.get("/auth/me")
+async def me(request: Request):
+    # Middleware already validated the token; just decode for the payload.
+    token = request.headers.get("Authorization", "").removeprefix("Bearer ").strip()
+    try:
+        payload = _jwt.decode(token, SESSION_SECRET, algorithms=["HS256"])
+    except Exception:
+        raise HTTPException(status_code=401, detail="Invalid token")
+    return {"email": payload.get("email")}
 
 # ── /auth ─────────────────────────────────────────────────────────────────────
 

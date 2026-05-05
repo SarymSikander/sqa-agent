@@ -1268,6 +1268,43 @@
 </head>
 <body>
 
+<!-- ── Login overlay ─────────────────────────────────────────────────────────── -->
+<div id="login-overlay" style="position:fixed;inset:0;background:#0f0f18;display:flex;align-items:center;justify-content:center;z-index:9999;padding:16px">
+  <div style="background:#1a1a2e;border:1px solid rgba(139,92,246,0.25);border-radius:14px;padding:40px 36px;width:100%;max-width:380px;box-shadow:0 24px 64px rgba(0,0,0,0.6)">
+    <!-- Logo -->
+    <div style="text-align:center;margin-bottom:32px">
+      <div style="display:inline-flex;align-items:center;justify-content:center;width:48px;height:48px;background:linear-gradient(135deg,#5B3DF5,#8b5cf6);border-radius:12px;margin-bottom:14px">
+        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3v11.5a3.5 3.5 0 0 0 7 0V3"/><path d="M6.5 21h11"/><path d="M9 3h6"/></svg>
+      </div>
+      <div style="font-size:20px;font-weight:700;color:#f1f5f9;letter-spacing:-.3px">Zambeel SQA</div>
+      <div style="font-size:12px;color:#64748b;margin-top:4px">SQA Intelligence Platform</div>
+    </div>
+    <!-- Fields -->
+    <div style="margin-bottom:14px">
+      <label style="display:block;font-size:12px;font-weight:600;color:#94a3b8;margin-bottom:6px;letter-spacing:.04em;text-transform:uppercase">Email</label>
+      <input id="login-email" type="email" autocomplete="email" placeholder="you@zambeel.com"
+        style="width:100%;box-sizing:border-box;background:#0f0f18;border:1px solid rgba(255,255,255,0.1);border-radius:8px;padding:10px 12px;font-size:13px;color:#f1f5f9;outline:none;transition:border-color .15s"
+        onfocus="this.style.borderColor='rgba(139,92,246,0.6)'" onblur="this.style.borderColor='rgba(255,255,255,0.1)'"
+        onkeydown="if(event.key==='Enter')document.getElementById('login-password').focus()">
+    </div>
+    <div style="margin-bottom:20px">
+      <label style="display:block;font-size:12px;font-weight:600;color:#94a3b8;margin-bottom:6px;letter-spacing:.04em;text-transform:uppercase">Password</label>
+      <input id="login-password" type="password" autocomplete="current-password" placeholder="••••••••"
+        style="width:100%;box-sizing:border-box;background:#0f0f18;border:1px solid rgba(255,255,255,0.1);border-radius:8px;padding:10px 12px;font-size:13px;color:#f1f5f9;outline:none;transition:border-color .15s"
+        onfocus="this.style.borderColor='rgba(139,92,246,0.6)'" onblur="this.style.borderColor='rgba(255,255,255,0.1)'"
+        onkeydown="if(event.key==='Enter')doLogin()">
+    </div>
+    <!-- Error -->
+    <div id="login-error" style="display:none;background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.3);border-radius:6px;padding:9px 12px;font-size:12px;color:#f87171;margin-bottom:16px"></div>
+    <!-- Button -->
+    <button id="login-btn" onclick="doLogin()"
+      style="width:100%;background:linear-gradient(135deg,#5B3DF5,#7c3aed);border:none;border-radius:8px;padding:11px;font-size:14px;font-weight:600;color:#fff;cursor:pointer;transition:opacity .15s;letter-spacing:.01em"
+      onmouseover="this.style.opacity='.88'" onmouseout="this.style.opacity='1'">
+      Sign In
+    </button>
+  </div>
+</div>
+
 <!-- ── Top gradient bar ──────────────────────────────────────────────────────── -->
 <div id="top-gradient-bar"></div>
 
@@ -1300,6 +1337,15 @@
   </nav>
 
   <div class="sidebar-footer">
+    <div id="sidebar-user" style="margin-bottom:12px;padding-bottom:12px;border-bottom:1px solid var(--border)">
+      <div id="sidebar-user-email" style="font-size:11px;color:var(--text3);margin-bottom:7px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:180px"></div>
+      <button onclick="doLogout()"
+        style="font-size:11px;color:var(--text3);background:none;border:1px solid var(--border);border-radius:5px;padding:4px 10px;cursor:pointer;transition:color .15s,border-color .15s"
+        onmouseover="this.style.color='var(--error)';this.style.borderColor='var(--error)'"
+        onmouseout="this.style.color='var(--text3)';this.style.borderColor='var(--border)'">
+        Sign out
+      </button>
+    </div>
     <div class="api-status">
       <div class="api-dot" id="api-dot"></div>
       <span id="api-status-text">Connecting…</span>
@@ -1308,7 +1354,7 @@
 </aside>
 
 <!-- ── App shell ──────────────────────────────────────────────────────────────── -->
-<div id="app-shell">
+<div id="app-shell" style="display:none">
 
   <!-- ── Top bar ──────────────────────────────────────────────────────────────── -->
   <header id="topbar">
@@ -1994,6 +2040,75 @@
 const CLOUD_API = 'https://sarimsikander-zambeel-sqa.hf.space';
 const API_BASE  = CLOUD_API;
 
+// ── Auth state ────────────────────────────────────────────────────────────────
+// Token lives in sessionStorage — clears automatically when the tab is closed.
+let _authToken = sessionStorage.getItem('sqa_token') || null;
+
+function _showLogin() {
+  document.getElementById('login-overlay').style.display = 'flex';
+  document.getElementById('app-shell').style.display = 'none';
+  document.getElementById('login-error').style.display = 'none';
+  document.getElementById('login-email').value = '';
+  document.getElementById('login-password').value = '';
+}
+
+function _showDashboard(email) {
+  document.getElementById('login-overlay').style.display = 'none';
+  document.getElementById('app-shell').style.display = '';
+  if (email) document.getElementById('sidebar-user-email').textContent = email;
+}
+
+async function doLogin() {
+  const btn   = document.getElementById('login-btn');
+  const errEl = document.getElementById('login-error');
+  const email = document.getElementById('login-email').value.trim();
+  const pass  = document.getElementById('login-password').value;
+  if (!email || !pass) { errEl.textContent = 'Enter your email and password.'; errEl.style.display = ''; return; }
+  btn.disabled = true; btn.textContent = 'Signing in…';
+  errEl.style.display = 'none';
+  try {
+    const res = await fetch(API_BASE + '/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password: pass }),
+    });
+    if (!res.ok) {
+      const d = await res.json().catch(() => ({}));
+      throw new Error(d.detail || 'Invalid email or password');
+    }
+    const d = await res.json();
+    _authToken = d.token;
+    sessionStorage.setItem('sqa_token', _authToken);
+    _showDashboard(d.user?.email || email);
+    loadOverview();
+  } catch (e) {
+    errEl.textContent = e.message;
+    errEl.style.display = '';
+  } finally {
+    btn.disabled = false; btn.textContent = 'Sign In';
+  }
+}
+
+async function doLogout() {
+  try { await api('/auth/logout', { method: 'POST' }); } catch {}
+  _authToken = null;
+  sessionStorage.removeItem('sqa_token');
+  _showLogin();
+}
+
+async function _initAuth() {
+  if (!_authToken) { _showLogin(); return; }
+  try {
+    const me = await api('/auth/me');
+    _showDashboard(me.email);
+    loadOverview();
+  } catch {
+    _authToken = null;
+    sessionStorage.removeItem('sqa_token');
+    _showLogin();
+  }
+}
+
 // ── State ─────────────────────────────────────────────────────────────────────
 const state = {
   testEnv:      'staging',
@@ -2018,10 +2133,15 @@ function toast(msg, type = 'info', dur = 3000) {
 // API
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 async function api(path, opts = {}) {
-  const res = await fetch(API_BASE + path, {
-    headers: { 'Content-Type': 'application/json', ...(opts.headers || {}) },
-    ...opts,
-  });
+  const headers = { 'Content-Type': 'application/json', ...(opts.headers || {}) };
+  if (_authToken) headers['Authorization'] = 'Bearer ' + _authToken;
+  const res = await fetch(API_BASE + path, { headers, ...opts });
+  if (res.status === 401) {
+    _authToken = null;
+    sessionStorage.removeItem('sqa_token');
+    _showLogin();
+    throw new Error('Session expired — please sign in again');
+  }
   if (!res.ok) {
     let detail = `HTTP ${res.status}`;
     try { detail = (await res.json()).detail || detail; } catch {}
@@ -3261,21 +3381,23 @@ document.addEventListener('DOMContentLoaded', () => {
     if (document.getElementById('lightbox').classList.contains('open'))     { closeLightbox();   return; }
   });
 
-  // API health check
-  api('/health').then(() => {
-    document.getElementById('api-dot').classList.remove('offline');
-    document.getElementById('api-status-text').textContent = 'API Connected';
+  // API health check (use raw fetch — /health is auth-exempt)
+  fetch(API_BASE + '/health').then(r => {
+    if (r.ok) {
+      document.getElementById('api-dot').classList.remove('offline');
+      document.getElementById('api-status-text').textContent = 'API Connected';
+    } else { throw new Error(); }
   }).catch(() => {
     document.getElementById('api-dot').classList.add('offline');
     document.getElementById('api-status-text').textContent = 'API Offline';
   });
 
-  // Initial page
-  loadOverview();
+  // Auth check — shows login or dashboard
+  _initAuth();
 
-  // Auto-refresh every 30 seconds (only when on overview)
+  // Auto-refresh every 30 seconds (only when on overview and authenticated)
   setInterval(() => {
-    if (document.getElementById('page-overview').classList.contains('active')) {
+    if (_authToken && document.getElementById('page-overview').classList.contains('active')) {
       loadOverview();
     }
   }, 30000);
