@@ -50,14 +50,10 @@ except Exception:
     _USERS = {}
 
 # Paths that bypass the auth middleware
+_AUTH_EXEMPT_PREFIXES = ("/api-tests/",)
 _AUTH_EXEMPT = {
     ("POST", "/auth/login"),
     ("GET",  "/health"),
-    # Upload endpoints are called by GitHub Actions (no user session)
-    ("POST", "/api-tests/upload-results"),
-    ("POST", "/api-tests/upload-sla"),
-    ("POST", "/api-tests/upload-inventory"),
-    ("POST", "/api-tests/upload-baseline"),
 }
 
 
@@ -68,6 +64,11 @@ async def _auth_middleware(request: Request, call_next):
         return await call_next(request)
 
     if (request.method, request.url.path) in _AUTH_EXEMPT:
+        return await call_next(request)
+
+    # All /api-tests/* routes are exempt — called by both GitHub Actions
+    # (no session) and the frontend before the token is attached.
+    if any(request.url.path.startswith(p) for p in _AUTH_EXEMPT_PREFIXES):
         return await call_next(request)
 
     auth = request.headers.get("Authorization", "")
