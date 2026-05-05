@@ -1269,39 +1269,136 @@
 <body>
 
 <!-- ── Login overlay ─────────────────────────────────────────────────────────── -->
-<div id="login-overlay" style="position:fixed;inset:0;background:#0f0f18;display:flex;align-items:center;justify-content:center;z-index:9999;padding:16px">
-  <div style="background:#1a1a2e;border:1px solid rgba(139,92,246,0.25);border-radius:14px;padding:40px 36px;width:100%;max-width:380px;box-shadow:0 24px 64px rgba(0,0,0,0.6)">
+<!-- ── Login overlay ─────────────────────────────────────────────────────────── -->
+<style>
+  #login-overlay {
+    position: fixed; inset: 0; z-index: 9999;
+    display: flex; align-items: center; justify-content: center;
+    padding: 16px;
+    background: linear-gradient(145deg, #0a0f2e 0%, #12083a 50%, #1a0a3e 100%);
+    overflow: hidden;
+  }
+  /* Geometric background shapes */
+  #login-overlay::before, #login-overlay::after {
+    content: '';
+    position: absolute;
+    pointer-events: none;
+  }
+  #login-overlay::before {
+    top: -10%; left: -8%;
+    width: 55%; height: 70%;
+    background: rgba(255,255,255,0.025);
+    clip-path: polygon(0 0, 100% 15%, 80% 100%, 0% 85%);
+    transform: rotate(-4deg);
+  }
+  #login-overlay::after {
+    bottom: -12%; right: -6%;
+    width: 50%; height: 65%;
+    background: rgba(255,255,255,0.02);
+    clip-path: polygon(20% 0, 100% 10%, 100% 100%, 0% 90%);
+    transform: rotate(3deg);
+  }
+  .lc-geo-1, .lc-geo-2, .lc-geo-3 {
+    position: absolute; pointer-events: none;
+  }
+  .lc-geo-1 {
+    top: 8%; right: 5%; width: 28%; height: 40%;
+    background: rgba(108,71,255,0.07);
+    clip-path: polygon(30% 0%, 100% 0%, 70% 100%, 0% 100%);
+  }
+  .lc-geo-2 {
+    bottom: 5%; left: 2%; width: 22%; height: 30%;
+    background: rgba(255,255,255,0.03);
+    clip-path: polygon(0 20%, 100% 0%, 100% 80%, 0% 100%);
+  }
+  .lc-geo-3 {
+    top: 40%; right: 15%; width: 18%; height: 25%;
+    background: rgba(108,71,255,0.04);
+    clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%);
+  }
+  /* Card */
+  #login-card {
+    position: relative; z-index: 1;
+    background: #ffffff;
+    border-radius: 12px;
+    padding: 40px;
+    width: 100%; max-width: 420px;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.45), 0 4px 16px rgba(0,0,0,0.3);
+  }
+  .lc-field-label {
+    display: block; font-size: 13px; font-weight: 600;
+    color: #374151; margin-bottom: 7px;
+  }
+  .lc-input {
+    width: 100%; box-sizing: border-box;
+    border: 1px solid #e0e0e0; border-radius: 6px;
+    padding: 10px 14px; font-size: 14px; color: #1a1a2e;
+    background: #fff; outline: none;
+    transition: border-color .15s, box-shadow .15s;
+    font-family: inherit;
+  }
+  .lc-input:focus { border-color: #6c47ff; box-shadow: 0 0 0 3px rgba(108,71,255,0.12); }
+  .lc-input::placeholder { color: #b0b8c8; }
+  #login-btn {
+    width: 100%; border: none; border-radius: 6px;
+    padding: 12px; font-size: 15px; font-weight: 700;
+    color: #fff; cursor: pointer; letter-spacing: .02em;
+    background: linear-gradient(135deg, #1a1a4e 0%, #3d1a6e 100%);
+    transition: opacity .15s, box-shadow .15s;
+    box-shadow: 0 4px 14px rgba(61,26,110,0.4);
+    font-family: inherit;
+  }
+  #login-btn:hover { opacity: .88; box-shadow: 0 6px 20px rgba(61,26,110,0.5); }
+  #login-btn:disabled { opacity: .65; cursor: default; }
+  #login-error {
+    display: none; border-radius: 6px; padding: 9px 13px;
+    font-size: 13px; color: #ef4444; margin-bottom: 16px;
+    background: #fff5f5; border: 1px solid #fecaca;
+  }
+</style>
+<div id="login-overlay">
+  <div class="lc-geo-1"></div>
+  <div class="lc-geo-2"></div>
+  <div class="lc-geo-3"></div>
+  <div id="login-card">
     <!-- Logo -->
-    <div style="text-align:center;margin-bottom:32px">
-      <div style="display:inline-flex;align-items:center;justify-content:center;width:48px;height:48px;background:linear-gradient(135deg,#5B3DF5,#8b5cf6);border-radius:12px;margin-bottom:14px">
-        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3v11.5a3.5 3.5 0 0 0 7 0V3"/><path d="M6.5 21h11"/><path d="M9 3h6"/></svg>
+    <div style="margin-bottom:28px">
+      <div style="margin-bottom:6px">
+        <svg width="130" height="37" viewBox="0 0 326 93" fill="none" xmlns="http://www.w3.org/2000/svg"><g clip-path="url(#lc_clip)"><path d="M118.745 61.5854C117.073 61.5854 115.518 61.2367 114.079 60.462C112.64 59.726 111.474 58.6801 110.54 57.4017C109.685 58.6801 108.557 59.6872 107.196 60.462C105.836 61.2367 104.319 61.5854 102.686 61.5854H94.9871C92.4208 61.5854 90.2044 60.6944 88.3769 58.835C86.5494 57.0144 85.6162 54.8063 85.6162 52.2496V40.977C85.6162 38.0717 86.3161 35.4376 87.7548 33.0359C89.1935 30.6341 91.1376 28.6973 93.5484 27.264C95.9592 25.8307 98.6032 25.1334 101.52 25.1334H102.686C104.941 25.1334 106.924 25.8307 108.635 27.264C111.474 27.3415 113.884 28.3486 115.829 30.2855C117.773 32.2224 118.745 34.5854 118.745 37.3745V61.5854ZM108.752 53.1406C108.635 52.5983 108.596 43.9986 108.596 27.264H107.974C104.863 27.264 102.219 28.3874 100.003 30.5954C97.7867 32.8034 96.698 35.4376 96.698 38.5366V46.5165C96.698 48.3372 97.359 49.8867 98.6421 51.2037C99.9642 52.4821 101.52 53.1406 103.347 53.1406H108.752Z" fill="#1A2B6F"/><path d="M179.131 61.5854H172.443C171.51 61.5854 170.576 61.4692 169.682 61.2367C167.466 60.6557 165.638 59.4548 164.199 57.6341C162.761 55.8522 162.022 53.7991 162.022 51.4362V38.2654C162.022 36.9483 161.711 35.9412 161.05 35.2826C160.389 34.6628 159.65 34.3142 158.717 34.3142L158.25 34.3529H152.418C152.457 34.6241 152.457 43.6887 152.457 61.5466C149.657 61.5466 147.285 60.5395 145.302 58.5638C143.319 56.5882 142.308 54.1865 142.308 51.4362V38.2654C142.308 36.9096 141.997 35.9412 141.336 35.2826C140.714 34.6628 139.936 34.3142 139.003 34.3142L138.536 34.3529H133.132C133.171 34.6241 133.171 43.6887 133.171 61.5854C130.371 61.5854 127.96 60.5782 125.977 58.6026C123.994 56.627 122.983 54.264 122.983 51.4749V25.0172C125.316 25.0172 127.377 25.7145 129.204 27.1478C131.071 25.7145 133.209 25.0172 135.659 25.0172H142.308C144.68 25.0172 146.819 25.792 148.685 27.3027C150.59 25.792 152.807 25.0172 155.334 25.0172H162.022C164.161 25.0172 165.91 25.4433 167.271 26.2956C169.76 27.8838 171.354 30.5954 172.015 34.4692C172.365 36.561 172.52 39.2726 172.52 42.6428C172.52 43.5337 172.52 44.4247 172.482 45.2769L172.443 48.3759C172.443 49.693 172.754 50.7001 173.415 51.3587C174.076 51.9785 174.853 52.2884 175.787 52.2884H189.279C189.279 54.8451 188.268 57.0144 186.285 58.835C184.302 60.6557 181.891 61.5854 179.131 61.5854Z" fill="#1A2B6F"/><path d="M198.417 25.1334C201.333 25.1334 203.977 25.8307 206.388 27.264C208.799 28.6973 210.704 30.6341 212.143 33.0359C213.581 35.4376 214.32 38.0717 214.32 40.977V52.2496C214.32 54.8063 213.387 57.0144 211.559 58.835C209.732 60.6944 207.516 61.5854 204.91 61.5854H197.211C195.034 61.5854 193.129 60.9268 191.457 59.6098V61.5854C188.657 61.5854 186.246 60.6169 184.263 58.6413C182.28 56.6657 181.308 54.264 181.308 51.4749V1.27116C184.069 1.27116 186.48 2.27834 188.463 4.25395C190.446 6.22956 191.457 8.63128 191.457 11.3816V27.1478C193.129 25.792 195.034 25.1334 197.211 25.1334H198.417ZM203.238 46.5165V38.5366C203.238 35.4376 202.111 32.8034 199.933 30.5954C197.717 28.3874 195.034 27.264 191.962 27.264H191.457V53.1406H196.589C198.417 53.1406 199.972 52.4821 201.255 51.2037C202.577 49.8867 203.238 48.3372 203.238 46.5165Z" fill="#1A2B6F"/><path d="M258.375 52.2884C258.375 54.8451 257.403 57.0143 255.381 58.8737C253.398 60.6944 251.026 61.5854 248.226 61.5854H235.589H228.513H227.89C225.324 61.5854 223.108 60.6944 221.28 58.835C219.453 57.0144 218.52 54.8063 218.52 52.2496V40.977C218.52 38.0717 219.219 35.4376 220.658 33.0359C222.097 30.6341 224.041 28.6973 226.452 27.264C228.862 25.8307 231.507 25.1334 234.423 25.1334H235.589C237.611 25.1334 239.4 25.7145 240.994 26.8379C244.882 28.6198 247.41 30.5567 248.576 32.6485C249.704 34.7791 249.821 36.7547 248.926 38.6915C247.993 40.5897 246.36 42.1779 244.027 43.4175C241.694 44.6571 239.011 45.2769 236.017 45.2769H234.851C232.906 45.2769 231.157 44.7346 229.601 43.6499V46.5165C229.601 48.957 230.729 50.8938 232.945 52.2884H258.375ZM229.601 38.5366V43.1076C232.79 43.0301 235.434 41.9067 237.611 39.7374C239.75 37.6069 240.839 34.9727 240.839 31.8737V27.264C237.65 27.3802 235.006 28.5036 232.829 30.6729C230.69 32.8034 229.601 35.4376 229.601 38.5366Z" fill="#1A2B6F"/><path d="M294.459 52.2884C294.459 54.8451 293.487 57.0143 291.465 58.8737C289.482 60.6944 287.11 61.5854 284.31 61.5854H271.673H264.596H263.974C261.408 61.5854 259.191 60.6944 257.364 58.835C255.536 57.0144 254.603 54.8063 254.603 52.2496V40.977C254.603 38.0717 255.303 35.4376 256.742 33.0359C258.181 30.6341 260.125 28.6973 262.535 27.264C264.946 25.8307 267.59 25.1334 270.507 25.1334H271.673C273.695 25.1334 275.484 25.7145 277.078 26.8379C280.966 28.6198 283.494 30.5567 284.66 32.6485C285.788 34.7791 285.904 36.7547 285.01 38.6915C284.077 40.5897 282.444 42.1779 280.111 43.4175C277.778 44.6571 275.095 45.2769 272.101 45.2769H270.934C268.99 45.2769 267.24 44.7346 265.685 43.6499V46.5165C265.685 48.957 266.813 50.8938 269.029 52.2884H294.459ZM265.685 38.5366V43.1076C268.873 43.0301 271.517 41.9067 273.695 39.7374C275.834 37.6069 276.922 34.9727 276.922 31.8737V27.264C273.734 27.3802 271.09 28.5036 268.912 30.6729C266.774 32.8034 265.685 35.4376 265.685 38.5366Z" fill="#1A2B6F"/><path d="M305.346 82C303.324 82 301.185 81.5739 298.969 80.6829C296.753 79.792 294.848 78.3974 293.214 76.4218C291.504 74.2525 290.648 71.8508 290.648 69.2166V44.5796H290.687V27.9613V11.3429C290.687 8.51506 291.698 6.07461 293.72 4.02152C295.742 2.00717 298.191 1 301.03 1V63.7547C301.03 66.7762 301.535 69.0617 302.585 70.5725C304.18 73.0129 306.668 74.2138 310.012 74.2138C311.878 74.2138 313.861 73.8651 316 73.1679C315.65 75.9957 314.561 78.1263 312.812 79.5595C310.829 81.1865 308.34 82 305.346 82Z" fill="#1A2B6F"/><path d="M61.1145 50.8117H84V51.85C84 56.9117 79.904 61 74.8328 61H52.1424L49.4118 57.4309C48.1765 55.8085 47.5263 53.8617 47.5263 51.85C47.5263 49.9681 48.1114 48.0862 49.2817 46.4638L67.8762 21.0904C58.1238 17.067 46.291 13.3032 27.1765 13.3032C3.51084 13.3032 3.44582 23.7511 3.44582 25.6979C3.44582 32.1872 7.34675 38.1575 7.34675 39.0011C7.34675 39.066 7.34675 39.1309 7.28173 39.1309C6.50155 39.1309 0 31.2138 0 22.583C0 5.77554 15.9938 0 27.1765 0C44.4056 0 62.935 6.29468 73.3375 10.383C78.2786 12.3298 81.5294 17.1319 81.5294 22.4532L61.1145 50.8117Z" fill="#1A2B6F"/><path d="M254.467 72.9436C254.467 70.0234 252.452 66 252.192 66C251.477 67.817 244 68.9202 244 71.0617C244 73.7223 246.146 78.6543 246.146 78.6543C249.201 75.6043 254.467 75.2798 254.467 72.9436Z" fill="#F9D849"/><path d="M266 72.9436C266 70.0234 263.985 66.0649 263.724 66.0649C263.009 67.817 255.533 68.9202 255.533 71.1266C255.533 73.7223 257.678 78.7191 257.678 78.7191C260.734 75.6691 266 75.2798 266 72.9436Z" fill="#F9D849"/><path d="M39.2692 28.7478C39.2692 25.8276 37.2538 21.8042 36.9937 21.8042C36.2785 23.6212 28.8018 24.7244 28.8018 26.8659C28.8018 29.5265 30.9473 34.4585 30.9473 34.4585C34.003 31.4085 39.2692 31.084 39.2692 28.7478Z" fill="#F9D849"/><path d="M39.2692 39.9744C39.2692 37.0542 37.2538 33.0957 36.9937 33.0957C36.2785 34.8478 28.8018 35.951 28.8018 38.1574C28.8018 40.7531 30.9473 45.7499 30.9473 45.7499C34.003 42.6999 39.2692 42.3106 39.2692 39.9744Z" fill="#F9D849"/></g><defs><clipPath id="lc_clip"><rect width="325.999" height="93.0001" fill="white"/></clipPath></defs></svg>
       </div>
-      <div style="font-size:20px;font-weight:700;color:#f1f5f9;letter-spacing:-.3px">Zambeel SQA</div>
-      <div style="font-size:12px;color:#64748b;margin-top:4px">SQA Intelligence Platform</div>
+      <div style="font-size:12px;color:#888888;font-weight:500">SQA Intelligence</div>
     </div>
-    <!-- Fields -->
-    <div style="margin-bottom:14px">
-      <label style="display:block;font-size:12px;font-weight:600;color:#94a3b8;margin-bottom:6px;letter-spacing:.04em;text-transform:uppercase">Email</label>
-      <input id="login-email" type="email" autocomplete="email" placeholder="you@zambeel.com"
-        style="width:100%;box-sizing:border-box;background:#0f0f18;border:1px solid rgba(255,255,255,0.1);border-radius:8px;padding:10px 12px;font-size:13px;color:#f1f5f9;outline:none;transition:border-color .15s"
-        onfocus="this.style.borderColor='rgba(139,92,246,0.6)'" onblur="this.style.borderColor='rgba(255,255,255,0.1)'"
+    <!-- Heading -->
+    <h1 style="margin:0 0 24px;font-size:20px;font-weight:700;color:#1a1a2e;letter-spacing:-.3px">Sign in to SQA Agent</h1>
+    <!-- Email -->
+    <div style="margin-bottom:16px">
+      <label class="lc-field-label" for="login-email">Email Address</label>
+      <input id="login-email" class="lc-input" type="email" autocomplete="email"
+        placeholder="Enter your email"
         onkeydown="if(event.key==='Enter')document.getElementById('login-password').focus()">
     </div>
-    <div style="margin-bottom:20px">
-      <label style="display:block;font-size:12px;font-weight:600;color:#94a3b8;margin-bottom:6px;letter-spacing:.04em;text-transform:uppercase">Password</label>
-      <input id="login-password" type="password" autocomplete="current-password" placeholder="••••••••"
-        style="width:100%;box-sizing:border-box;background:#0f0f18;border:1px solid rgba(255,255,255,0.1);border-radius:8px;padding:10px 12px;font-size:13px;color:#f1f5f9;outline:none;transition:border-color .15s"
-        onfocus="this.style.borderColor='rgba(139,92,246,0.6)'" onblur="this.style.borderColor='rgba(255,255,255,0.1)'"
-        onkeydown="if(event.key==='Enter')doLogin()">
+    <!-- Password -->
+    <div style="margin-bottom:22px">
+      <label class="lc-field-label" for="login-password">Password</label>
+      <div style="position:relative">
+        <input id="login-password" class="lc-input" type="password" autocomplete="current-password"
+          placeholder="Enter your password" style="padding-right:42px"
+          onkeydown="if(event.key==='Enter')doLogin()">
+        <button type="button" onclick="_togglePw()"
+          style="position:absolute;right:0;top:0;bottom:0;width:42px;border:none;background:none;cursor:pointer;color:#b0b8c8;display:flex;align-items:center;justify-content:center;padding:0"
+          title="Show / hide password">
+          <svg id="login-eye-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+        </button>
+      </div>
     </div>
     <!-- Error -->
-    <div id="login-error" style="display:none;background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.3);border-radius:6px;padding:9px 12px;font-size:12px;color:#f87171;margin-bottom:16px"></div>
+    <div id="login-error"></div>
     <!-- Button -->
-    <button id="login-btn" onclick="doLogin()"
-      style="width:100%;background:linear-gradient(135deg,#5B3DF5,#7c3aed);border:none;border-radius:8px;padding:11px;font-size:14px;font-weight:600;color:#fff;cursor:pointer;transition:opacity .15s;letter-spacing:.01em"
-      onmouseover="this.style.opacity='.88'" onmouseout="this.style.opacity='1'">
-      Sign In
-    </button>
+    <button id="login-btn" onclick="doLogin()">Sign In</button>
+    <!-- Footer note -->
+    <p style="margin:20px 0 0;text-align:center;font-size:12px;color:#888888;line-height:1.5">
+      Access restricted to authorized team members only
+    </p>
   </div>
 </div>
 
@@ -2094,6 +2191,18 @@ async function doLogout() {
   _authToken = null;
   sessionStorage.removeItem('sqa_token');
   _showLogin();
+}
+
+function _togglePw() {
+  const inp = document.getElementById('login-password');
+  const ico = document.getElementById('login-eye-icon');
+  if (inp.type === 'password') {
+    inp.type = 'text';
+    ico.innerHTML = '<path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/>';
+  } else {
+    inp.type = 'password';
+    ico.innerHTML = '<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>';
+  }
 }
 
 async function _initAuth() {
