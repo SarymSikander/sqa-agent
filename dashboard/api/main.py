@@ -1419,6 +1419,58 @@ async def get_sprints(project_key: str):
     sprints = await asyncio.to_thread(_jira.get_sprints, board_id, "active")
     return {"sprints": sprints or []}
 
+@app.get("/jira/members")
+async def get_members(project: str = "OMS"):
+    try:
+        members = await asyncio.to_thread(_jira.get_project_members, project)
+        return {
+            "members": [
+                {"accountId": m["accountId"], "displayName": m.get("displayName", "?"),
+                 "email": m.get("emailAddress", "")}
+                for m in (members or [])
+            ]
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+class AssignBody(BaseModel):
+    account_id: str
+
+@app.put("/jira/tickets/{issue_key}/assign")
+async def assign_ticket(issue_key: str, body: AssignBody):
+    try:
+        await asyncio.to_thread(_jira.assign_ticket, issue_key, body.account_id)
+        return {"success": True, "key": issue_key}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/jira/sprint/{sprint_id}/start")
+async def start_sprint(sprint_id: int):
+    try:
+        await asyncio.to_thread(_jira.start_sprint, sprint_id)
+        return {"success": True, "sprint_id": sprint_id}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/jira/sprint/{sprint_id}/end")
+async def end_sprint(sprint_id: int):
+    try:
+        await asyncio.to_thread(_jira.end_sprint, sprint_id)
+        return {"success": True, "sprint_id": sprint_id}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+class SprintIssueBody(BaseModel):
+    issue_keys: list[str]
+
+@app.post("/jira/sprint/{sprint_id}/issue")
+async def add_to_sprint(sprint_id: int, body: SprintIssueBody):
+    try:
+        await asyncio.to_thread(_jira.add_to_sprint, sprint_id, body.issue_keys)
+        return {"success": True, "sprint_id": sprint_id}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 # ── /github ───────────────────────────────────────────────────────────────────
 
 @app.get("/github/branches/{repo}")

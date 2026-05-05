@@ -1620,7 +1620,7 @@
             <div class="form-row form-row-2">
               <div>
                 <label>Project</label>
-                <select id="j-project">
+                <select id="j-project" onchange="_sprintOptionsLoaded=false;document.getElementById('j-sprint').innerHTML='<option value=\\'\\'>— No Sprint —</option>'">
                   <option value="OMS">OMS — Order Management</option>
                   <option value="ZSP">ZSP — Seller Portal</option>
                 </select>
@@ -1647,6 +1647,14 @@
                 <textarea id="j-description" placeholder="Detailed description, steps to reproduce, etc. (optional)"></textarea>
               </div>
             </div>
+            <div class="form-row">
+              <div>
+                <label>Add to Sprint <span style="font-weight:400;color:var(--text3)">(optional)</span></label>
+                <select id="j-sprint" onclick="loadSprintOptions()">
+                  <option value="">— No Sprint —</option>
+                </select>
+              </div>
+            </div>
             <button class="btn btn-primary w100" id="jira-create-btn" onclick="jiraCreate()" style="justify-content:center">
               <div class="spin"></div><span class="label">Create Ticket</span>
             </button>
@@ -1667,7 +1675,10 @@
                   <div class="spin"></div><span class="label">Load</span>
                 </button>
               </div>
-              <input placeholder="Search tickets…" id="jira-search" oninput="jiraFilter()" style="max-width:180px" />
+              <div style="display:flex;gap:8px;align-items:center">
+                <input placeholder="Search tickets…" id="jira-search" oninput="jiraFilter()" style="max-width:180px" />
+                <button class="btn btn-secondary btn-sm" onclick="openSprintModal()" title="Manage Sprint">🏃 Sprint</button>
+              </div>
             </div>
             <div class="tbl-wrap">
               <table>
@@ -2002,6 +2013,28 @@
     <button class="btn btn-secondary w100" id="jira-panel-submit-btn" onclick="submitJiraPanelComment()" style="justify-content:center">
       <div class="spin"></div><span class="label">Submit Comment</span>
     </button>
+  </div>
+</div>
+
+<!-- ── Sprint Modal ──────────────────────────────────────────────────────────── -->
+<div id="sprint-modal" class="modal-overlay" onclick="if(event.target===this)closeSprintModal()" style="display:none">
+  <div class="modal-box" style="max-width:420px">
+    <div class="modal-header">
+      <div class="modal-title">Manage Sprint</div>
+      <button class="modal-close" onclick="closeSprintModal()">✕</button>
+    </div>
+    <div id="sprint-modal-body" style="padding:0 0 16px">
+      <div style="color:var(--text3);font-size:13px;padding:8px 0">Loading sprint info…</div>
+    </div>
+    <div style="display:flex;gap:8px;padding-top:12px;border-top:1px solid var(--border)">
+      <button class="btn btn-primary btn-sm" id="sprint-start-btn" onclick="doStartSprint()" style="flex:1;justify-content:center">
+        <div class="spin"></div><span class="label">▶ Start Sprint</span>
+      </button>
+      <button class="btn btn-danger btn-sm" id="sprint-end-btn" onclick="doEndSprint()" style="flex:1;justify-content:center">
+        <div class="spin"></div><span class="label">⏹ End Sprint</span>
+      </button>
+      <button class="btn btn-secondary btn-sm" onclick="closeSprintModal()">Close</button>
+    </div>
   </div>
 </div>
 
@@ -2683,6 +2716,7 @@ async function jiraCreate() {
   const summary     = document.getElementById('j-summary').value.trim();
   const issue_type  = document.getElementById('j-type').value;
   const description = document.getElementById('j-description').value.trim() || null;
+  const sprintId    = document.getElementById('j-sprint').value;
   if (!summary) { toast('Summary is required', 'warn'); return; }
   btnLoad('jira-create-btn', true);
   try {
@@ -2690,9 +2724,21 @@ async function jiraCreate() {
       method: 'POST',
       body: JSON.stringify({ project_key: project, summary, issue_type, description }),
     });
-    toast(`Created <a href="${data.url}" target="_blank">${data.key}</a>`, 'success', 6000);
+    if (sprintId) {
+      try {
+        await api(`/jira/sprint/${sprintId}/issue`, {
+          method: 'POST', body: JSON.stringify({ issue_keys: [data.key] }),
+        });
+        toast(`Created <a href="${data.url}" target="_blank">${data.key}</a> and added to sprint`, 'success', 6000);
+      } catch {
+        toast(`Created <a href="${data.url}" target="_blank">${data.key}</a> (sprint add failed)`, 'warn', 6000);
+      }
+    } else {
+      toast(`Created <a href="${data.url}" target="_blank">${data.key}</a>`, 'success', 6000);
+    }
     document.getElementById('j-summary').value = '';
     document.getElementById('j-description').value = '';
+    document.getElementById('j-sprint').value = '';
     document.getElementById('j-list-project').value = project;
     jiraLoad();
   } catch(e) { toast(e.message, 'error'); }
@@ -2756,6 +2802,126 @@ async function jiraComment(key) {
     await api(`/jira/tickets/${key}/comment`, { method:'POST', body: JSON.stringify({ comment }) });
     toast(`Comment added to ${key}`, 'success');
   } catch(e) { toast(e.message, 'error'); }
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// ── Assign Ticket ─────────────────────────────────────────────────────────────
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+let _assignCurrentKey = null;
+
+async function openAssignDropdown(key) {
+  _assignCurrentKey = key;
+  const dd = document.getElementById('jira-assign-dropdown');
+  const sel = document.getElementById('jira-assign-select');
+  dd.style.display = 'block';
+  sel.innerHTML = '<option value="">Loading…</option>';
+  try {
+    const project = key.split('-')[0];
+    const data = await api(`/jira/members?project=${project}`);
+    sel.innerHTML = '<option value="">— Unassign —</option>' +
+      data.members.map(m => `<option value="${esc(m.accountId)}">${esc(m.displayName)}</option>`).join('');
+  } catch(e) {
+    sel.innerHTML = '<option value="">Error loading members</option>';
+  }
+}
+
+async function confirmAssign() {
+  if (!_assignCurrentKey) return;
+  const sel = document.getElementById('jira-assign-select');
+  const accountId = sel.value;
+  const displayName = sel.options[sel.selectedIndex]?.text || 'Unassigned';
+  btnLoad('jira-assign-confirm-btn', true);
+  try {
+    await api(`/jira/tickets/${_assignCurrentKey}/assign`, {
+      method: 'PUT', body: JSON.stringify({ account_id: accountId || null }),
+    });
+    document.getElementById('jira-panel-assignee-text').textContent = accountId ? displayName : 'Unassigned';
+    document.getElementById('jira-assign-dropdown').style.display = 'none';
+    toast(`Assigned ${_assignCurrentKey} to ${accountId ? displayName : 'nobody'}`, 'success');
+    jiraLoad();
+  } catch(e) { toast(e.message, 'error'); }
+  finally { btnLoad('jira-assign-confirm-btn', false); }
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// ── Sprint Management ─────────────────────────────────────────────────────────
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+let _activeSprint = null;
+
+async function openSprintModal() {
+  document.getElementById('sprint-modal').style.display = 'flex';
+  const body = document.getElementById('sprint-modal-body');
+  body.innerHTML = '<div style="color:var(--text3);font-size:13px;padding:8px 0">Loading sprint info…</div>';
+  _activeSprint = null;
+  try {
+    const project = document.getElementById('j-list-project').value || 'OMS';
+    const data = await api(`/jira/sprints/${project}`);
+    const sprints = data.sprints || [];
+    if (!sprints.length) {
+      body.innerHTML = '<div style="color:var(--text3);font-size:13px">No active sprints found for this project.</div>';
+      return;
+    }
+    _activeSprint = sprints[0];
+    body.innerHTML = sprints.map(s => `
+      <div style="background:var(--surface2);border-radius:8px;padding:12px 14px;margin-bottom:8px">
+        <div style="font-weight:600;font-size:13.5px;margin-bottom:4px">${esc(s.name||'Sprint')}</div>
+        <div style="font-size:12px;color:var(--text3)">State: <strong>${esc(s.state||'—')}</strong>
+          ${s.startDate ? ` · Started: ${fmtDate(s.startDate)}` : ''}
+          ${s.endDate ? ` · Ends: ${fmtDate(s.endDate)}` : ''}
+        </div>
+      </div>`).join('');
+  } catch(e) {
+    body.innerHTML = `<div style="color:var(--error);font-size:13px">${esc(e.message)}</div>`;
+  }
+}
+
+function closeSprintModal() {
+  document.getElementById('sprint-modal').style.display = 'none';
+  _activeSprint = null;
+}
+
+async function doStartSprint() {
+  if (!_activeSprint) { toast('No sprint loaded', 'warn'); return; }
+  btnLoad('sprint-start-btn', true);
+  try {
+    await api(`/jira/sprint/${_activeSprint.id}/start`, { method: 'POST' });
+    toast(`Sprint "${_activeSprint.name}" started`, 'success');
+    closeSprintModal();
+  } catch(e) { toast(e.message, 'error'); }
+  finally { btnLoad('sprint-start-btn', false); }
+}
+
+async function doEndSprint() {
+  if (!_activeSprint) { toast('No sprint loaded', 'warn'); return; }
+  if (!confirm(`End sprint "${_activeSprint.name}"?`)) return;
+  btnLoad('sprint-end-btn', true);
+  try {
+    await api(`/jira/sprint/${_activeSprint.id}/end`, { method: 'POST' });
+    toast(`Sprint "${_activeSprint.name}" ended`, 'success');
+    closeSprintModal();
+  } catch(e) { toast(e.message, 'error'); }
+  finally { btnLoad('sprint-end-btn', false); }
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// ── Sprint dropdown for Create Ticket ─────────────────────────────────────────
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+let _sprintOptionsLoaded = false;
+
+async function loadSprintOptions() {
+  if (_sprintOptionsLoaded) return;
+  _sprintOptionsLoaded = true;
+  const sel = document.getElementById('j-sprint');
+  sel.innerHTML = '<option value="">Loading…</option>';
+  try {
+    const project = document.getElementById('j-project').value || 'OMS';
+    const data = await api(`/jira/sprints/${project}`);
+    const sprints = data.sprints || [];
+    sel.innerHTML = '<option value="">— No Sprint —</option>' +
+      sprints.map(s => `<option value="${s.id}">${esc(s.name)}</option>`).join('');
+  } catch(e) {
+    sel.innerHTML = '<option value="">Error loading sprints</option>';
+  }
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -2966,7 +3132,21 @@ async function openJiraPanel(key) {
       </div>
       <div class="panel-section">
         <div class="panel-label">Assignee</div>
-        <div class="panel-value">${esc(d.assignee||'Unassigned')}</div>
+        <div style="display:flex;align-items:center;gap:8px">
+          <div class="panel-value" id="jira-panel-assignee-text">${esc(d.assignee||'Unassigned')}</div>
+          <button class="btn btn-secondary btn-sm" onclick="openAssignDropdown('${esc(key)}')" style="flex-shrink:0">Assign</button>
+        </div>
+        <div id="jira-assign-dropdown" style="display:none;margin-top:8px">
+          <select id="jira-assign-select" style="width:100%;margin-bottom:6px">
+            <option value="">Loading members…</option>
+          </select>
+          <div style="display:flex;gap:6px">
+            <button class="btn btn-primary btn-sm" id="jira-assign-confirm-btn" onclick="confirmAssign()" style="flex:1;justify-content:center">
+              <div class="spin"></div><span class="label">Assign</span>
+            </button>
+            <button class="btn btn-secondary btn-sm" onclick="document.getElementById('jira-assign-dropdown').style.display='none'">Cancel</button>
+          </div>
+        </div>
       </div>
       ${d.description ? `<div class="panel-section">
         <div class="panel-label">Description</div>
