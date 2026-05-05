@@ -1,6 +1,7 @@
 import asyncio
 import json
 import os
+import re
 import shutil
 import time
 import requests
@@ -1436,6 +1437,9 @@ class ApiTestRunBody(BaseModel):
     scope: str = "all"
     single_endpoint: str = ""
 
+_ANSI_RE = re.compile(r'\x1b\[[0-9;]*m')
+
+
 @app.get("/api-tests/results")
 async def get_api_test_results():
     try:
@@ -1445,8 +1449,17 @@ async def get_api_test_results():
     if data is None:
         return {"available": False, "message": "No results found. Run the test suite first."}
 
-    raw_suites = data.get("testResults", [])
-    total = passed = failed = skipped = 0
+    # Jest --json stores pre-computed totals at the top level
+    passed  = data.get("numPassedTests", 0)
+    failed  = data.get("numFailedTests", 0)
+    skipped = data.get("numPendingTests", 0)
+    total   = data.get("numTotalTests", 0) or (passed + failed + skipped)
+    pass_rate = round(passed / total * 100) if total else 0
+
+    ts = data.get("startTime")
+    run_at = (datetime.fromtimestamp(ts / 1000, tz=timezone.utc).isoformat()
+              if ts else None)
+
     dim = {
         "perf":  {"pass": 0, "fail": 0},
         "auth":  {"pass": 0, "fail": 0},
@@ -1456,49 +1469,43 @@ async def get_api_test_results():
     failures   = []
     suites_out = []
 
-    for suite in raw_suites:
-        suite_file = suite.get("testFilePath", "").split("/")[-1]
+    # Each suite uses "name" for the file path and "assertionResults" for tests
+    for suite in data.get("testResults", []):
+        suite_file = suite.get("name", "").split("/")[-1]
         suite_tests = []
-        for t in suite.get("testResults", []):
-            # Jest --json uses "title"; some versions also populate "fullName"
-            title    = t.get("title") or t.get("fullName") or ""
+
+        for t in suite.get("assertionResults", []):
+            ancestors = t.get("ancestorTitles") or []
+            leaf      = t.get("title") or ""
+            display   = " › ".join(ancestors + [leaf]) if ancestors else leaf
+
             status   = t.get("status", "")
             duration = t.get("duration")
             msgs     = t.get("failureMessages") or []
-            error    = msgs[0][:400] if msgs else None
+            error    = _ANSI_RE.sub("", msgs[0]).strip()[:200] if msgs else None
 
-            total += 1
-            if status == "passed":
-                passed += 1
-            elif status == "failed":
-                failed += 1
-                failures.append({"title": title, "suite": suite_file, "message": error or ""})
-            else:
-                skipped += 1
-
-            title_up = title.upper()
-            if "[PERF]"  in title_up: tag = "perf"
-            elif "[AUTH]"  in title_up: tag = "auth"
-            elif "[VALID]" in title_up: tag = "valid"
-            elif "[SEC]"   in title_up: tag = "sec"
-            else:                       tag = None
+            # Dimension tag lives in fullName (concatenation of ancestor describe blocks)
+            full_up = (t.get("fullName") or "").upper()
+            if   "[PERF]"  in full_up: tag = "perf"
+            elif "[AUTH]"  in full_up: tag = "auth"
+            elif "[VALID]" in full_up: tag = "valid"
+            elif "[SEC]"   in full_up: tag = "sec"
+            else:                      tag = None
             if tag:
                 if status == "passed":   dim[tag]["pass"] += 1
                 elif status == "failed": dim[tag]["fail"] += 1
 
+            if status == "failed":
+                failures.append({"title": display, "suite": suite_file, "message": error or ""})
+
             suite_tests.append({
-                "title":    title,
+                "title":    display,
                 "status":   status,
                 "duration": duration,
                 "error":    error,
             })
+
         suites_out.append({"file": suite_file, "tests": suite_tests})
-
-    pass_rate = round(passed / total * 100) if total else 0
-
-    ts = data.get("startTime")
-    run_at = (datetime.fromtimestamp(ts / 1000, tz=timezone.utc).isoformat()
-              if ts else None)
 
     return {
         "available": True,
