@@ -1632,6 +1632,13 @@ async def upload_sla(file: UploadFile = File(...)):
     return {"ok": True, "path": str(dest)}
 
 
+@app.post("/api-tests/upload-inventory")
+async def upload_inventory(file: UploadFile = File(...)):
+    dest = _suite_root_dir() / "inventory.json"
+    dest.write_bytes(await file.read())
+    return {"ok": True, "path": str(dest)}
+
+
 @app.post("/api-tests/upload-baseline")
 async def upload_baseline(file: UploadFile = File(...)):
     dest = _suite_reports_dir() / "baseline-runs.json"
