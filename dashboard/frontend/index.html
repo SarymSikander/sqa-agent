@@ -1700,7 +1700,7 @@
           <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
             <div style="font-size:13px;font-weight:600;color:var(--text)">Failed Tests</div>
             <button class="btn btn-danger btn-sm" id="at-jira-btn" onclick="atCreateJiraBugs()" style="display:none">
-              <span class="spin" style="display:none"></span> Create Jira Bugs
+              <span class="spin" style="display:none"></span> Create All as Jira Tickets
             </button>
           </div>
           <div class="tbl-wrap">
@@ -3291,22 +3291,29 @@ async function atLoadAll() {
   await Promise.all([atLoadResults(), atLoadSla(), atLoadInventory(), atLoadBaseline()]);
 }
 
-function _atDimCard(id, valId, subId, data, label) {
+function _atDimCard(id, valId, subId, data) {
   const pass = data ? data.pass : 0;
   const fail = data ? data.fail : 0;
   const total = pass + fail;
   const el = document.getElementById(id);
-  const isOk = fail === 0 && total > 0;
   const hasFail = fail > 0;
   el.style.borderColor = hasFail ? 'var(--error)' : (total > 0 ? 'var(--success)' : 'var(--border)');
-  document.getElementById(valId).textContent = total > 0 ? (hasFail ? `${fail} fail` : `${pass} pass`) : '—';
-  document.getElementById(valId).style.color = hasFail ? 'var(--error)' : (total > 0 ? 'var(--success)' : 'var(--text3)');
-  document.getElementById(subId).textContent = total > 0 ? `${pass}/${total}` : '';
+  if (total > 0) {
+    document.getElementById(valId).textContent = `${pass} passed`;
+    document.getElementById(valId).style.color = hasFail ? 'var(--text)' : 'var(--success)';
+    document.getElementById(subId).textContent = `${fail} failed`;
+    document.getElementById(subId).style.color = fail > 0 ? 'var(--error)' : 'var(--text3)';
+  } else {
+    document.getElementById(valId).textContent = '—';
+    document.getElementById(valId).style.color = 'var(--text3)';
+    document.getElementById(subId).textContent = '';
+  }
 }
 
 async function atLoadResults() {
   try {
     const d = await api('/api-tests/results');
+    console.log('[AT-DEBUG] results response:', d);
     if (!d.available) {
       document.getElementById('at-total-val').textContent = '—';
       document.getElementById('at-total-sub').textContent = d.message || '';
@@ -3319,17 +3326,20 @@ async function atLoadResults() {
     document.getElementById('at-last-run').textContent = d.timestamp
       ? 'Last run: ' + fmtDate(d.timestamp)
       : 'Last run: —';
-    document.getElementById('at-total-val').textContent = s.failed > 0 ? `${s.failed} fail` : `${s.passed} pass`;
-    document.getElementById('at-total-val').style.color = s.failed > 0 ? 'var(--error)' : 'var(--success)';
-    document.getElementById('at-total-sub').textContent = `${s.passed}/${s.total}`;
-    _atDimCard('at-card-perf', 'at-perf-val', 'at-perf-sub', s.perf);
-    _atDimCard('at-card-auth', 'at-auth-val', 'at-auth-sub', s.auth);
+    const pct = s.total > 0 ? Math.round((s.passed / s.total) * 100) : 0;
+    document.getElementById('at-total-val').textContent = `${s.passed} passed`;
+    document.getElementById('at-total-val').style.color = s.failed > 0 ? 'var(--text)' : 'var(--success)';
+    document.getElementById('at-total-sub').textContent = `${s.failed} failed · ${s.skipped} skipped · ${pct}%`;
+    _atDimCard('at-card-perf',  'at-perf-val',  'at-perf-sub',  s.perf);
+    _atDimCard('at-card-auth',  'at-auth-val',  'at-auth-sub',  s.auth);
     _atDimCard('at-card-valid', 'at-valid-val', 'at-valid-sub', s.valid);
-    _atDimCard('at-card-sec',  'at-sec-val',  'at-sec-sub',  s.sec);
+    _atDimCard('at-card-sec',   'at-sec-val',   'at-sec-sub',   s.sec);
     _atFailures = d.failures || [];
     document.getElementById('at-jira-btn').style.display = _atFailures.length ? '' : 'none';
     atRenderFailures(_atFailures);
+    if (d.suites && d.suites.length) atRenderTerminal(d);
   } catch (e) {
+    console.error('[AT-DEBUG] results error:', e);
     document.getElementById('at-total-val').textContent = 'Error';
     toast('Failed to load test results: ' + e.message, 'error');
   }
@@ -3341,17 +3351,21 @@ function atRenderFailures(failures) {
     tbody.innerHTML = '<tr class="empty-row"><td colspan="3">No failures — all tests passed or suite not yet run</td></tr>';
     return;
   }
-  tbody.innerHTML = failures.map(f => `
-    <tr>
-      <td class="td-mono">${esc(f.suite)}</td>
+  tbody.innerHTML = failures.map(f => {
+    const suite = esc(f.suite.replace(/\.test\.js$/i, ''));
+    const firstLine = (f.message || '').split('\n').find(l => l.trim()) || f.message || '';
+    return `<tr>
+      <td class="td-mono" style="font-size:11px">${suite}</td>
       <td style="font-size:12px">${esc(f.title)}</td>
-      <td style="font-size:11px;color:var(--error);max-width:320px;white-space:pre-wrap;font-family:monospace">${esc(f.message)}</td>
-    </tr>`).join('');
+      <td style="font-size:11px;color:var(--error);max-width:320px;white-space:pre-wrap;font-family:monospace">${esc(firstLine.slice(0, 300))}</td>
+    </tr>`;
+  }).join('');
 }
 
 async function atLoadSla() {
   try {
     const d = await api('/api-tests/sla');
+    console.log('[AT-DEBUG] sla response:', d);
     const entries = d.entries || [];
     const tbody = document.getElementById('at-sla-body');
     if (!entries.length) {
@@ -3417,6 +3431,49 @@ async function atLoadBaseline() {
   } catch (e) {
     el.textContent = 'Error loading baseline log.';
   }
+}
+
+function atRenderTerminal(data) {
+  const termWrap = document.getElementById('at-terminal-wrap');
+  const term     = document.getElementById('at-terminal');
+  termWrap.style.display = '';
+
+  // Preserve any status messages already written by the polling flow
+  const prior = term.textContent.trim();
+  const html = [];
+
+  if (prior) {
+    html.push(`<span style="color:#8b949e">${esc(prior)}</span>`);
+    html.push(`<span style="color:#30363d">${'─'.repeat(50)}</span>\n`);
+  }
+
+  for (const suite of data.suites || []) {
+    html.push(`<span style="color:#58a6ff;font-weight:600">SUITE: ${esc(suite.file)}</span>`);
+    for (const t of suite.tests || []) {
+      if (t.status === 'passed') {
+        html.push(`  <span style="color:#3fb950">✅ ${esc(t.title)}</span>`);
+      } else if (t.status === 'failed') {
+        const brief = t.message ? ' — ' + esc(t.message.replace(/\n/g,' ').trim().slice(0,120)) : '';
+        html.push(`  <span style="color:#f85149">❌ ${esc(t.title)}${brief}</span>`);
+      } else {
+        html.push(`  <span style="color:#8b949e">⏭ ${esc(t.title)}</span>`);
+      }
+    }
+    html.push('');
+  }
+
+  const s = data.summary;
+  const ruler = `<span style="color:#30363d">${'━'.repeat(42)}</span>`;
+  const suitesTotal = (data.suites || []).length;
+  const suitesFailed = (data.suites || []).filter(su => su.tests.some(t => t.status === 'failed')).length;
+  html.push(ruler);
+  html.push(`Tests:  <span style="color:#3fb950">${s.passed} passed</span> · <span style="color:#f85149">${s.failed} failed</span> · <span style="color:#8b949e">${s.skipped} skipped</span>`);
+  html.push(`Suites: <span style="color:#f85149">${suitesFailed} failed</span> · <span style="color:#8b949e">${suitesTotal} total</span>`);
+  if (data.timestamp) html.push(`Time:   <span style="color:#8b949e">${esc(fmtDate(data.timestamp))}</span>`);
+  html.push(ruler);
+
+  term.innerHTML = html.join('\n');
+  term.scrollTop = term.scrollHeight;
 }
 
 async function atRunSuite(scope = 'all', singleEndpoint = '') {

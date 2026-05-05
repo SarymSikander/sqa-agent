@@ -1437,7 +1437,7 @@ async def get_api_test_results():
         raise HTTPException(status_code=500, detail=str(e))
     if data is None:
         return {"available": False, "message": "No results found. Run the test suite first."}
-    suites = data.get("testResults", [])
+    raw_suites = data.get("testResults", [])
     summary = {
         "total": 0, "passed": 0, "failed": 0, "skipped": 0,
         "perf":  {"pass": 0, "fail": 0},
@@ -1446,10 +1446,15 @@ async def get_api_test_results():
         "sec":   {"pass": 0, "fail": 0},
     }
     failures = []
-    for suite in suites:
+    suites_out = []
+    for suite in raw_suites:
+        suite_file = suite.get("testFilePath", "").split("/")[-1]
+        suite_tests = []
         for t in suite.get("testResults", []):
             title  = t.get("fullName", "")
             status = t.get("status", "")
+            msgs   = t.get("failureMessages") or []
+            msg    = msgs[0][:400] if msgs else ""
             summary["total"] += 1
             if status == "passed":
                 summary["passed"] += 1
@@ -1457,23 +1462,26 @@ async def get_api_test_results():
                 summary["failed"] += 1
                 failures.append({
                     "title":   title,
-                    "suite":   suite.get("testFilePath", "").split("/")[-1],
-                    "message": (t.get("failureMessages") or [""])[0][:400],
+                    "suite":   suite_file,
+                    "message": msg,
                 })
             else:
                 summary["skipped"] += 1
             tag = None
-            if "[PERF]" in title:  tag = "perf"
-            elif "[AUTH]" in title: tag = "auth"
+            if "[PERF]" in title:   tag = "perf"
+            elif "[AUTH]" in title:  tag = "auth"
             elif "[VALID]" in title: tag = "valid"
-            elif "[SEC]" in title:  tag = "sec"
+            elif "[SEC]" in title:   tag = "sec"
             if tag:
-                if status == "passed":  summary[tag]["pass"] += 1
+                if status == "passed":   summary[tag]["pass"] += 1
                 elif status == "failed": summary[tag]["fail"] += 1
+            suite_tests.append({"title": title, "status": status, "message": msg})
+        suites_out.append({"file": suite_file, "tests": suite_tests})
     return {
         "available":  True,
         "summary":    summary,
         "failures":   failures,
+        "suites":     suites_out,
         "timestamp":  data.get("startTime"),
     }
 
@@ -1484,7 +1492,12 @@ async def get_api_test_sla():
         data = await asyncio.to_thread(_jest.get_sla)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-    entries = [{"key": k, **v} for k, v in data.items()]
+    entries = []
+    for k, v in data.items():
+        if isinstance(v, dict):
+            entries.append({"key": k, **v})
+        else:
+            entries.append({"key": k, "p95_baseline": None, "pass": None, "warn": None, "fail": None, "status": str(v)})
     return {"entries": entries}
 
 
