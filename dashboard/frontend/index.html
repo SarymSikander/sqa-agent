@@ -3810,6 +3810,7 @@ async function atLoadInventory() {
   try {
     const d = await api('/api-tests/inventory');
     const eps = d.endpoints || [];
+    _atInvAll = eps; // keep modal cache in sync
     const tbody = document.getElementById('at-inventory-body');
     if (!eps.length) {
       tbody.innerHTML = '<tr class="empty-row"><td colspan="6">No inventory data found</td></tr>';
@@ -3970,15 +3971,13 @@ async function atOpenInventoryModal() {
   document.getElementById('at-inv-modal-body').innerHTML =
     '<tr class="empty-row"><td colspan="7">Loading…</td></tr>';
 
-  if (!_atInvAll.length) {
-    try {
-      const d = await api('/api-tests/inventory');
-      _atInvAll = d.endpoints || [];
-    } catch (e) {
-      document.getElementById('at-inv-modal-body').innerHTML =
-        `<tr class="empty-row"><td colspan="7">Error: ${esc(e.message)}</td></tr>`;
-      return;
-    }
+  try {
+    const d = await api('/api-tests/inventory');
+    _atInvAll = d.endpoints || [];
+  } catch (e) {
+    document.getElementById('at-inv-modal-body').innerHTML =
+      `<tr class="empty-row"><td colspan="7">Error: ${esc(e.message)}</td></tr>`;
+    return;
   }
   atInvFilter();
 }
