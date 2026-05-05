@@ -37,6 +37,13 @@ REPORTS_DIR = _HERE / "reports"
 SCREENSHOTS_DIR.mkdir(exist_ok=True)
 REPORTS_DIR.mkdir(exist_ok=True)
 
+# HF Docker spaces persist only /data — use it when available, else local reports/
+_DATA_DIR = Path("/data")
+try:
+    _DATA_DIR.mkdir(parents=True, exist_ok=True)
+except OSError:
+    _DATA_DIR = REPORTS_DIR
+
 GITHUB_REPO = os.getenv("GITHUB_REPO", "SarymSikander/api-test-suite")
 GITHUB_WORKFLOW_FILE = os.getenv("GITHUB_WORKFLOW_FILE", "api-tests.yml")
 
@@ -1636,49 +1643,30 @@ async def get_run_status(run_id: int):
     }
 
 
-def _suite_reports_dir() -> Path:
-    """Returns a writable reports directory — prefers SUITE_PATH, falls back to REPORTS_DIR."""
-    candidate = _jest.SUITE_PATH / "reports"
-    try:
-        candidate.mkdir(parents=True, exist_ok=True)
-        return candidate
-    except OSError:
-        return REPORTS_DIR
-
-
-def _suite_root_dir() -> Path:
-    """Returns a writable root directory — prefers SUITE_PATH, falls back to REPORTS_DIR."""
-    try:
-        _jest.SUITE_PATH.mkdir(parents=True, exist_ok=True)
-        return _jest.SUITE_PATH
-    except OSError:
-        return REPORTS_DIR
-
-
 @app.post("/api-tests/upload-results")
 async def upload_results(file: UploadFile = File(...)):
-    dest = _suite_reports_dir() / "results.json"
+    dest = _DATA_DIR / "results.json"
     dest.write_bytes(await file.read())
     return {"ok": True, "path": str(dest)}
 
 
 @app.post("/api-tests/upload-sla")
 async def upload_sla(file: UploadFile = File(...)):
-    dest = _suite_root_dir() / "sla-config.json"
+    dest = _DATA_DIR / "sla-config.json"
     dest.write_bytes(await file.read())
     return {"ok": True, "path": str(dest)}
 
 
 @app.post("/api-tests/upload-inventory")
 async def upload_inventory(file: UploadFile = File(...)):
-    dest = _suite_root_dir() / "inventory.json"
+    dest = _DATA_DIR / "inventory.json"
     dest.write_bytes(await file.read())
     return {"ok": True, "path": str(dest)}
 
 
 @app.post("/api-tests/upload-baseline")
 async def upload_baseline(file: UploadFile = File(...)):
-    dest = _suite_reports_dir() / "baseline-runs.json"
+    dest = _DATA_DIR / "baseline-runs.json"
     dest.write_bytes(await file.read())
     return {"ok": True, "path": str(dest)}
 
