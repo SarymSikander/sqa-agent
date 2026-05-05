@@ -14,7 +14,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from fastapi.staticfiles import StaticFiles
@@ -36,6 +36,9 @@ SCREENSHOTS_DIR = _HERE / "screenshots"
 REPORTS_DIR = _HERE / "reports"
 SCREENSHOTS_DIR.mkdir(exist_ok=True)
 REPORTS_DIR.mkdir(exist_ok=True)
+
+GITHUB_REPO = os.getenv("GITHUB_REPO", "SarymSikander/api-test-suite")
+GITHUB_WORKFLOW_FILE = os.getenv("GITHUB_WORKFLOW_FILE", "api-tests.yml")
 
 # Load knowledge base — concatenate all knowledge/*.md files, fall back to app_context.md
 def _load_knowledge_base() -> str:
@@ -1422,6 +1425,10 @@ class CreateJiraBugsBody(BaseModel):
     project_key: str = "OMS"
     bugs: list[dict]
 
+class ApiTestRunBody(BaseModel):
+    scope: str = "all"
+    single_endpoint: str = ""
+
 @app.get("/api-tests/results")
 async def get_api_test_results():
     try:
@@ -1499,56 +1506,137 @@ async def get_api_test_inventory():
     return {"endpoints": items}
 
 
-def _find_npm() -> str | None:
-    extra = "/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/usr/bin:/bin"
-    augmented = extra + ":" + os.environ.get("PATH", "")
-    return shutil.which("npm", path=augmented)
+_GH_HEADERS = {
+    "Accept": "application/vnd.github+json",
+    "X-GitHub-Api-Version": "2022-11-28",
+}
 
 
 @app.post("/api-tests/run")
-async def run_api_tests():
-    async def generate():
-        def evt(data: dict) -> str:
-            return f"data: {json.dumps(data)}\n\n"
+async def run_api_tests(body: ApiTestRunBody = None):
+    if body is None:
+        body = ApiTestRunBody()
 
-        npm_bin = _find_npm()
-        if npm_bin is None:
-            yield evt({
-                "type": "unavailable",
-                "message": "API Tests require Node.js/npm which is not available on the cloud server. Run the SQA agent locally to execute API tests.",
-            })
-            return
+    if not GITHUB_TOKEN:
+        raise HTTPException(
+            status_code=503,
+            detail="GITHUB_TOKEN not configured. Add it to the server environment to trigger remote test runs.",
+        )
 
-        reports_dir = _jest.SUITE_PATH / "reports"
-        reports_dir.mkdir(parents=True, exist_ok=True)
-        results_file = reports_dir / "results.json"
+    headers = {**_GH_HEADERS, "Authorization": f"Bearer {GITHUB_TOKEN}"}
+    trigger_time = datetime.utcnow().strftime("%Y-%m-%dT%H:%M")
 
-        yield evt({"type": "start", "message": f"Starting npm test via {npm_bin}..."})
-        try:
-            sub_env = {**os.environ, "PATH": "/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/usr/bin:/bin:" + os.environ.get("PATH", "")}
-            proc = await asyncio.create_subprocess_exec(
-                npm_bin, "test", "--", "--json", "--forceExit",
-                f"--outputFile={results_file}",
-                cwd=str(_jest.SUITE_PATH),
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.STDOUT,
-                env=sub_env,
-            )
-            while True:
-                raw = await proc.stdout.readline()
-                if not raw:
-                    break
-                yield evt({"type": "line", "text": raw.decode(errors="replace").rstrip("\n")})
-            exit_code = await proc.wait()
-            yield evt({"type": "done", "exitCode": exit_code, "passed": exit_code == 0})
-        except Exception as e:
-            yield evt({"type": "error", "message": str(e)})
+    def _dispatch():
+        r = requests.post(
+            f"https://api.github.com/repos/{GITHUB_REPO}/actions/workflows/{GITHUB_WORKFLOW_FILE}/dispatches",
+            json={
+                "ref": "main",
+                "inputs": {
+                    "scope": body.scope,
+                    "single_endpoint": body.single_endpoint or "",
+                },
+            },
+            headers=headers,
+            timeout=15,
+        )
+        if r.status_code not in (204, 200):
+            raise HTTPException(status_code=502, detail=f"GitHub dispatch failed ({r.status_code}): {r.text}")
 
-    return StreamingResponse(
-        generate(),
-        media_type="text/event-stream",
-        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no", "Connection": "keep-alive"},
-    )
+    await asyncio.to_thread(_dispatch)
+
+    # Poll up to 30 s for the triggered run to appear
+    run_id = None
+    run_url = None
+    for _ in range(15):
+        await asyncio.sleep(2)
+        def _poll():
+            return requests.get(
+                f"https://api.github.com/repos/{GITHUB_REPO}/actions/runs"
+                "?event=workflow_dispatch&per_page=5",
+                headers=headers,
+                timeout=15,
+            ).json()
+        data = await asyncio.to_thread(_poll)
+        for run in data.get("workflow_runs", []):
+            # created_at looks like "2024-01-01T12:34:56Z"; trigger_time is "2024-01-01T12:34"
+            if run.get("created_at", "")[:16] >= trigger_time:
+                run_id = run["id"]
+                run_url = run["html_url"]
+                break
+        if run_id:
+            break
+
+    return {"status": "triggered", "run_id": run_id, "run_url": run_url}
+
+
+@app.get("/api-tests/run-status/{run_id}")
+async def get_run_status(run_id: int):
+    if not GITHUB_TOKEN:
+        raise HTTPException(status_code=503, detail="GITHUB_TOKEN not configured.")
+
+    headers = {**_GH_HEADERS, "Authorization": f"Bearer {GITHUB_TOKEN}"}
+
+    def _fetch():
+        r = requests.get(
+            f"https://api.github.com/repos/{GITHUB_REPO}/actions/runs/{run_id}",
+            headers=headers,
+            timeout=15,
+        )
+        r.raise_for_status()
+        return r.json()
+
+    try:
+        run = await asyncio.to_thread(_fetch)
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=str(e))
+
+    return {
+        "status":     run.get("status"),       # queued | in_progress | completed
+        "conclusion": run.get("conclusion"),   # success | failure | null
+        "run_url":    run.get("html_url"),
+        "started_at": run.get("run_started_at"),
+        "updated_at": run.get("updated_at"),
+    }
+
+
+def _suite_reports_dir() -> Path:
+    """Returns a writable reports directory — prefers SUITE_PATH, falls back to REPORTS_DIR."""
+    candidate = _jest.SUITE_PATH / "reports"
+    try:
+        candidate.mkdir(parents=True, exist_ok=True)
+        return candidate
+    except OSError:
+        return REPORTS_DIR
+
+
+def _suite_root_dir() -> Path:
+    """Returns a writable root directory — prefers SUITE_PATH, falls back to REPORTS_DIR."""
+    try:
+        _jest.SUITE_PATH.mkdir(parents=True, exist_ok=True)
+        return _jest.SUITE_PATH
+    except OSError:
+        return REPORTS_DIR
+
+
+@app.post("/api-tests/upload-results")
+async def upload_results(file: UploadFile = File(...)):
+    dest = _suite_reports_dir() / "results.json"
+    dest.write_bytes(await file.read())
+    return {"ok": True, "path": str(dest)}
+
+
+@app.post("/api-tests/upload-sla")
+async def upload_sla(file: UploadFile = File(...)):
+    dest = _suite_root_dir() / "sla-config.json"
+    dest.write_bytes(await file.read())
+    return {"ok": True, "path": str(dest)}
+
+
+@app.post("/api-tests/upload-baseline")
+async def upload_baseline(file: UploadFile = File(...)):
+    dest = _suite_reports_dir() / "baseline-runs.json"
+    dest.write_bytes(await file.read())
+    return {"ok": True, "path": str(dest)}
 
 
 @app.post("/api-tests/create-jira-bugs")

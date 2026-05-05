@@ -722,11 +722,27 @@
       animation: modalIn .22s cubic-bezier(0.16, 1, 0.3, 1);
     }
     @keyframes modalIn { from { transform: scale(0.96); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+    @keyframes modalUp  { from { transform: translateY(24px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
     .modal-header { display: flex; justify-content: space-between; align-items: center; }
     .modal-title  { font-size: 15px; font-weight: 700; }
     .modal-close  { cursor: pointer; color: var(--text3); font-size: 20px; line-height: 1; transition: color .15s; }
     .modal-close:hover { color: var(--text); }
     .modal-body   { overflow-y: auto; }
+
+    /* ── Inventory modal filter buttons ──────────────────────────────────────── */
+    .inv-filter-btn {
+      padding: 4px 10px; border-radius: 99px; font-size: 11px; font-weight: 600;
+      border: 1px solid var(--border); background: transparent; color: var(--text2);
+      cursor: pointer; transition: all .12s;
+    }
+    .inv-filter-btn:hover { border-color: var(--border-hover); color: var(--text); }
+    .inv-filter-btn.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+    /* method badge colours in inventory modal */
+    .mb-GET    { background: #1a7f37; color:#fff; }
+    .mb-POST   { background: #0969da; color:#fff; }
+    .mb-PATCH  { background: #bc4c00; color:#fff; }
+    .mb-DELETE { background: #cf222e; color:#fff; }
+    .mb-PUT    { background: #8250df; color:#fff; }
 
     /* ── Current branch display ──────────────────────────────────────────────── */
     .branch-current {
@@ -1628,6 +1644,7 @@
             <button class="btn btn-primary btn-sm" id="at-run-btn" onclick="atRunSuite()">
               <span class="spin" style="display:none"></span> Run Suite
             </button>
+            <button class="btn btn-secondary btn-sm" onclick="atOpenInventoryModal()">Browse All APIs</button>
             <button class="btn btn-secondary btn-sm" onclick="atLoadAll()">Refresh</button>
           </div>
         </div>
@@ -1910,6 +1927,51 @@
           <div class="spin"></div><span class="label">🔄 Regenerate</span>
         </button>
       </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── API Inventory Modal ────────────────────────────────────────────────────── -->
+<div id="at-inventory-modal" class="modal-overlay" onclick="if(event.target===this)atCloseInventoryModal()" style="align-items:flex-end">
+  <div class="modal-box" style="max-width:1000px;width:96vw;max-height:88vh;display:flex;flex-direction:column;animation:modalUp .22s cubic-bezier(0.16,1,0.3,1)">
+    <div class="modal-header" style="flex-shrink:0;padding-bottom:12px">
+      <div>
+        <div class="modal-title" id="at-inv-modal-title">Zambeel API Inventory</div>
+        <div id="at-inv-footer" style="font-size:11px;color:var(--text3);margin-top:3px"></div>
+      </div>
+      <div class="modal-close" onclick="atCloseInventoryModal()">✕</div>
+    </div>
+    <!-- filter bar -->
+    <div style="flex-shrink:0;display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px">
+      <input id="at-inv-search" type="search" placeholder="Search path…"
+        oninput="atInvFilter()"
+        style="flex:1;min-width:160px;padding:6px 10px;border-radius:6px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:13px;outline:none">
+      <div id="at-inv-method-btns" style="display:flex;gap:4px;flex-wrap:wrap">
+        <button class="inv-filter-btn active" data-method="ALL"   onclick="atInvSetMethod(this)">ALL</button>
+        <button class="inv-filter-btn" data-method="GET"    onclick="atInvSetMethod(this)">GET</button>
+        <button class="inv-filter-btn" data-method="POST"   onclick="atInvSetMethod(this)">POST</button>
+        <button class="inv-filter-btn" data-method="PATCH"  onclick="atInvSetMethod(this)">PATCH</button>
+        <button class="inv-filter-btn" data-method="DELETE" onclick="atInvSetMethod(this)">DELETE</button>
+        <button class="inv-filter-btn" data-method="PUT"    onclick="atInvSetMethod(this)">PUT</button>
+      </div>
+      <div id="at-inv-pri-btns" style="display:flex;gap:4px;flex-wrap:wrap">
+        <button class="inv-filter-btn active" data-pri="ALL" onclick="atInvSetPri(this)">ALL</button>
+        <button class="inv-filter-btn" data-pri="P0"  onclick="atInvSetPri(this)">P0</button>
+        <button class="inv-filter-btn" data-pri="P1"  onclick="atInvSetPri(this)">P1</button>
+        <button class="inv-filter-btn" data-pri="P2"  onclick="atInvSetPri(this)">P2</button>
+      </div>
+      <div id="at-inv-auth-btns" style="display:flex;gap:4px">
+        <button class="inv-filter-btn active" data-auth="ALL"  onclick="atInvSetAuth(this)">All</button>
+        <button class="inv-filter-btn" data-auth="AUTH" onclick="atInvSetAuth(this)">Auth required</button>
+        <button class="inv-filter-btn" data-auth="PUB"  onclick="atInvSetAuth(this)">Public</button>
+      </div>
+    </div>
+    <!-- table -->
+    <div class="tbl-wrap" style="flex:1;overflow-y:auto;min-height:0">
+      <table>
+        <thead><tr><th>TC ID</th><th>Method</th><th>Path</th><th>Priority</th><th>Auth</th><th>Roles</th><th></th></tr></thead>
+        <tbody id="at-inv-modal-body"><tr class="empty-row"><td colspan="7">Loading…</td></tr></tbody>
+      </table>
     </div>
   </div>
 </div>
@@ -3357,14 +3419,10 @@ async function atLoadBaseline() {
   }
 }
 
-async function atRunSuite() {
-  const btn = document.getElementById('at-run-btn');
+async function atRunSuite(scope = 'all', singleEndpoint = '') {
   btnLoad('at-run-btn', true);
   const termWrap = document.getElementById('at-terminal-wrap');
-  const unavailNotice = document.getElementById('at-unavailable-notice');
-  const unavailMsg = document.getElementById('at-unavailable-msg');
-  const term = document.getElementById('at-terminal');
-  unavailNotice.style.display = 'none';
+  const term     = document.getElementById('at-terminal');
   termWrap.style.display = '';
   term.textContent = '';
 
@@ -3374,35 +3432,28 @@ async function atRunSuite() {
   }
 
   try {
-    const res = await fetch(API_BASE + '/api-tests/run', { method: 'POST', headers: { 'Content-Type': 'application/json' } });
-    const reader = res.body.getReader();
-    const decoder = new TextDecoder();
-    let buf = '';
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      buf += decoder.decode(value, { stream: true });
-      const parts = buf.split('\n\n');
-      buf = parts.pop();
-      for (const part of parts) {
-        const line = part.replace(/^data: /, '').trim();
-        if (!line) continue;
-        try {
-          const evt = JSON.parse(line);
-          if (evt.type === 'line') appendLine(evt.text);
-          else if (evt.type === 'start') appendLine('▶ ' + evt.message);
-          else if (evt.type === 'done') {
-            appendLine(evt.passed ? '\n✅ All tests passed.' : '\n❌ Tests completed with failures.');
-            await atLoadResults();
-          }
-          else if (evt.type === 'error') appendLine('⚠ Error: ' + evt.message);
-          else if (evt.type === 'unavailable') {
-            termWrap.style.display = 'none';
-            unavailMsg.textContent = evt.message;
-            unavailNotice.style.display = '';
-          }
-        } catch {}
-      }
+    const res = await fetch(API_BASE + '/api-tests/run', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ scope, single_endpoint: singleEndpoint }),
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ detail: res.statusText }));
+      appendLine('⚠ Error: ' + (err.detail || res.statusText));
+      toast('Run failed: ' + (err.detail || res.statusText), 'error');
+      return;
+    }
+
+    const data = await res.json();
+
+    if (data.run_id) {
+      appendLine('✅ Tests triggered on GitHub Actions');
+      appendLine('🔗 View live run: ' + (data.run_url || '—'));
+      appendLine('⏳ Waiting for results… (usually 5-10 mins)\n');
+      atPollRunStatus(data.run_id, appendLine);
+    } else {
+      appendLine('⚠ Triggered but could not get run ID. Check GitHub Actions manually.');
     }
   } catch (e) {
     appendLine('⚠ Connection error: ' + e.message);
@@ -3410,6 +3461,145 @@ async function atRunSuite() {
   } finally {
     btnLoad('at-run-btn', false);
   }
+}
+
+let _atPollTimer = null;
+function atPollRunStatus(runId, appendLine) {
+  if (_atPollTimer) clearTimeout(_atPollTimer);
+
+  async function poll() {
+    try {
+      const d = await api('/api-tests/run-status/' + runId);
+      const status = d.status || 'unknown';
+      const conclusion = d.conclusion || '';
+
+      if (status === 'completed') {
+        if (conclusion === 'success') {
+          appendLine('Status: completed ✅');
+        } else {
+          appendLine('Status: completed (' + conclusion + ')');
+        }
+        appendLine('📊 Results uploaded — refreshing dashboard…');
+        await atLoadAll();
+        _atPollTimer = null;
+      } else {
+        appendLine('Status: ' + status + '…');
+        _atPollTimer = setTimeout(poll, 10000);
+      }
+    } catch (e) {
+      appendLine('⚠ Status check failed: ' + e.message + ' — will retry');
+      _atPollTimer = setTimeout(poll, 10000);
+    }
+  }
+
+  _atPollTimer = setTimeout(poll, 10000);
+}
+
+// ── API Inventory Modal ────────────────────────────────────────────────────────
+
+let _atInvAll = [];
+let _atInvMethod = 'ALL';
+let _atInvPri    = 'ALL';
+let _atInvAuth   = 'ALL';
+
+async function atOpenInventoryModal() {
+  document.getElementById('at-inventory-modal').classList.add('open');
+  document.getElementById('at-inv-modal-body').innerHTML =
+    '<tr class="empty-row"><td colspan="7">Loading…</td></tr>';
+
+  if (!_atInvAll.length) {
+    try {
+      const d = await api('/api-tests/inventory');
+      _atInvAll = d.endpoints || [];
+    } catch (e) {
+      document.getElementById('at-inv-modal-body').innerHTML =
+        `<tr class="empty-row"><td colspan="7">Error: ${esc(e.message)}</td></tr>`;
+      return;
+    }
+  }
+  atInvFilter();
+}
+
+function atCloseInventoryModal() {
+  document.getElementById('at-inventory-modal').classList.remove('open');
+}
+
+function atInvSetMethod(btn) {
+  document.querySelectorAll('#at-inv-method-btns .inv-filter-btn')
+    .forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  _atInvMethod = btn.dataset.method;
+  atInvFilter();
+}
+
+function atInvSetPri(btn) {
+  document.querySelectorAll('#at-inv-pri-btns .inv-filter-btn')
+    .forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  _atInvPri = btn.dataset.pri;
+  atInvFilter();
+}
+
+function atInvSetAuth(btn) {
+  document.querySelectorAll('#at-inv-auth-btns .inv-filter-btn')
+    .forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  _atInvAuth = btn.dataset.auth;
+  atInvFilter();
+}
+
+function atInvFilter() {
+  const q = (document.getElementById('at-inv-search').value || '').toLowerCase();
+  const filtered = _atInvAll.filter(e => {
+    if (q && !(e.path || '').toLowerCase().includes(q)) return false;
+    if (_atInvMethod !== 'ALL' && (e.method || '').toUpperCase() !== _atInvMethod) return false;
+    if (_atInvPri    !== 'ALL' && e.priority !== _atInvPri) return false;
+    if (_atInvAuth === 'AUTH' && !e.authRequired) return false;
+    if (_atInvAuth === 'PUB'  &&  e.authRequired) return false;
+    return true;
+  });
+
+  const methodCounts = {};
+  _atInvAll.forEach(e => { const m = (e.method||'?').toUpperCase(); methodCounts[m] = (methodCounts[m]||0)+1; });
+  const footerParts = Object.entries(methodCounts)
+    .sort((a,b)=>b[1]-a[1])
+    .map(([m,n])=>`${n} ${m}`)
+    .join(' · ');
+  document.getElementById('at-inv-modal-title').textContent =
+    `Zambeel API Inventory — ${_atInvAll.length} endpoints`;
+  document.getElementById('at-inv-footer').textContent =
+    filtered.length === _atInvAll.length
+      ? `${_atInvAll.length} endpoints · ${footerParts}`
+      : `${filtered.length} of ${_atInvAll.length} shown · ${footerParts}`;
+
+  const priColor = { P0: 'var(--error)', P1: 'var(--warn)', P2: 'var(--text3)' };
+  const tbody = document.getElementById('at-inv-modal-body');
+  if (!filtered.length) {
+    tbody.innerHTML = '<tr class="empty-row"><td colspan="7">No endpoints match the current filters</td></tr>';
+    return;
+  }
+  tbody.innerHTML = filtered.map(e => {
+    const m = (e.method || 'GET').toUpperCase();
+    return `<tr>
+      <td class="td-mono" style="font-size:11px">${esc(e.id || '—')}</td>
+      <td><span class="badge mb-${m}" style="min-width:52px;text-align:center">${esc(m)}</span></td>
+      <td class="td-mono" style="font-size:12px">${esc(e.path || '')}</td>
+      <td style="color:${priColor[e.priority]||'var(--text)'};font-weight:600;font-size:12px">${esc(e.priority||'—')}</td>
+      <td>${e.authRequired ? '<span class="badge badge-warn">Auth</span>' : '<span class="badge badge-neutral">Public</span>'}</td>
+      <td style="font-size:11px;color:var(--text3)">${(e.roles||[]).join(', ')||'—'}</td>
+      <td><button class="btn btn-secondary btn-sm" style="font-size:11px;padding:3px 8px"
+          onclick="atTestSingleEndpoint(${JSON.stringify(e.path||'')})">▶ Test</button></td>
+    </tr>`;
+  }).join('');
+}
+
+async function atTestSingleEndpoint(path) {
+  atCloseInventoryModal();
+  const term = document.getElementById('at-terminal');
+  const termWrap = document.getElementById('at-terminal-wrap');
+  termWrap.style.display = '';
+  term.textContent = `▶ Running single-endpoint test: ${path}\n`;
+  await atRunSuite('single', path);
 }
 
 async function atCreateJiraBugs() {
