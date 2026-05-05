@@ -4,7 +4,7 @@ import os
 import shutil
 import time
 import requests
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Optional
 
@@ -1437,52 +1437,76 @@ async def get_api_test_results():
         raise HTTPException(status_code=500, detail=str(e))
     if data is None:
         return {"available": False, "message": "No results found. Run the test suite first."}
+
     raw_suites = data.get("testResults", [])
-    summary = {
-        "total": 0, "passed": 0, "failed": 0, "skipped": 0,
+    total = passed = failed = skipped = 0
+    dim = {
         "perf":  {"pass": 0, "fail": 0},
         "auth":  {"pass": 0, "fail": 0},
         "valid": {"pass": 0, "fail": 0},
         "sec":   {"pass": 0, "fail": 0},
     }
-    failures = []
+    failures   = []
     suites_out = []
+
     for suite in raw_suites:
         suite_file = suite.get("testFilePath", "").split("/")[-1]
         suite_tests = []
         for t in suite.get("testResults", []):
-            title  = t.get("fullName", "")
-            status = t.get("status", "")
-            msgs   = t.get("failureMessages") or []
-            msg    = msgs[0][:400] if msgs else ""
-            summary["total"] += 1
+            # Jest --json uses "title"; some versions also populate "fullName"
+            title    = t.get("title") or t.get("fullName") or ""
+            status   = t.get("status", "")
+            duration = t.get("duration")
+            msgs     = t.get("failureMessages") or []
+            error    = msgs[0][:400] if msgs else None
+
+            total += 1
             if status == "passed":
-                summary["passed"] += 1
+                passed += 1
             elif status == "failed":
-                summary["failed"] += 1
-                failures.append({
-                    "title":   title,
-                    "suite":   suite_file,
-                    "message": msg,
-                })
+                failed += 1
+                failures.append({"title": title, "suite": suite_file, "message": error or ""})
             else:
-                summary["skipped"] += 1
-            tag = None
-            if "[PERF]" in title:   tag = "perf"
-            elif "[AUTH]" in title:  tag = "auth"
-            elif "[VALID]" in title: tag = "valid"
-            elif "[SEC]" in title:   tag = "sec"
+                skipped += 1
+
+            title_up = title.upper()
+            if "[PERF]"  in title_up: tag = "perf"
+            elif "[AUTH]"  in title_up: tag = "auth"
+            elif "[VALID]" in title_up: tag = "valid"
+            elif "[SEC]"   in title_up: tag = "sec"
+            else:                       tag = None
             if tag:
-                if status == "passed":   summary[tag]["pass"] += 1
-                elif status == "failed": summary[tag]["fail"] += 1
-            suite_tests.append({"title": title, "status": status, "message": msg})
+                if status == "passed":   dim[tag]["pass"] += 1
+                elif status == "failed": dim[tag]["fail"] += 1
+
+            suite_tests.append({
+                "title":    title,
+                "status":   status,
+                "duration": duration,
+                "error":    error,
+            })
         suites_out.append({"file": suite_file, "tests": suite_tests})
+
+    pass_rate = round(passed / total * 100) if total else 0
+
+    ts = data.get("startTime")
+    run_at = (datetime.fromtimestamp(ts / 1000, tz=timezone.utc).isoformat()
+              if ts else None)
+
     return {
-        "available":  True,
-        "summary":    summary,
-        "failures":   failures,
-        "suites":     suites_out,
-        "timestamp":  data.get("startTime"),
+        "available": True,
+        "total":     total,
+        "passed":    passed,
+        "failed":    failed,
+        "skipped":   skipped,
+        "pass_rate": pass_rate,
+        "run_at":    run_at,
+        "perf":      dim["perf"],
+        "auth":      dim["auth"],
+        "valid":     dim["valid"],
+        "sec":       dim["sec"],
+        "failures":  failures,
+        "suites":    suites_out,
     }
 
 

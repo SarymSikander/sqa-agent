@@ -3322,18 +3322,16 @@ async function atLoadResults() {
       atRenderFailures([]);
       return;
     }
-    const s = d.summary;
-    document.getElementById('at-last-run').textContent = d.timestamp
-      ? 'Last run: ' + fmtDate(d.timestamp)
+    document.getElementById('at-last-run').textContent = d.run_at
+      ? 'Last run: ' + fmtDate(d.run_at)
       : 'Last run: —';
-    const pct = s.total > 0 ? Math.round((s.passed / s.total) * 100) : 0;
-    document.getElementById('at-total-val').textContent = `${s.passed} passed`;
-    document.getElementById('at-total-val').style.color = s.failed > 0 ? 'var(--text)' : 'var(--success)';
-    document.getElementById('at-total-sub').textContent = `${s.failed} failed · ${s.skipped} skipped · ${pct}%`;
-    _atDimCard('at-card-perf',  'at-perf-val',  'at-perf-sub',  s.perf);
-    _atDimCard('at-card-auth',  'at-auth-val',  'at-auth-sub',  s.auth);
-    _atDimCard('at-card-valid', 'at-valid-val', 'at-valid-sub', s.valid);
-    _atDimCard('at-card-sec',   'at-sec-val',   'at-sec-sub',   s.sec);
+    document.getElementById('at-total-val').textContent = `${d.passed} passed`;
+    document.getElementById('at-total-val').style.color = d.failed > 0 ? 'var(--text)' : 'var(--success)';
+    document.getElementById('at-total-sub').textContent = `${d.failed} failed · ${d.skipped} skipped · ${d.pass_rate}%`;
+    _atDimCard('at-card-perf',  'at-perf-val',  'at-perf-sub',  d.perf);
+    _atDimCard('at-card-auth',  'at-auth-val',  'at-auth-sub',  d.auth);
+    _atDimCard('at-card-valid', 'at-valid-val', 'at-valid-sub', d.valid);
+    _atDimCard('at-card-sec',   'at-sec-val',   'at-sec-sub',   d.sec);
     _atFailures = d.failures || [];
     document.getElementById('at-jira-btn').style.display = _atFailures.length ? '' : 'none';
     atRenderFailures(_atFailures);
@@ -3453,7 +3451,7 @@ function atRenderTerminal(data) {
       if (t.status === 'passed') {
         html.push(`  <span style="color:#3fb950">✅ ${esc(t.title)}</span>`);
       } else if (t.status === 'failed') {
-        const brief = t.message ? ' — ' + esc(t.message.replace(/\n/g,' ').trim().slice(0,120)) : '';
+        const brief = t.error ? ' — ' + esc(t.error.replace(/\n/g,' ').trim().slice(0,120)) : '';
         html.push(`  <span style="color:#f85149">❌ ${esc(t.title)}${brief}</span>`);
       } else {
         html.push(`  <span style="color:#8b949e">⏭ ${esc(t.title)}</span>`);
@@ -3462,14 +3460,13 @@ function atRenderTerminal(data) {
     html.push('');
   }
 
-  const s = data.summary;
   const ruler = `<span style="color:#30363d">${'━'.repeat(42)}</span>`;
-  const suitesTotal = (data.suites || []).length;
+  const suitesTotal  = (data.suites || []).length;
   const suitesFailed = (data.suites || []).filter(su => su.tests.some(t => t.status === 'failed')).length;
   html.push(ruler);
-  html.push(`Tests:  <span style="color:#3fb950">${s.passed} passed</span> · <span style="color:#f85149">${s.failed} failed</span> · <span style="color:#8b949e">${s.skipped} skipped</span>`);
+  html.push(`Tests:  <span style="color:#3fb950">${data.passed} passed</span> · <span style="color:#f85149">${data.failed} failed</span> · <span style="color:#8b949e">${data.skipped} skipped</span>`);
   html.push(`Suites: <span style="color:#f85149">${suitesFailed} failed</span> · <span style="color:#8b949e">${suitesTotal} total</span>`);
-  if (data.timestamp) html.push(`Time:   <span style="color:#8b949e">${esc(fmtDate(data.timestamp))}</span>`);
+  if (data.run_at) html.push(`Time:   <span style="color:#8b949e">${esc(fmtDate(data.run_at))}</span>`);
   html.push(ruler);
 
   term.innerHTML = html.join('\n');
