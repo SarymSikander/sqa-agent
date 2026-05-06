@@ -61,12 +61,15 @@ _FEATURE_SELECTORS = {
     ],
 }
 
+_ENV_SUFFIX = {"staging": "STAGING", "production": "PRODUCTION", "local": "LOCAL"}
+
 
 def login_to_portal(page, portal, env):
     """Fill the login form with credentials from .env and wait until off /login."""
     base_url  = "https://staging.myzambeel.com" if env == "staging" else "https://portal.myzambeel.com"
-    email_key = f"{portal.upper()}_{env.upper()}_EMAIL"
-    pass_key  = f"{portal.upper()}_{env.upper()}_PASSWORD"
+    suffix    = _ENV_SUFFIX.get(env, env.upper())
+    email_key = f"{portal.upper()}_{suffix}_EMAIL"
+    pass_key  = f"{portal.upper()}_{suffix}_PASSWORD"
     email     = os.getenv(email_key, "").strip()
     password  = os.getenv(pass_key, "").strip()
     print(f"[LOGIN] {portal}/{env} — email={email}")
