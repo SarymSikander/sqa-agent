@@ -1734,7 +1734,9 @@ async def run_api_tests(body: ApiTestRunBody = None):
             json={
                 "ref": "main",
                 "inputs": {
-                    "scope": body.scope,
+                    # "single" is not a valid workflow choice; the workflow
+                    # already gates on single_endpoint first, so "all" is correct.
+                    "scope": "all" if body.single_endpoint else body.scope,
                     "single_endpoint": body.single_endpoint or "",
                 },
             },

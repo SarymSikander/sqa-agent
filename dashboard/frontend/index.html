@@ -4050,7 +4050,8 @@ function atInvFilter() {
       <td>${e.authRequired ? '<span class="badge badge-warn">Auth</span>' : '<span class="badge badge-neutral">Public</span>'}</td>
       <td style="font-size:11px;color:var(--text3)">${(e.roles||[]).join(', ')||'—'}</td>
       <td><button class="btn btn-secondary btn-sm" style="font-size:11px;padding:3px 8px"
-          onclick="atTestSingleEndpoint(${JSON.stringify(e.path||'')})">▶ Test</button></td>
+          data-path="${esc(e.path||'')}"
+          onclick="atTestSingleEndpoint(this.dataset.path)">▶ Test</button></td>
     </tr>`;
   }).join('');
 }
