@@ -1,0 +1,1890 @@
+[
+  {
+    "id": "TC_001",
+    "method": "POST",
+    "path": "/api/login",
+    "authRequired": false,
+    "roles": [],
+    "category": "auth",
+    "priority": "P0",
+    "slaKey": "login"
+  },
+  {
+    "id": "TC_002",
+    "method": "POST",
+    "path": "/api/signUp",
+    "authRequired": false,
+    "roles": [],
+    "category": "auth",
+    "priority": "P2",
+    "slaKey": null
+  },
+  {
+    "id": "TC_003",
+    "method": "GET",
+    "path": "/api/auth/check-email",
+    "authRequired": false,
+    "roles": [],
+    "category": "auth",
+    "priority": "P2",
+    "slaKey": null
+  },
+  {
+    "id": "TC_004",
+    "method": "GET",
+    "path": "/api/verify-email",
+    "authRequired": false,
+    "roles": [],
+    "category": "auth",
+    "priority": "P2",
+    "slaKey": null
+  },
+  {
+    "id": "TC_005",
+    "method": "PUT",
+    "path": "/api/user/profile",
+    "authRequired": true,
+    "roles": [
+      "Seller",
+      "Agency"
+    ],
+    "category": "misc",
+    "priority": "P2",
+    "slaKey": null
+  },
+  {
+    "id": "TC_006",
+    "method": "POST",
+    "path": "/api/user/accept-terms",
+    "authRequired": true,
+    "roles": [
+      "Seller",
+      "Agency"
+    ],
+    "category": "misc",
+    "priority": "P2",
+    "slaKey": null
+  },
+  {
+    "id": "TC_007",
+    "method": "GET",
+    "path": "/api/teams",
+    "authRequired": false,
+    "roles": [],
+    "category": "teams",
+    "priority": "P1",
+    "slaKey": "teamslist"
+  },
+  {
+    "id": "TC_008",
+    "method": "GET",
+    "path": "/api/agents",
+    "authRequired": false,
+    "roles": [],
+    "category": "teams",
+    "priority": "P1",
+    "slaKey": "agentsList"
+  },
+  {
+    "id": "TC_009",
+    "method": "GET",
+    "path": "/api/dashboard/data",
+    "authRequired": true,
+    "roles": [
+      "Seller",
+      "Agency"
+    ],
+    "category": "dashboard",
+    "priority": "P0",
+    "slaKey": "sellerDashboard"
+  },
+  {
+    "id": "TC_010",
+    "method": "POST",
+    "path": "/api/remarks",
+    "authRequired": false,
+    "roles": [],
+    "category": "orders",
+    "priority": "P1",
+    "slaKey": "bulkRemarks"
+  },
+  {
+    "id": "TC_011",
+    "method": "POST",
+    "path": "/api/tags",
+    "authRequired": false,
+    "roles": [],
+    "category": "orders",
+    "priority": "P2",
+    "slaKey": "updateStatusTags"
+  },
+  {
+    "id": "TC_012",
+    "method": "GET",
+    "path": "/api/sub-statuses",
+    "authRequired": false,
+    "roles": [],
+    "category": "misc",
+    "priority": "P2",
+    "slaKey": null
+  },
+  {
+    "id": "TC_013",
+    "method": "GET",
+    "path": "/api/inventory/seller-inventory",
+    "authRequired": true,
+    "roles": [
+      "Seller",
+      "Agency"
+    ],
+    "category": "inventory",
+    "priority": "P1",
+    "slaKey": "stockValidation"
+  },
+  {
+    "id": "TC_014",
+    "method": "GET",
+    "path": "/api/inventory/seller-inventory/export",
+    "authRequired": true,
+    "roles": [
+      "Seller",
+      "Agency"
+    ],
+    "category": "inventory",
+    "priority": "P1",
+    "slaKey": "csvExport"
+  },
+  {
+    "id": "TC_015",
+    "method": "GET",
+    "path": "/api/inventory/purchase-order/:variantId",
+    "authRequired": true,
+    "roles": [
+      "Seller",
+      "Agency"
+    ],
+    "category": "inventory",
+    "priority": "P1",
+    "slaKey": null
+  },
+  {
+    "id": "TC_016",
+    "method": "GET",
+    "path": "/api/inventory/purchase-order/orders/:variantId",
+    "authRequired": true,
+    "roles": [
+      "Seller",
+      "Agency"
+    ],
+    "category": "orders",
+    "priority": "P1",
+    "slaKey": null
+  },
+  {
+    "id": "TC_017",
+    "method": "GET",
+    "path": "/api/inventory/inventory-movements/:variantId",
+    "authRequired": true,
+    "roles": [
+      "Seller",
+      "Agency"
+    ],
+    "category": "inventory",
+    "priority": "P1",
+    "slaKey": null
+  },
+  {
+    "id": "TC_018",
+    "method": "POST",
+    "path": "/api/payments/create",
+    "authRequired": true,
+    "roles": [
+      "Seller",
+      "Agency"
+    ],
+    "category": "misc",
+    "priority": "P2",
+    "slaKey": null
+  },
+  {
+    "id": "TC_019",
+    "method": "POST",
+    "path": "/api/payments/callback",
+    "authRequired": false,
+    "roles": [],
+    "category": "misc",
+    "priority": "P2",
+    "slaKey": null
+  },
+  {
+    "id": "TC_020",
+    "method": "POST",
+    "path": "/api/payments/redirect",
+    "authRequired": false,
+    "roles": [],
+    "category": "misc",
+    "priority": "P2",
+    "slaKey": null
+  },
+  {
+    "id": "TC_021",
+    "method": "POST",
+    "path": "/api/payments/verify",
+    "authRequired": true,
+    "roles": [
+      "Seller",
+      "Agency"
+    ],
+    "category": "misc",
+    "priority": "P2",
+    "slaKey": null
+  },
+  {
+    "id": "TC_022",
+    "method": "GET",
+    "path": "/api/payments/checkUserSubscription",
+    "authRequired": true,
+    "roles": [
+      "Seller",
+      "Agency"
+    ],
+    "category": "misc",
+    "priority": "P2",
+    "slaKey": null
+  },
+  {
+    "id": "TC_023",
+    "method": "POST",
+    "path": "/api/accounts/",
+    "authRequired": true,
+    "roles": [
+      "Seller",
+      "Agency"
+    ],
+    "category": "misc",
+    "priority": "P2",
+    "slaKey": null
+  },
+  {
+    "id": "TC_024",
+    "method": "GET",
+    "path": "/api/accounts/:userId",
+    "authRequired": true,
+    "roles": [
+      "Seller",
+      "Agency"
+    ],
+    "category": "misc",
+    "priority": "P2",
+    "slaKey": null
+  },
+  {
+    "id": "TC_025",
+    "method": "GET",
+    "path": "/api/accounts/:userId/all",
+    "authRequired": true,
+    "roles": [
+      "Seller",
+      "Agency"
+    ],
+    "category": "misc",
+    "priority": "P2",
+    "slaKey": null
+  },
+  {
+    "id": "TC_026",
+    "method": "PUT",
+    "path": "/api/accounts/:id",
+    "authRequired": true,
+    "roles": [
+      "Seller",
+      "Agency"
+    ],
+    "category": "misc",
+    "priority": "P2",
+    "slaKey": null
+  },
+  {
+    "id": "TC_027",
+    "method": "DELETE",
+    "path": "/api/accounts/:id",
+    "authRequired": true,
+    "roles": [
+      "Seller",
+      "Agency"
+    ],
+    "category": "misc",
+    "priority": "P2",
+    "slaKey": null
+  },
+  {
+    "id": "TC_028",
+    "method": "PATCH",
+    "path": "/api/accounts/:id/set-primary",
+    "authRequired": true,
+    "roles": [
+      "Seller",
+      "Agency"
+    ],
+    "category": "misc",
+    "priority": "P2",
+    "slaKey": null
+  },
+  {
+    "id": "TC_029",
+    "method": "GET",
+    "path": "/api/accounts/myaccount/:id",
+    "authRequired": true,
+    "roles": [
+      "Seller",
+      "Agency"
+    ],
+    "category": "misc",
+    "priority": "P2",
+    "slaKey": null
+  },
+  {
+    "id": "TC_030",
+    "method": "GET",
+    "path": "/api/accounts/store/:storeId",
+    "authRequired": true,
+    "roles": [
+      "Seller",
+      "Agency"
+    ],
+    "category": "store",
+    "priority": "P2",
+    "slaKey": null
+  },
+  {
+    "id": "TC_031",
+    "method": "GET",
+    "path": "/api/notion/notion_data",
+    "authRequired": true,
+    "roles": [
+      "Seller",
+      "Agency"
+    ],
+    "category": "integrations",
+    "priority": "P2",
+    "slaKey": null
+  },
+  {
+    "id": "TC_032",
+    "method": "GET",
+    "path": "/api/shopify/checkUser",
+    "authRequired": true,
+    "roles": [
+      "Seller",
+      "Agency"
+    ],
+    "category": "integrations",
+    "priority": "P2",
+    "slaKey": null
+  },
+  {
+    "id": "TC_033",
+    "method": "GET",
+    "path": "/api/shopify/shop",
+    "authRequired": true,
+    "roles": [
+      "Seller",
+      "Agency"
+    ],
+    "category": "integrations",
+    "priority": "P2",
+    "slaKey": null
+  },
+  {
+    "id": "TC_034",
+    "method": "GET",
+    "path": "/api/shopify/check-store-exists",
+    "authRequired": true,
+    "roles": [
+      "Seller",
+      "Agency"
+    ],
+    "category": "integrations",
+    "priority": "P2",
+    "slaKey": null
+  },
+  {
+    "id": "TC_035",
+    "method": "POST",
+    "path": "/api/shopify/bind-store",
+    "authRequired": true,
+    "roles": [
+      "Seller",
+      "Agency"
+    ],
+    "category": "integrations",
+    "priority": "P2",
+    "slaKey": null
+  },
+  {
+    "id": "TC_036",
+    "method": "GET",
+    "path": "/api/shopify/auth",
+    "authRequired": false,
+    "roles": [],
+    "category": "auth",
+    "priority": "P2",
+    "slaKey": null
+  },
+  {
+    "id": "TC_037",
+    "method": "DELETE",
+    "path": "/api/shopify/webhooks/delete",
+    "authRequired": true,
+    "roles": [
+      "Seller",
+      "Agency"
+    ],
+    "category": "integrations",
+    "priority": "P2",
+    "slaKey": null
+  },
+  {
+    "id": "TC_038",
+    "method": "POST",
+    "path": "/api/shopify/app/installation-status",
+    "authRequired": false,
+    "roles": [],
+    "category": "integrations",
+    "priority": "P2",
+    "slaKey": null
+  },
+  {
+    "id": "TC_039",
+    "method": "POST",
+    "path": "/api/lightfunnels/auth",
+    "authRequired": true,
+    "roles": [
+      "Seller",
+      "Agency"
+    ],
+    "category": "auth",
+    "priority": "P2",
+    "slaKey": null
+  },
+  {
+    "id": "TC_040",
+    "method": "DELETE",
+    "path": "/api/lightfunnels/webhooks/delete",
+    "authRequired": true,
+    "roles": [
+      "Seller",
+      "Agency"
+    ],
+    "category": "integrations",
+    "priority": "P2",
+    "slaKey": null
+  },
+  {
+    "id": "TC_041",
+    "method": "GET",
+    "path": "/api/store/",
+    "authRequired": true,
+    "roles": [
+      "Admin",
+      "Seller",
+      "Agency"
+    ],
+    "category": "store",
+    "priority": "P2",
+    "slaKey": null
+  },
+  {
+    "id": "TC_042",
+    "method": "GET",
+    "path": "/api/store/trust/confirmation-pending-tags",
+    "authRequired": true,
+    "roles": [
+      "Admin",
+      "Seller",
+      "Agency"
+    ],
+    "category": "store",
+    "priority": "P2",
+    "slaKey": null
+  },
+  {
+    "id": "TC_043",
+    "method": "GET",
+    "path": "/api/store/:id",
+    "authRequired": true,
+    "roles": [
+      "Admin",
+      "Seller",
+      "Agency"
+    ],
+    "category": "store",
+    "priority": "P2",
+    "slaKey": null
+  },
+  {
+    "id": "TC_044",
+    "method": "PUT",
+    "path": "/api/store/:id",
+    "authRequired": true,
+    "roles": [
+      "Admin",
+      "Seller",
+      "Agency"
+    ],
+    "category": "store",
+    "priority": "P2",
+    "slaKey": null
+  },
+  {
+    "id": "TC_045",
+    "method": "GET",
+    "path": "/api/store/user/:userId",
+    "authRequired": true,
+    "roles": [
+      "Admin",
+      "Seller",
+      "Agency"
+    ],
+    "category": "store",
+    "priority": "P2",
+    "slaKey": null
+  },
+  {
+    "id": "TC_046",
+    "method": "GET",
+    "path": "/api/store/user/stores/:userId",
+    "authRequired": true,
+    "roles": [
+      "Admin",
+      "Seller",
+      "Agency"
+    ],
+    "category": "store",
+    "priority": "P2",
+    "slaKey": null
+  },
+  {
+    "id": "TC_047",
+    "method": "DELETE",
+    "path": "/api/store/:id",
+    "authRequired": true,
+    "roles": [
+      "Admin",
+      "Seller",
+      "Agency"
+    ],
+    "category": "store",
+    "priority": "P2",
+    "slaKey": null
+  },
+  {
+    "id": "TC_048",
+    "method": "POST",
+    "path": "/api/store/check-name",
+    "authRequired": true,
+    "roles": [
+      "Admin",
+      "Seller",
+      "Agency"
+    ],
+    "category": "store",
+    "priority": "P2",
+    "slaKey": null
+  },
+  {
+    "id": "TC_049",
+    "method": "POST",
+    "path": "/api/store/create/storeManually",
+    "authRequired": true,
+    "roles": [
+      "Admin",
+      "Seller",
+      "Agency"
+    ],
+    "category": "store",
+    "priority": "P2",
+    "slaKey": null
+  },
+  {
+    "id": "TC_050",
+    "method": "GET",
+    "path": "/api/store-names",
+    "authRequired": false,
+    "roles": [],
+    "category": "store",
+    "priority": "P2",
+    "slaKey": null
+  },
+  {
+    "id": "TC_051",
+    "method": "POST",
+    "path": "/api/easyOrders/install-link",
+    "authRequired": true,
+    "roles": [
+      "Seller",
+      "Agency"
+    ],
+    "category": "misc",
+    "priority": "P2",
+    "slaKey": null
+  },
+  {
+    "id": "TC_052",
+    "method": "POST",
+    "path": "/api/easyOrders/callback",
+    "authRequired": false,
+    "roles": [],
+    "category": "misc",
+    "priority": "P2",
+    "slaKey": null
+  },
+  {
+    "id": "TC_053",
+    "method": "DELETE",
+    "path": "/api/easyOrders/disconnect",
+    "authRequired": true,
+    "roles": [
+      "Seller",
+      "Agency"
+    ],
+    "category": "misc",
+    "priority": "P2",
+    "slaKey": null
+  },
+  {
+    "id": "TC_054",
+    "method": "GET",
+    "path": "/api/youcan/auth",
+    "authRequired": false,
+    "roles": [],
+    "category": "auth",
+    "priority": "P2",
+    "slaKey": null
+  },
+  {
+    "id": "TC_055",
+    "method": "GET",
+    "path": "/api/youcan/callback",
+    "authRequired": false,
+    "roles": [],
+    "category": "integrations",
+    "priority": "P2",
+    "slaKey": null
+  },
+  {
+    "id": "TC_056",
+    "method": "GET",
+    "path": "/api/youcan/store-info",
+    "authRequired": false,
+    "roles": [],
+    "category": "store",
+    "priority": "P2",
+    "slaKey": null
+  },
+  {
+    "id": "TC_057",
+    "method": "POST",
+    "path": "/api/youcan/disconnect",
+    "authRequired": true,
+    "roles": [
+      "Seller",
+      "Agency"
+    ],
+    "category": "integrations",
+    "priority": "P2",
+    "slaKey": null
+  },
+  {
+    "id": "TC_058",
+    "method": "POST",
+    "path": "/api/youcan/webhooks",
+    "authRequired": false,
+    "roles": [],
+    "category": "integrations",
+    "priority": "P2",
+    "slaKey": null
+  },
+  {
+    "id": "TC_059",
+    "method": "DELETE",
+    "path": "/api/youcan/webhooks/delete",
+    "authRequired": true,
+    "roles": [
+      "Seller",
+      "Agency"
+    ],
+    "category": "integrations",
+    "priority": "P2",
+    "slaKey": null
+  },
+  {
+    "id": "TC_060",
+    "method": "GET",
+    "path": "/api/salla/auth",
+    "authRequired": false,
+    "roles": [],
+    "category": "auth",
+    "priority": "P2",
+    "slaKey": null
+  },
+  {
+    "id": "TC_061",
+    "method": "GET",
+    "path": "/api/salla/callback",
+    "authRequired": false,
+    "roles": [],
+    "category": "integrations",
+    "priority": "P2",
+    "slaKey": null
+  },
+  {
+    "id": "TC_062",
+    "method": "DELETE",
+    "path": "/api/salla/disconnect",
+    "authRequired": true,
+    "roles": [
+      "Seller",
+      "Agency"
+    ],
+    "category": "integrations",
+    "priority": "P2",
+    "slaKey": null
+  },
+  {
+    "id": "TC_063",
+    "method": "POST",
+    "path": "/api/salla/order/created",
+    "authRequired": false,
+    "roles": [],
+    "category": "integrations",
+    "priority": "P2",
+    "slaKey": null
+  },
+  {
+    "id": "TC_064",
+    "method": "PUT",
+    "path": "/api/orders/bulk-csv-update",
+    "authRequired": true,
+    "roles": [
+      "Admin",
+      "Agent"
+    ],
+    "category": "orders",
+    "priority": "P2",
+    "slaKey": null
+  },
+  {
+    "id": "TC_065",
+    "method": "PUT",
+    "path": "/api/orders/revert-to-confirmation-pending",
+    "authRequired": true,
+    "roles": [
+      "Admin",
+      "Agent"
+    ],
+    "category": "orders",
+    "priority": "P2",
+    "slaKey": null
+  },
+  {
+    "id": "TC_066",
+    "method": "POST",
+    "path": "/api/orders/bulk-order-upload",
+    "authRequired": true,
+    "roles": [
+      "Admin",
+      "Agent"
+    ],
+    "category": "orders",
+    "priority": "P2",
+    "slaKey": null
+  },
+  {
+    "id": "TC_067",
+    "method": "POST",
+    "path": "/api/orders/bulk-vendor-courier-upload",
+    "authRequired": true,
+    "roles": [
+      "Admin",
+      "Agent"
+    ],
+    "category": "orders",
+    "priority": "P2",
+    "slaKey": null
+  },
+  {
+    "id": "TC_068",
+    "method": "GET",
+    "path": "/api/orders/duplicates/:orderId",
+    "authRequired": true,
+    "roles": [
+      "Admin",
+      "Agent"
+    ],
+    "category": "orders",
+    "priority": "P2",
+    "slaKey": null
+  },
+  {
+    "id": "TC_069",
+    "method": "POST",
+    "path": "/api/orders/",
+    "authRequired": true,
+    "roles": [
+      "Admin",
+      "Agent"
+    ],
+    "category": "orders",
+    "priority": "P2",
+    "slaKey": null
+  },
+  {
+    "id": "TC_070",
+    "method": "GET",
+    "path": "/api/orders/status-counts",
+    "authRequired": true,
+    "roles": [
+      "Admin",
+      "Agent"
+    ],
+    "category": "orders",
+    "priority": "P0",
+    "slaKey": "statusCounts"
+  },
+  {
+    "id": "TC_071",
+    "method": "GET",
+    "path": "/api/orders/order-analytics",
+    "authRequired": true,
+    "roles": [
+      "Seller",
+      "Agency"
+    ],
+    "category": "orders",
+    "priority": "P1",
+    "slaKey": "orderAnalytics"
+  },
+  {
+    "id": "TC_072",
+    "method": "GET",
+    "path": "/api/orders/substatusOrders",
+    "authRequired": true,
+    "roles": [
+      "Seller",
+      "Agency"
+    ],
+    "category": "orders",
+    "priority": "P2",
+    "slaKey": null
+  },
+  {
+    "id": "TC_073",
+    "method": "GET",
+    "path": "/api/orders/seller-orders",
+    "authRequired": true,
+    "roles": [
+      "Seller",
+      "Agency"
+    ],
+    "category": "orders",
+    "priority": "P2",
+    "slaKey": null
+  },
+  {
+    "id": "TC_074",
+    "method": "POST",
+    "path": "/api/orders/add-product",
+    "authRequired": true,
+    "roles": [
+      "Admin",
+      "Agent",
+      "Seller"
+    ],
+    "category": "orders",
+    "priority": "P2",
+    "slaKey": null
+  },
+  {
+    "id": "TC_075",
+    "method": "GET",
+    "path": "/api/orders/couriers",
+    "authRequired": true,
+    "roles": [
+      "Admin",
+      "Agent"
+    ],
+    "category": "orders",
+    "priority": "P2",
+    "slaKey": null
+  },
+  {
+    "id": "TC_076",
+    "method": "GET",
+    "path": "/api/orders/batch-ids",
+    "authRequired": true,
+    "roles": [
+      "Admin",
+      "Agent"
+    ],
+    "category": "orders",
+    "priority": "P2",
+    "slaKey": null
+  },
+  {
+    "id": "TC_077",
+    "method": "POST",
+    "path": "/api/orders/courier-assignment/report",
+    "authRequired": true,
+    "roles": [
+      "Admin",
+      "Agent"
+    ],
+    "category": "orders",
+    "priority": "P2",
+    "slaKey": null
+  },
+  {
+    "id": "TC_078",
+    "method": "POST",
+    "path": "/api/orders/assign-courier",
+    "authRequired": true,
+    "roles": [
+      "Admin",
+      "Agent"
+    ],
+    "category": "orders",
+    "priority": "P1",
+    "slaKey": "assignCourier"
+  },
+  {
+    "id": "TC_079",
+    "method": "POST",
+    "path": "/api/orders/check-availability",
+    "authRequired": true,
+    "roles": [
+      "Admin",
+      "Agent"
+    ],
+    "category": "orders",
+    "priority": "P2",
+    "slaKey": null
+  },
+  {
+    "id": "TC_080",
+    "method": "POST",
+    "path": "/api/orders/variants/price",
+    "authRequired": true,
+    "roles": [
+      "Admin",
+      "Agent",
+      "Seller"
+    ],
+    "category": "orders",
+    "priority": "P2",
+    "slaKey": null
+  },
+  {
+    "id": "TC_081",
+    "method": "GET",
+    "path": "/api/orders/proccessedOrders",
+    "authRequired": true,
+    "roles": [
+      "Seller",
+      "Agency"
+    ],
+    "category": "orders",
+    "priority": "P2",
+    "slaKey": null
+  },
+  {
+    "id": "TC_082",
+    "method": "GET",
+    "path": "/api/orders/tags",
+    "authRequired": true,
+    "roles": [
+      "Admin",
+      "Agent"
+    ],
+    "category": "orders",
+    "priority": "P2",
+    "slaKey": null
+  },
+  {
+    "id": "TC_083",
+    "method": "GET",
+    "path": "/api/orders/remarks",
+    "authRequired": true,
+    "roles": [
+      "Admin",
+      "Agent"
+    ],
+    "category": "orders",
+    "priority": "P1",
+    "slaKey": null
+  },
+  {
+    "id": "TC_084",
+    "method": "POST",
+    "path": "/api/orders/ndr-remarks",
+    "authRequired": true,
+    "roles": [
+      "Admin",
+      "Agent"
+    ],
+    "category": "orders",
+    "priority": "P2",
+    "slaKey": null
+  },
+  {
+    "id": "TC_085",
+    "method": "GET",
+    "path": "/api/orders/batches/dip",
+    "authRequired": true,
+    "roles": [
+      "Admin",
+      "Agent"
+    ],
+    "category": "orders",
+    "priority": "P2",
+    "slaKey": null
+  },
+  {
+    "id": "TC_086",
+    "method": "POST",
+    "path": "/api/orders/download-awbs",
+    "authRequired": true,
+    "roles": [
+      "Admin",
+      "Agent"
+    ],
+    "category": "orders",
+    "priority": "P2",
+    "slaKey": null
+  },
+  {
+    "id": "TC_087",
+    "method": "POST",
+    "path": "/api/orders/download-packing-list",
+    "authRequired": true,
+    "roles": [
+      "Admin",
+      "Agent"
+    ],
+    "category": "orders",
+    "priority": "P2",
+    "slaKey": null
+  },
+  {
+    "id": "TC_088",
+    "method": "PUT",
+    "path": "/api/orders/approve-status/bulk",
+    "authRequired": true,
+    "roles": [
+      "Admin",
+      "Agent",
+      "Seller"
+    ],
+    "category": "orders",
+    "priority": "P2",
+    "slaKey": null
+  },
+  {
+    "id": "TC_089",
+    "method": "POST",
+    "path": "/api/orders/sub-statuses/bulk-update",
+    "authRequired": true,
+    "roles": [
+      "Admin",
+      "Agent",
+      "Seller"
+    ],
+    "category": "orders",
+    "priority": "P2",
+    "slaKey": null
+  },
+  {
+    "id": "TC_090",
+    "method": "PUT",
+    "path": "/api/orders/:orderId",
+    "authRequired": true,
+    "roles": [
+      "Admin",
+      "Agent",
+      "Seller"
+    ],
+    "category": "orders",
+    "priority": "P2",
+    "slaKey": null
+  },
+  {
+    "id": "TC_091",
+    "method": "PUT",
+    "path": "/api/orders/:orderId/order-product-variants/:orderProductVariantId",
+    "authRequired": true,
+    "roles": [
+      "Admin",
+      "Agent",
+      "Seller"
+    ],
+    "category": "orders",
+    "priority": "P2",
+    "slaKey": null
+  },
+  {
+    "id": "TC_092",
+    "method": "DELETE",
+    "path": "/api/orders/:orderId/delete-product/:orderProductVariantId",
+    "authRequired": true,
+    "roles": [
+      "Admin",
+      "Agent",
+      "Seller"
+    ],
+    "category": "orders",
+    "priority": "P2",
+    "slaKey": null
+  },
+  {
+    "id": "TC_093",
+    "method": "POST",
+    "path": "/api/orders/variants/search",
+    "authRequired": true,
+    "roles": [
+      "Admin",
+      "Agent",
+      "Seller"
+    ],
+    "category": "orders",
+    "priority": "P2",
+    "slaKey": null
+  },
+  {
+    "id": "TC_094",
+    "method": "GET",
+    "path": "/api/orders/store/:storeId",
+    "authRequired": false,
+    "roles": [],
+    "category": "orders",
+    "priority": "P2",
+    "slaKey": null
+  },
+  {
+    "id": "TC_095",
+    "method": "GET",
+    "path": "/api/orders/orderDetails/:orderId",
+    "authRequired": true,
+    "roles": [
+      "Admin",
+      "Agent",
+      "Seller"
+    ],
+    "category": "orders",
+    "priority": "P0",
+    "slaKey": "orderDetails"
+  },
+  {
+    "id": "TC_096",
+    "method": "GET",
+    "path": "/api/orders/:orderId/conversation/media",
+    "authRequired": true,
+    "roles": [
+      "Admin",
+      "Agent",
+      "Seller"
+    ],
+    "category": "orders",
+    "priority": "P2",
+    "slaKey": null
+  },
+  {
+    "id": "TC_097",
+    "method": "GET",
+    "path": "/api/orders/:orderId/conversation",
+    "authRequired": true,
+    "roles": [
+      "Admin",
+      "Agent",
+      "Seller"
+    ],
+    "category": "orders",
+    "priority": "P2",
+    "slaKey": null
+  },
+  {
+    "id": "TC_098",
+    "method": "PUT",
+    "path": "/api/orders/customers/:customerId",
+    "authRequired": true,
+    "roles": [
+      "Admin",
+      "Agent",
+      "Seller"
+    ],
+    "category": "orders",
+    "priority": "P2",
+    "slaKey": null
+  },
+  {
+    "id": "TC_099",
+    "method": "PUT",
+    "path": "/api/orders/:orderId/status",
+    "authRequired": true,
+    "roles": [
+      "Admin",
+      "Seller",
+      "Agency"
+    ],
+    "category": "orders",
+    "priority": "P2",
+    "slaKey": null
+  },
+  {
+    "id": "TC_100",
+    "method": "PUT",
+    "path": "/api/orders/:orderId/approve-status",
+    "authRequired": true,
+    "roles": [
+      "Admin",
+      "Agent",
+      "Seller"
+    ],
+    "category": "orders",
+    "priority": "P2",
+    "slaKey": null
+  },
+  {
+    "id": "TC_101",
+    "method": "DELETE",
+    "path": "/api/orders/:orderId/delete-product/:variantId",
+    "authRequired": true,
+    "roles": [
+      "Admin",
+      "Agent",
+      "Seller"
+    ],
+    "category": "orders",
+    "priority": "P2",
+    "slaKey": null
+  },
+  {
+    "id": "TC_102",
+    "method": "POST",
+    "path": "/api/orders/uploadOrderCSV",
+    "authRequired": true,
+    "roles": [
+      "Seller",
+      "Agency"
+    ],
+    "category": "orders",
+    "priority": "P2",
+    "slaKey": null
+  },
+  {
+    "id": "TC_103",
+    "method": "GET",
+    "path": "/api/orders/:orderId/logs",
+    "authRequired": true,
+    "roles": [
+      "Admin",
+      "Agent",
+      "Seller"
+    ],
+    "category": "orders",
+    "priority": "P1",
+    "slaKey": "orderLogs"
+  },
+  {
+    "id": "TC_104",
+    "method": "PUT",
+    "path": "/api/orders/address/:orderId",
+    "authRequired": true,
+    "roles": [
+      "Admin",
+      "Seller"
+    ],
+    "category": "orders",
+    "priority": "P2",
+    "slaKey": null
+  },
+  {
+    "id": "TC_105",
+    "method": "PUT",
+    "path": "/api/orders/:orderId/edit",
+    "authRequired": true,
+    "roles": [
+      "Admin",
+      "Agent",
+      "Seller"
+    ],
+    "category": "orders",
+    "priority": "P2",
+    "slaKey": null
+  },
+  {
+    "id": "TC_106",
+    "method": "POST",
+    "path": "/api/orders/clear-courier-assignment",
+    "authRequired": true,
+    "roles": [
+      "Admin",
+      "Agent",
+      "Seller"
+    ],
+    "category": "orders",
+    "priority": "P2",
+    "slaKey": null
+  },
+  {
+    "id": "TC_107",
+    "method": "GET",
+    "path": "/api/orders/dispatch-batches",
+    "authRequired": true,
+    "roles": [
+      "Admin",
+      "Agent"
+    ],
+    "category": "orders",
+    "priority": "P2",
+    "slaKey": null
+  },
+  {
+    "id": "TC_108",
+    "method": "POST",
+    "path": "/api/orders/generate-batches",
+    "authRequired": true,
+    "roles": [
+      "Admin",
+      "Agent"
+    ],
+    "category": "orders",
+    "priority": "P2",
+    "slaKey": null
+  },
+  {
+    "id": "TC_109",
+    "method": "POST",
+    "path": "/api/orders/generate-tracking-ids",
+    "authRequired": true,
+    "roles": [
+      "Admin",
+      "Agent"
+    ],
+    "category": "orders",
+    "priority": "P2",
+    "slaKey": null
+  },
+  {
+    "id": "TC_110",
+    "method": "GET",
+    "path": "/api/orders/tracking-generation-report",
+    "authRequired": true,
+    "roles": [
+      "Admin",
+      "Agent"
+    ],
+    "category": "orders",
+    "priority": "P2",
+    "slaKey": null
+  },
+  {
+    "id": "TC_111",
+    "method": "GET",
+    "path": "/api/orders/vendors",
+    "authRequired": true,
+    "roles": [
+      "Admin",
+      "Agent"
+    ],
+    "category": "orders",
+    "priority": "P2",
+    "slaKey": null
+  },
+  {
+    "id": "TC_112",
+    "method": "POST",
+    "path": "/api/orders/generate-documents",
+    "authRequired": true,
+    "roles": [
+      "Admin",
+      "Agent"
+    ],
+    "category": "orders",
+    "priority": "P2",
+    "slaKey": null
+  },
+  {
+    "id": "TC_113",
+    "method": "DELETE",
+    "path": "/api/orders/delete/:orderId",
+    "authRequired": true,
+    "roles": [
+      "Seller",
+      "Agency"
+    ],
+    "category": "orders",
+    "priority": "P2",
+    "slaKey": null
+  },
+  {
+    "id": "TC_114",
+    "method": "GET",
+    "path": "/api/orders/substatus-orders-for-csv",
+    "authRequired": true,
+    "roles": [
+      "Seller",
+      "Agency"
+    ],
+    "category": "orders",
+    "priority": "P2",
+    "slaKey": null
+  },
+  {
+    "id": "TC_115",
+    "method": "PUT",
+    "path": "/api/orderTags/:tagId",
+    "authRequired": true,
+    "roles": [
+      "Admin",
+      "Agent"
+    ],
+    "category": "misc",
+    "priority": "P2",
+    "slaKey": null
+  },
+  {
+    "id": "TC_116",
+    "method": "POST",
+    "path": "/api/tags/createTag",
+    "authRequired": true,
+    "roles": [
+      "Admin",
+      "Agent"
+    ],
+    "category": "orders",
+    "priority": "P2",
+    "slaKey": null
+  },
+  {
+    "id": "TC_117",
+    "method": "GET",
+    "path": "/api/tags/",
+    "authRequired": true,
+    "roles": [
+      "Admin",
+      "Seller"
+    ],
+    "category": "orders",
+    "priority": "P2",
+    "slaKey": null
+  },
+  {
+    "id": "TC_118",
+    "method": "DELETE",
+    "path": "/api/tags/:id",
+    "authRequired": true,
+    "roles": [
+      "Admin",
+      "Agent"
+    ],
+    "category": "orders",
+    "priority": "P2",
+    "slaKey": null
+  },
+  {
+    "id": "TC_119",
+    "method": "PUT",
+    "path": "/api/tags/:id",
+    "authRequired": true,
+    "roles": [
+      "Admin",
+      "Agent"
+    ],
+    "category": "orders",
+    "priority": "P2",
+    "slaKey": null
+  },
+  {
+    "id": "TC_120",
+    "method": "GET",
+    "path": "/api/tags/statuses",
+    "authRequired": true,
+    "roles": [
+      "Admin",
+      "Seller"
+    ],
+    "category": "orders",
+    "priority": "P2",
+    "slaKey": null
+  },
+  {
+    "id": "TC_121",
+    "method": "GET",
+    "path": "/api/tags/substatuses/:statusId",
+    "authRequired": true,
+    "roles": [
+      "Admin",
+      "Seller"
+    ],
+    "category": "orders",
+    "priority": "P2",
+    "slaKey": null
+  },
+  {
+    "id": "TC_122",
+    "method": "GET",
+    "path": "/api/billing/status",
+    "authRequired": true,
+    "roles": [
+      "Seller",
+      "Agency"
+    ],
+    "category": "misc",
+    "priority": "P2",
+    "slaKey": null
+  },
+  {
+    "id": "TC_123",
+    "method": "POST",
+    "path": "/api/billing/shopify/create",
+    "authRequired": true,
+    "roles": [
+      "Seller",
+      "Agency"
+    ],
+    "category": "integrations",
+    "priority": "P2",
+    "slaKey": null
+  },
+  {
+    "id": "TC_124",
+    "method": "GET",
+    "path": "/api/billing/shopify/callback",
+    "authRequired": false,
+    "roles": [],
+    "category": "integrations",
+    "priority": "P2",
+    "slaKey": null
+  },
+  {
+    "id": "TC_125",
+    "method": "GET",
+    "path": "/api/billing/shopify/stores",
+    "authRequired": true,
+    "roles": [
+      "Seller",
+      "Agency"
+    ],
+    "category": "store",
+    "priority": "P2",
+    "slaKey": null
+  },
+  {
+    "id": "TC_126",
+    "method": "GET",
+    "path": "/api/admin/gold-subscriptions/users/gold",
+    "authRequired": true,
+    "roles": [
+      "Admin"
+    ],
+    "category": "admin",
+    "priority": "P2",
+    "slaKey": null
+  },
+  {
+    "id": "TC_127",
+    "method": "GET",
+    "path": "/api/admin/gold-subscriptions/users",
+    "authRequired": true,
+    "roles": [
+      "Admin"
+    ],
+    "category": "admin",
+    "priority": "P2",
+    "slaKey": null
+  },
+  {
+    "id": "TC_128",
+    "method": "GET",
+    "path": "/api/admin/gold-subscriptions/users/:userId",
+    "authRequired": true,
+    "roles": [
+      "Admin"
+    ],
+    "category": "admin",
+    "priority": "P2",
+    "slaKey": null
+  },
+  {
+    "id": "TC_129",
+    "method": "POST",
+    "path": "/api/admin/gold-subscriptions/give",
+    "authRequired": true,
+    "roles": [
+      "Admin"
+    ],
+    "category": "admin",
+    "priority": "P2",
+    "slaKey": null
+  },
+  {
+    "id": "TC_130",
+    "method": "POST",
+    "path": "/api/admin/gold-subscriptions/extend",
+    "authRequired": true,
+    "roles": [
+      "Admin"
+    ],
+    "category": "admin",
+    "priority": "P2",
+    "slaKey": null
+  },
+  {
+    "id": "TC_131",
+    "method": "POST",
+    "path": "/api/admin/gold-subscriptions/remove",
+    "authRequired": true,
+    "roles": [
+      "Admin"
+    ],
+    "category": "admin",
+    "priority": "P2",
+    "slaKey": null
+  },
+  {
+    "id": "TC_132",
+    "method": "GET",
+    "path": "/api/admin/agency-registrations/applications",
+    "authRequired": true,
+    "roles": [
+      "Admin"
+    ],
+    "category": "admin",
+    "priority": "P2",
+    "slaKey": null
+  },
+  {
+    "id": "TC_133",
+    "method": "GET",
+    "path": "/api/admin/agency-registrations/applications/:id",
+    "authRequired": true,
+    "roles": [
+      "Admin"
+    ],
+    "category": "admin",
+    "priority": "P2",
+    "slaKey": null
+  },
+  {
+    "id": "TC_134",
+    "method": "GET",
+    "path": "/api/admin/agency-registrations/commission-models",
+    "authRequired": true,
+    "roles": [
+      "Admin"
+    ],
+    "category": "admin",
+    "priority": "P2",
+    "slaKey": null
+  },
+  {
+    "id": "TC_135",
+    "method": "GET",
+    "path": "/api/admin/agency-registrations/commission-models/manage",
+    "authRequired": true,
+    "roles": [
+      "Admin"
+    ],
+    "category": "admin",
+    "priority": "P2",
+    "slaKey": null
+  },
+  {
+    "id": "TC_136",
+    "method": "POST",
+    "path": "/api/admin/agency-registrations/commission-models",
+    "authRequired": true,
+    "roles": [
+      "Admin"
+    ],
+    "category": "admin",
+    "priority": "P2",
+    "slaKey": null
+  },
+  {
+    "id": "TC_137",
+    "method": "PUT",
+    "path": "/api/admin/agency-registrations/commission-models/:id",
+    "authRequired": true,
+    "roles": [
+      "Admin"
+    ],
+    "category": "admin",
+    "priority": "P2",
+    "slaKey": null
+  },
+  {
+    "id": "TC_138",
+    "method": "POST",
+    "path": "/api/admin/agency-registrations/applications/:id/approve",
+    "authRequired": true,
+    "roles": [
+      "Admin"
+    ],
+    "category": "admin",
+    "priority": "P2",
+    "slaKey": null
+  },
+  {
+    "id": "TC_139",
+    "method": "POST",
+    "path": "/api/admin/agency-registrations/applications/:id/hold",
+    "authRequired": true,
+    "roles": [
+      "Admin"
+    ],
+    "category": "admin",
+    "priority": "P2",
+    "slaKey": null
+  },
+  {
+    "id": "TC_140",
+    "method": "POST",
+    "path": "/api/admin/agency-registrations/applications/:id/reject",
+    "authRequired": true,
+    "roles": [
+      "Admin"
+    ],
+    "category": "admin",
+    "priority": "P2",
+    "slaKey": null
+  },
+  {
+    "id": "TC_141",
+    "method": "POST",
+    "path": "/api/admin/agency-registrations/applications/:id/revert-to-pending",
+    "authRequired": true,
+    "roles": [
+      "Admin"
+    ],
+    "category": "admin",
+    "priority": "P2",
+    "slaKey": null
+  },
+  {
+    "id": "TC_142",
+    "method": "POST",
+    "path": "/api/admin/agency-registrations/applications/:id/revoke",
+    "authRequired": true,
+    "roles": [
+      "Admin"
+    ],
+    "category": "admin",
+    "priority": "P2",
+    "slaKey": null
+  },
+  {
+    "id": "TC_143",
+    "method": "GET",
+    "path": "/api/imile/token",
+    "authRequired": true,
+    "roles": [
+      "Admin",
+      "Agent",
+      "Seller"
+    ],
+    "category": "misc",
+    "priority": "P2",
+    "slaKey": null
+  },
+  {
+    "id": "TC_144",
+    "method": "POST",
+    "path": "/api/imile/create-order",
+    "authRequired": true,
+    "roles": [
+      "Admin",
+      "Agent",
+      "Seller"
+    ],
+    "category": "misc",
+    "priority": "P2",
+    "slaKey": null
+  },
+  {
+    "id": "TC_145",
+    "method": "POST",
+    "path": "/api/imile/track",
+    "authRequired": true,
+    "roles": [
+      "Admin",
+      "Agent",
+      "Seller"
+    ],
+    "category": "misc",
+    "priority": "P2",
+    "slaKey": null
+  },
+  {
+    "id": "TC_146",
+    "method": "POST",
+    "path": "/api/imile/cancel",
+    "authRequired": true,
+    "roles": [
+      "Admin",
+      "Agent",
+      "Seller"
+    ],
+    "category": "misc",
+    "priority": "P2",
+    "slaKey": null
+  },
+  {
+    "id": "TC_147",
+    "method": "POST",
+    "path": "/api/imile/reprint-awb",
+    "authRequired": true,
+    "roles": [
+      "Admin",
+      "Agent",
+      "Seller"
+    ],
+    "category": "misc",
+    "priority": "P2",
+    "slaKey": null
+  },
+  {
+    "id": "TC_148",
+    "method": "POST",
+    "path": "/api/imile/pod",
+    "authRequired": true,
+    "roles": [
+      "Admin",
+      "Agent",
+      "Seller"
+    ],
+    "category": "misc",
+    "priority": "P2",
+    "slaKey": null
+  },
+  {
+    "id": "TC_149",
+    "method": "POST",
+    "path": "/api/imile/webhook",
+    "authRequired": false,
+    "roles": [],
+    "category": "misc",
+    "priority": "P2",
+    "slaKey": null
+  },
+  {
+    "id": "TC_150",
+    "method": "POST",
+    "path": "/api/tawseel/webhook",
+    "authRequired": false,
+    "roles": [],
+    "category": "misc",
+    "priority": "P2",
+    "slaKey": null
+  }
+]
