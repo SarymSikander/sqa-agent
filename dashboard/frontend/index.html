@@ -490,6 +490,33 @@
       border-radius: 99px;
     }
 
+    /* ── API Tests collapsible sections ──────────────────────────────────── */
+    .at-sec-hdr {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      cursor: pointer;
+      margin-bottom: 8px;
+      user-select: none;
+    }
+    .at-sec-hdr:hover .at-sec-toggle { color: var(--text); }
+    .at-sec-toggle {
+      background: none;
+      border: none;
+      cursor: pointer;
+      color: var(--text3);
+      font-size: 11px;
+      padding: 0 3px;
+      line-height: 1;
+      flex-shrink: 0;
+    }
+    .at-sec-title {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text);
+    }
+    .at-sec-body.collapsed { display: none; }
+
     /* ── Screenshots grid ────────────────────────────────────────────────────── */
     .screenshots-grid {
       display: grid;
@@ -1849,52 +1876,78 @@
 
         <!-- 4. Failed tests / bugs table -->
         <div style="margin-bottom:20px">
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
-            <div style="font-size:13px;font-weight:600;color:var(--text)">Failed Tests</div>
-            <button class="btn btn-danger btn-sm" id="at-jira-btn" onclick="atCreateJiraBugs()" style="display:none">
-              <span class="spin" style="display:none"></span> Create All as Jira Tickets
-            </button>
+          <div class="at-sec-hdr" onclick="atToggleSection('failed')">
+            <span class="at-sec-title">Failed Tests</span>
+            <div style="display:flex;align-items:center;gap:8px">
+              <button class="btn btn-danger btn-sm" id="at-jira-btn"
+                onclick="event.stopPropagation();atCreateJiraBugs()" style="display:none">
+                <span class="spin" style="display:none"></span> Create All as Jira Tickets
+              </button>
+              <button class="at-sec-toggle" id="at-toggle-failed" aria-label="Toggle">▼</button>
+            </div>
           </div>
-          <div class="tbl-wrap">
-            <table>
-              <thead><tr><th>Suite</th><th>Test</th><th>Error</th></tr></thead>
-              <tbody id="at-failures-body"><tr class="empty-row"><td colspan="3">No data — run the suite or click Refresh</td></tr></tbody>
-            </table>
+          <div class="at-sec-body" id="at-body-failed">
+            <div class="tbl-wrap">
+              <table>
+                <thead><tr><th>Suite</th><th>Test</th><th>Error</th></tr></thead>
+                <tbody id="at-failures-body"><tr class="empty-row"><td colspan="3">No data — run the suite or click Refresh</td></tr></tbody>
+              </table>
+            </div>
           </div>
         </div>
 
         <!-- 5. SLA table -->
         <div style="margin-bottom:20px">
-          <div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:8px">SLA Thresholds</div>
-          <div class="tbl-wrap">
-            <table>
-              <thead><tr><th>Key</th><th>p95 Baseline</th><th>Pass</th><th>Warn</th><th>Fail</th><th>Status</th></tr></thead>
-              <tbody id="at-sla-body"><tr class="empty-row"><td colspan="6">Loading…</td></tr></tbody>
-            </table>
+          <div class="at-sec-hdr" onclick="atToggleSection('sla')">
+            <span class="at-sec-title">SLA Thresholds</span>
+            <button class="at-sec-toggle" id="at-toggle-sla" aria-label="Toggle">▼</button>
+          </div>
+          <div class="at-sec-body" id="at-body-sla">
+            <div class="tbl-wrap">
+              <table>
+                <thead><tr><th>Key</th><th>p95 Baseline</th><th>Pass</th><th>Warn</th><th>Fail</th><th>Status</th></tr></thead>
+                <tbody id="at-sla-body"><tr class="empty-row"><td colspan="6">Loading…</td></tr></tbody>
+              </table>
+            </div>
           </div>
         </div>
 
         <!-- 6. Dead endpoints -->
         <div style="margin-bottom:20px">
-          <div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:8px">Dead Endpoints</div>
-          <div id="at-dead-list" style="color:var(--text3);font-size:13px">Loading…</div>
+          <div class="at-sec-hdr" onclick="atToggleSection('dead')">
+            <span class="at-sec-title">Dead Endpoints</span>
+            <button class="at-sec-toggle" id="at-toggle-dead" aria-label="Toggle">▼</button>
+          </div>
+          <div class="at-sec-body" id="at-body-dead">
+            <div id="at-dead-list" style="color:var(--text3);font-size:13px">Loading…</div>
+          </div>
         </div>
 
         <!-- 7. Test inventory -->
         <div style="margin-bottom:20px">
-          <div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:8px">Endpoint Inventory</div>
-          <div class="tbl-wrap">
-            <table>
-              <thead><tr><th>TC ID</th><th>Method</th><th>Endpoint</th><th>Priority</th><th>Auth</th><th>Roles</th></tr></thead>
-              <tbody id="at-inventory-body"><tr class="empty-row"><td colspan="6">Loading…</td></tr></tbody>
-            </table>
+          <div class="at-sec-hdr" onclick="atToggleSection('inventory')">
+            <span class="at-sec-title">Endpoint Inventory</span>
+            <button class="at-sec-toggle" id="at-toggle-inventory" aria-label="Toggle">▼</button>
+          </div>
+          <div class="at-sec-body" id="at-body-inventory">
+            <div class="tbl-wrap">
+              <table>
+                <thead><tr><th>TC ID</th><th>Method</th><th>Endpoint</th><th>Priority</th><th>Auth</th><th>Roles</th></tr></thead>
+                <tbody id="at-inventory-body"><tr class="empty-row"><td colspan="6">Loading…</td></tr></tbody>
+              </table>
+            </div>
           </div>
         </div>
 
         <!-- 8. Baseline log -->
         <div style="margin-bottom:8px">
-          <div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:8px">Baseline Log</div>
-          <div id="at-baseline-log" style="background:var(--card);border:1px solid var(--border);border-radius:8px;padding:16px;max-height:320px;overflow-y:auto;font-size:12px;color:var(--text2)">Loading…</div>
+          <div class="at-sec-hdr" onclick="atToggleSection('baseline')">
+            <span class="at-sec-title">Baseline Log</span>
+            <button class="at-sec-toggle" id="at-toggle-baseline" aria-label="Toggle">▼</button>
+          </div>
+          <div class="at-sec-body" id="at-body-baseline">
+            <div id="at-baseline-log" style="background:var(--card);border:1px solid var(--border);border-radius:8px;padding:16px;max-height:320px;overflow-y:auto;font-size:12px;color:var(--text2)">Loading…</div>
+          </div>
         </div>
 
       </div>
@@ -2321,7 +2374,7 @@ function onPageEnter(page) {
   if (page === 'overview')  loadOverview();
   if (page === 'tests')     loadScreenshots();
   if (page === 'reports')   reportsLoad();
-  if (page === 'api-tests') atLoadAll();
+  if (page === 'api-tests') { atRestoreSections(); atLoadAll(); }
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -3696,6 +3749,29 @@ document.addEventListener('DOMContentLoaded', () => {
 
 let _atFailures = [];
 let _atLastSingleEndpoint = '';  // path used in the last single-endpoint test run
+
+const _AT_SECTIONS = ['failed', 'sla', 'dead', 'inventory', 'baseline'];
+
+function atToggleSection(key) {
+  const body   = document.getElementById('at-body-'   + key);
+  const toggle = document.getElementById('at-toggle-' + key);
+  if (!body) return;
+  const closing = !body.classList.contains('collapsed');
+  body.classList.toggle('collapsed', closing);
+  if (toggle) toggle.textContent = closing ? '▶' : '▼';
+  sessionStorage.setItem('at_sec_' + key, closing ? 'closed' : 'open');
+}
+
+function atRestoreSections() {
+  _AT_SECTIONS.forEach(key => {
+    const closed = sessionStorage.getItem('at_sec_' + key) === 'closed';
+    const body   = document.getElementById('at-body-'   + key);
+    const toggle = document.getElementById('at-toggle-' + key);
+    if (!body) return;
+    body.classList.toggle('collapsed', closed);
+    if (toggle) toggle.textContent = closed ? '▶' : '▼';
+  });
+}
 
 async function atLoadAll() {
   await Promise.all([atLoadResults(), atLoadSla(), atLoadInventory(), atLoadBaseline()]);
