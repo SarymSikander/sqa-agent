@@ -3695,6 +3695,7 @@ document.addEventListener('DOMContentLoaded', () => {
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 let _atFailures = [];
+let _atLastSingleEndpoint = '';  // path used in the last single-endpoint test run
 
 async function atLoadAll() {
   await Promise.all([atLoadResults(), atLoadSla(), atLoadInventory(), atLoadBaseline()]);
@@ -3721,7 +3722,10 @@ function _atDimCard(id, valId, subId, data) {
 
 async function atLoadResults() {
   try {
-    const d = await api('/api-tests/results');
+    const [d, perfMetrics] = await Promise.all([
+      api('/api-tests/results'),
+      api('/api-tests/perf-metrics').catch(() => []),
+    ]);
     console.log('[AT-DEBUG] results response:', d);
     if (!d.available) {
       document.getElementById('at-total-val').textContent = '—';
@@ -3744,7 +3748,7 @@ async function atLoadResults() {
     _atFailures = d.failures || [];
     document.getElementById('at-jira-btn').style.display = _atFailures.length ? '' : 'none';
     atRenderFailures(_atFailures);
-    if (d.suites && d.suites.length) atRenderTerminal(d);
+    if (d.suites && d.suites.length) atRenderTerminal(d, Array.isArray(perfMetrics) ? perfMetrics : []);
   } catch (e) {
     console.error('[AT-DEBUG] results error:', e);
     document.getElementById('at-total-val').textContent = 'Error';
@@ -3841,7 +3845,7 @@ async function atLoadBaseline() {
   }
 }
 
-function atRenderTerminal(data) {
+function atRenderTerminal(data, perfMetrics = []) {
   const termWrap = document.getElementById('at-terminal-wrap');
   const term     = document.getElementById('at-terminal');
   termWrap.style.display = '';
@@ -3855,16 +3859,72 @@ function atRenderTerminal(data) {
     html.push(`<span style="color:#30363d">${'─'.repeat(50)}</span>\n`);
   }
 
+  // Extract METHOD /path from a test title (e.g. "GET /api/dashboard/data")
+  function _ep(title) {
+    const m = (title || '').match(/(GET|POST|PUT|DELETE|PATCH)\s+(\/\S+)/);
+    return m ? (m[1] + ' ' + m[2]) : null;
+  }
+
+  // Find the most-recent perf entry matching a label (accumulates over runs)
+  function _perf(label) {
+    const hits = perfMetrics.filter(e => e.label === label);
+    return hits.length ? hits[hits.length - 1] : null;
+  }
+
+  function _perfColors(result) {
+    return result === 'PASS' ? { col: '#3fb950', icon: '✅' }
+         : result === 'WARN' ? { col: '#d29922', icon: '⚠️' }
+         :                     { col: '#f85149', icon: '❌' };
+  }
+
+  // ── Prominent response-time card for single-endpoint runs ──────────────────
+  if (_atLastSingleEndpoint && perfMetrics.length) {
+    const hits  = perfMetrics.filter(e => e.label && e.label.endsWith(_atLastSingleEndpoint));
+    const entry = hits.length ? hits[hits.length - 1] : null;
+    if (entry) {
+      const { col, icon } = _perfColors(entry.result);
+      const sla = entry.sla_pass != null ? `≤${entry.sla_pass}ms` : 'n/a';
+      const bar = '─'.repeat(33);
+      html.push(`<span style="color:#58a6ff">┌${bar}┐</span>`);
+      html.push(`<span style="color:#58a6ff">│</span>  <span style="color:#c9d1d9;font-weight:600">${esc(entry.label)}</span>`);
+      html.push(`<span style="color:#58a6ff">│</span>  avg: <span style="color:${col};font-weight:600">${entry.avg}ms</span>  ·  p50: ${entry.p50}ms  ·  p95: ${entry.p95}ms`);
+      html.push(`<span style="color:#58a6ff">│</span>  SLA: <span style="color:${col}">${esc(sla)}</span>`);
+      html.push(`<span style="color:#58a6ff">│</span>  <span style="color:${col};font-weight:600">${icon} ${entry.result} — within SLA</span>`);
+      html.push(`<span style="color:#58a6ff">└${bar}┘</span>`);
+      html.push('');
+    }
+  }
+
+  // ── Suite test list with inline ⏱ lines after each PERF test ──────────────
   for (const suite of data.suites || []) {
     html.push(`<span style="color:#58a6ff;font-weight:600">SUITE: ${esc(suite.file)}</span>`);
     for (const t of suite.tests || []) {
+      const isPerf = (t.title || '').includes('[PERF]');
       if (t.status === 'passed') {
         html.push(`  <span style="color:#3fb950">✅ ${esc(t.title)}</span>`);
       } else if (t.status === 'failed') {
-        const brief = t.error ? ' — ' + esc(t.error.replace(/\n/g,' ').trim().slice(0,120)) : '';
+        const brief = t.error ? ' — ' + esc(t.error.replace(/\n/g,' ').trim().slice(0, 120)) : '';
         html.push(`  <span style="color:#f85149">❌ ${esc(t.title)}${brief}</span>`);
       } else {
         html.push(`  <span style="color:#8b949e">⏭ ${esc(t.title)}</span>`);
+      }
+
+      // ⏱ timing summary after each PERF test
+      if (isPerf && perfMetrics.length) {
+        const ep    = _ep(t.title);
+        const entry = ep ? _perf(ep) : null;
+        if (entry) {
+          const { col, icon } = _perfColors(entry.result);
+          const sla = entry.sla_pass != null ? `≤${entry.sla_pass}ms` : 'n/a';
+          html.push(
+            `  <span style="color:#8b949e">⏱  Response times: ` +
+            `avg <span style="color:${col}">${entry.avg}ms</span> · ` +
+            `p50 ${entry.p50}ms · ` +
+            `p95 ${entry.p95}ms · ` +
+            `SLA pass ${sla} · ` +
+            `<span style="color:${col}">${icon} ${entry.result}</span></span>`
+          );
+        }
       }
     }
     html.push('');
@@ -3880,7 +3940,7 @@ function atRenderTerminal(data) {
   html.push(ruler);
 
   term.innerHTML = html.join('\n');
-  term.scrollTop = term.scrollHeight;
+  term.scrollTop = term.scrollTop > 0 ? term.scrollTop : 0;  // keep card visible at top
 }
 
 async function atRunSuite(scope = 'all', singleEndpoint = '') {
@@ -4057,12 +4117,13 @@ function atInvFilter() {
 }
 
 async function atTestSingleEndpoint(path) {
+  _atLastSingleEndpoint = path;
   atCloseInventoryModal();
   const term = document.getElementById('at-terminal');
   const termWrap = document.getElementById('at-terminal-wrap');
   termWrap.style.display = '';
   term.textContent = `▶ Running single-endpoint test: ${path}\n`;
-  await atRunSuite('single', path);
+  await atRunSuite('all', path);
 }
 
 async function atCreateJiraBugs() {

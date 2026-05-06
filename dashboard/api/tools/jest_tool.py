@@ -73,3 +73,16 @@ def get_inventory() -> list:
         return []
     with open(p) as f:
         return json.load(f)
+
+
+def get_perf_metrics() -> list:
+    # Accumulates on every test run — no static fallback (dynamic data)
+    p = _find(
+        _DATA_DIR / 'perf-metrics.json',
+        SUITE_PATH / 'reports' / 'perf-metrics.json',
+        _FALLBACK_REPORTS / 'perf-metrics.json',
+    )
+    if p is None:
+        return []
+    with open(p) as f:
+        return json.load(f)

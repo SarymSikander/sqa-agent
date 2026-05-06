@@ -1831,6 +1831,22 @@ async def upload_baseline(file: UploadFile = File(...)):
     return {"ok": True, "path": str(dest)}
 
 
+@app.post("/api-tests/upload-perf-metrics")
+async def upload_perf_metrics(file: UploadFile = File(...)):
+    dest = _DATA_DIR / "perf-metrics.json"
+    dest.write_bytes(await file.read())
+    return {"ok": True, "path": str(dest)}
+
+
+@app.get("/api-tests/perf-metrics")
+async def get_api_test_perf_metrics():
+    try:
+        data = await asyncio.to_thread(_jest.get_perf_metrics)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    return data or []
+
+
 @app.post("/api-tests/create-jira-bugs")
 async def create_api_test_jira_bugs(body: CreateJiraBugsBody):
     created, errors = [], []
