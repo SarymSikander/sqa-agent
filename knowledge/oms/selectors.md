@@ -1,7 +1,7 @@
 # OMS — UI Selectors Reference (VERIFIED from live portal screenshots)
 
 > Source: 12 screenshots of portal.myzambeel.com — all selectors confirmed from actual UI.
-> Last verified: 2026-05-01
+> Last verified: 2026-05-06
 
 ## Selector Rules (React + Tailwind — No IDs)
 - **Buttons:** `button:has-text('exact text')`
@@ -110,6 +110,13 @@ button:has-text('Update Remarks')
 button:has-text('Assign Courier')
 ```
 
+### Opening an Order
+```
+# Click the order ID link (plain text link in the ORDER ID column):
+text='651501'               → example; use the actual order ID value
+# The Order Details modal opens after the click.
+```
+
 ### Empty State
 ```
 text='No orders found'
@@ -206,6 +213,9 @@ text='Area Name'
 text='Building/Society'
 text='National Address Short Code'
 ```
+> ⚠️ These fields display their current values as **read-only text** by default.
+> They only become editable `<input>` elements **after** clicking `button:has-text('Edit Order')`.
+> Do NOT try to FILL these fields before clicking Edit Order.
 
 ### Financial Summary Section
 ```
@@ -839,3 +849,6 @@ span:has-text('Submitted')
 | Dispatch search | 'Search orders' | **'Search orders...'** (with ellipsis) |
 | Filter modal apply btn | 'Apply Filters' | **'Apply filter'** (lowercase 'f') |
 | Filter modal clear btn | 'Reset' | **'Clear all filters'** |
+| Orders search input | 'Search Order ID' | **`input[placeholder='Search orders']`** |
+| Opening an order | click row | **`CLICK: text='<order-id>'`** (ID link in table) |
+| Order address fields | editable inputs | **read-only text until 'Edit Order' clicked** |
