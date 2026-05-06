@@ -3341,7 +3341,9 @@ async function _runQAStream(key, env, fe, be, portal, apiBase) {
   try {
     const _qaAbort = new AbortController();
     const _qaTimeout = setTimeout(() => _qaAbort.abort(), 15 * 60 * 1000);
-    const resp = await fetch(`${base}/jira/tickets/${key}/run-qa`, {
+    const _rqaToken = sessionStorage.getItem('sqa_token') || '';
+    const _rqaUrl = `${base}/jira/tickets/${key}/run-qa${_rqaToken ? `?token=${encodeURIComponent(_rqaToken)}` : ''}`;
+    const resp = await fetch(_rqaUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ env, frontend_branch: fe, backend_branch: be, portal }),

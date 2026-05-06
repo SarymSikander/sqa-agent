@@ -73,6 +73,12 @@ async def _auth_middleware(request: Request, call_next):
 
     auth = request.headers.get("Authorization", "")
     if not auth.startswith("Bearer "):
+        # Fallback: token as query param for SSE endpoints that can't set headers
+        query_token = request.query_params.get("token", "")
+        if query_token:
+            auth = f"Bearer {query_token}"
+
+    if not auth.startswith("Bearer "):
         return JSONResponse({"detail": "Not authenticated"}, status_code=401)
 
     token = auth.removeprefix("Bearer ").strip()
