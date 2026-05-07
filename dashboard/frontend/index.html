@@ -2398,12 +2398,13 @@ function toggleCollapse(id) {
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // Helpers
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-function fmtDate(iso) {
-  if (!iso) return '—';
-  const d = new Date(iso);
-  return d.toLocaleDateString('en-PK', { timeZone: 'Asia/Karachi' }) + ' ' +
-         d.toLocaleTimeString('en-PK', { timeZone: 'Asia/Karachi', hour: '2-digit', minute: '2-digit' });
+function formatPKT(dateStr) {
+  if (!dateStr) return '—';
+  const d = new Date(dateStr);
+  d.setHours(d.getHours() + 5);
+  return d.toLocaleString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
 }
+function fmtDate(iso) { return formatPKT(iso); }
 function fmtBytes(b) {
   if (b < 1024) return b + ' B';
   if (b < 1048576) return (b/1024).toFixed(1) + ' KB';
@@ -2490,7 +2491,7 @@ function calcPassRate() {
 // ── Last Updated timestamp ────────────────────────────────────────────────────
 function markLastUpdated() {
   const el = document.getElementById('last-updated-time');
-  if (el) el.textContent = new Date().toLocaleTimeString('en-PK', { timeZone: 'Asia/Karachi', hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  if (el) { const n = new Date(); n.setHours(n.getHours() + 5); el.textContent = n.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit' }); }
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
