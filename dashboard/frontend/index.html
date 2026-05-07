@@ -2401,7 +2401,8 @@ function toggleCollapse(id) {
 function fmtDate(iso) {
   if (!iso) return '—';
   const d = new Date(iso);
-  return d.toLocaleDateString() + ' ' + d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  return d.toLocaleDateString('en-PK', { timeZone: 'Asia/Karachi' }) + ' ' +
+         d.toLocaleTimeString('en-PK', { timeZone: 'Asia/Karachi', hour: '2-digit', minute: '2-digit' });
 }
 function fmtBytes(b) {
   if (b < 1024) return b + ' B';
@@ -2489,7 +2490,7 @@ function calcPassRate() {
 // ── Last Updated timestamp ────────────────────────────────────────────────────
 function markLastUpdated() {
   const el = document.getElementById('last-updated-time');
-  if (el) el.textContent = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  if (el) el.textContent = new Date().toLocaleTimeString('en-PK', { timeZone: 'Asia/Karachi', hour: '2-digit', minute: '2-digit', second: '2-digit' });
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
