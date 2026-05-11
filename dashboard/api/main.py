@@ -13,6 +13,7 @@ from pathlib import Path
 from typing import Any, Optional
 
 from openai import OpenAI
+from playwright.sync_api import sync_playwright
 
 from dotenv import load_dotenv
 
@@ -757,7 +758,137 @@ def _extract_relevant_context(title: str, description: str, max_chars: int = 400
     return "\n\n".join(result)[:max_chars]
 
 
-def generate_test_cases(ticket_key, title, description):
+_PORTAL_ROUTES = {
+    "admin": [
+        "/orders-management/dashboard",
+        "/orders-management/commission-models",
+        "/orders-management/agency-management",
+        "/orders-management/seller-management",
+        "/orders-management/all-orders",
+        "/orders-management/dispatch-batches",
+        "/orders-management/purchase-orders",
+        "/orders-management/team-management",
+    ],
+    "seller": [
+        "/get-started",
+        "/dashboard",
+        "/orders",
+        "/orders-analytics",
+        "/ticketing",
+        "/settings",
+        "/stores/integration",
+        "/my-invoices",
+        "/seller/inventory",
+        "/profile",
+        "/gold-subscription",
+        "/academy",
+    ],
+    "agency": [
+        "/get-started",
+        "/agency/portal/dashboard",
+        "/agency/portal/sellers",
+        "/agency/portal/ticketing",
+        "/agency/portal/settings",
+    ],
+}
+
+
+def _identify_pages_from_ticket(title: str, description: str, portal: str) -> list:
+    """Uses GPT-4o to identify which page URL paths the ticket refers to."""
+    routes = _PORTAL_ROUTES.get(portal, [])
+    prompt = (
+        f"You are a QA engineer for the Zambeel platform.\n"
+        f"Based on the ticket below, identify which page URL paths need to be tested.\n"
+        f"Available routes for the '{portal}' portal: {routes}\n\n"
+        f"Ticket title: {title}\n"
+        f"Ticket description: {description}\n\n"
+        f"Return ONLY a JSON array of strings from the available routes list, e.g. "
+        f'["/orders-management/commission-models"]. '
+        f"Return at most 3 paths. If unsure, return the single most likely path."
+    )
+    try:
+        client = OpenAI(
+            base_url="https://models.inference.ai.azure.com",
+            api_key=os.getenv("GITHUB_TOKEN"),
+        )
+        response = client.chat.completions.create(
+            model="gpt-4o",
+            messages=[{"role": "user", "content": prompt}],
+            max_tokens=200,
+        )
+        output = (response.choices[0].message.content or "").strip()
+        arr_match = re.search(r'\[.*?\]', output, re.DOTALL)
+        if arr_match:
+            paths = json.loads(arr_match.group(0))
+            valid = [p for p in paths if isinstance(p, str) and p in routes]
+            if valid:
+                return valid[:3]
+    except Exception as e:
+        print(f"[_identify_pages_from_ticket] ERROR: {e}")
+    return routes[:1]
+
+
+def inspect_page_dom(portal: str, env: str, url_path: str) -> dict:
+    """Navigate to the page using a saved auth session and return live DOM elements."""
+    auth_file = _HERE / "auth" / f"{portal}_{env}.json"
+    if not auth_file.exists():
+        print(f"[inspect_page_dom] Auth file not found: {auth_file}")
+        return {}
+
+    base_url = _ENV_ORIGINS.get(env, "https://staging.myzambeel.com")
+    full_url = base_url.rstrip("/") + url_path
+    print(f"[inspect_page_dom] Inspecting {full_url} as {portal}/{env}")
+
+    try:
+        with sync_playwright() as p:
+            browser = p.chromium.launch(headless=True)
+            ctx = browser.new_context(storage_state=str(auth_file))
+            page = ctx.new_page()
+            page.goto(full_url, timeout=30000, wait_until="networkidle")
+            page.wait_for_timeout(2000)
+
+            dom = page.evaluate("""() => {
+                const buttons = Array.from(document.querySelectorAll('button'))
+                    .map(b => b.innerText.trim()).filter(Boolean);
+                const inputs = Array.from(document.querySelectorAll('input'))
+                    .map(i => ({placeholder: i.placeholder, type: i.type, name: i.name}))
+                    .filter(i => i.placeholder || i.type);
+                const selects = Array.from(document.querySelectorAll('select'))
+                    .map(s => ({
+                        name: s.name,
+                        options: Array.from(s.options).map(o => o.text.trim()).filter(Boolean)
+                    }));
+                const headings = Array.from(document.querySelectorAll('h1, h2, h3'))
+                    .map(h => ({tag: h.tagName.toLowerCase(), text: h.innerText.trim()}))
+                    .filter(h => h.text);
+                const tabs = Array.from(
+                    document.querySelectorAll('[role="tab"], [role="tablist"] button')
+                ).map(t => t.innerText.trim()).filter(Boolean);
+                return {
+                    buttons: [...new Set(buttons)],
+                    inputs,
+                    selects,
+                    headings,
+                    tabs: [...new Set(tabs)],
+                    title: document.title,
+                };
+            }""")
+
+            result = {"url": full_url, "portal": portal, "env": env, **dom}
+            print(
+                f"[inspect_page_dom] {url_path}: "
+                f"{len(dom.get('buttons', []))} buttons, "
+                f"{len(dom.get('inputs', []))} inputs, "
+                f"{len(dom.get('headings', []))} headings"
+            )
+            browser.close()
+            return result
+    except Exception as e:
+        print(f"[inspect_page_dom] ERROR for {full_url}: {e}")
+        return {"url": full_url, "error": str(e)}
+
+
+def generate_test_cases(ticket_key, title, description, live_dom_data: list = None):
     import re
 
     relevant_context = _extract_relevant_context(title, description)
@@ -819,7 +950,14 @@ def generate_test_cases(ticket_key, title, description):
         f"Description: {description}\n\n"
         f"Relevant app context (includes full knowledge base):\n{relevant_context}\n\n"
         f"{selectors_context}\n\n"
-        "Generate 3-5 test cases as JSON. Each test case must have:\n"
+        + (
+            "REAL PAGE ELEMENTS CURRENTLY ON PAGE (extracted via live browser inspection):\n"
+            "CRITICAL: Prefer selectors that match button texts, input placeholders, and headings "
+            "listed here. Do NOT invent selectors absent from this live DOM snapshot.\n"
+            + json.dumps(live_dom_data, indent=2) + "\n\n"
+            if live_dom_data else ""
+        )
+        + "Generate 3-5 test cases as JSON. Each test case must have:\n"
         "- test_name: string\n"
         "- url_path: exact URL path to navigate to (e.g. /orders-management/dashboard)\n"
         "- portal: which portal to test (admin/seller/agency)\n"
@@ -1165,10 +1303,40 @@ async def run_qa_endpoint(issue_key: str, body: RunQABody):
                 branches_switched = True
                 yield evt({"stage": "switching_branches", "status": "done"})
 
+        # ── Stage: inspect live page DOM ───────────────────────────────────────
+        live_dom_data: list = []
+        yield evt({"stage": "inspecting_page", "status": "running"})
+        try:
+            portal_for_inspect = (
+                body.portal if (body.portal and body.portal != "all") else "seller"
+            )
+            pages = await asyncio.to_thread(
+                _identify_pages_from_ticket, summary, description, portal_for_inspect
+            )
+            print(f"[inspecting_page] Identified pages: {pages}")
+            for url_path in pages:
+                yield f": keepalive\n\n"
+                dom = await asyncio.to_thread(
+                    inspect_page_dom, portal_for_inspect, run_env, url_path
+                )
+                if dom and not dom.get("error"):
+                    live_dom_data.append(dom)
+            yield evt({
+                "stage": "inspecting_page",
+                "status": "done",
+                "pages_inspected": [d.get("url") for d in live_dom_data],
+            })
+        except Exception as e:
+            print(f"[inspecting_page] ERROR: {e}")
+            yield evt({"stage": "inspecting_page", "status": "error", "message": str(e)})
+            # Non-fatal — continue without live DOM data
+
         # ── Stage: generate test cases ─────────────────────────────────────────
         yield evt({"stage": "generating_test_cases", "status": "running"})
         yield f": keepalive\n\n"
-        test_cases = await asyncio.to_thread(generate_test_cases, issue_key, summary, description)
+        test_cases = await asyncio.to_thread(
+            generate_test_cases, issue_key, summary, description, live_dom_data or None
+        )
         # save as Jira comment regardless of parse success
         if test_cases:
             try:
