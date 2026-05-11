@@ -377,3 +377,46 @@
 | POST | `/billing/shopify/create` | verifySeller | Create Shopify subscription |
 | GET | `/billing/shopify/callback` | None | Shopify subscription callback |
 | GET | `/billing/shopify/stores` | verifySeller | Get user's Shopify stores |
+
+---
+
+## Webhooks (Inbound)
+
+All webhook routes are public (no JWT auth — verified by platform signatures where applicable).
+
+| Method | Path | Platform | Purpose |
+|--------|------|----------|---------|
+| POST | `/shopify/webhook` | Shopify | Order/fulfillment/app events |
+| POST | `/shopify/app-purchases-one-time/update` | Shopify | One-time charge callback |
+| POST | `/easyorders/webhook` | EasyOrder | Order status update |
+| POST | `/lightfunnels/webhook` | LightFunnels | Order events |
+| POST | `/salla/webhook` | Salla | Order events |
+| POST | `/smartlane/webhook` | Smartlane | Courier tracking update |
+| POST | `/wati/webhook` | WATI (WhatsApp) | Message/conversation events |
+| POST | `/youcan/webhook` | YouCan | Order events |
+| POST | `/imile/webhook` | iMile | Courier tracking update |
+| POST | `/tawseel/webhook` | Tawseel | Courier tracking update |
+
+---
+
+## Proxy
+
+| Method | Path | Purpose |
+|--------|------|---------|
+| `*` | `/proxy/*` | Generic proxy passthrough (platform-specific) |
+
+---
+
+## Creative Analytics
+
+| Method | Path | Auth | Purpose |
+|--------|------|------|---------|
+| (Various) | `/creative-analytics/*` | verifyUser | AI video creator / creative analytics (feature flagged off in router) |
+
+---
+
+## WATI / WhatsApp Conversation
+
+| Method | Path | Auth | Purpose |
+|--------|------|------|---------|
+| GET | `/orders/:orderId/conversation` | verifyAgentAdminAndSeller | Get WATI WhatsApp conversation for order |

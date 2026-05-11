@@ -82,3 +82,25 @@ Monday | Tuesday | Wednesday | Thursday | Friday | Saturday | Sunday
 
 ## Store Platforms Supported
 Shopify | EasyOrder | Light Funnels | YouCan | Salla | Manual (no platform)
+
+## Webhook Integrations (Inbound)
+Order events arrive via webhooks from: Shopify, EasyOrder, LightFunnels, Salla, YouCan, Smartlane, Wati (WhatsApp), iMile, Tawseel
+
+## Key Zustand Stores (Seller-relevant)
+| Store | Key | Contents |
+|-------|-----|---------|
+| `useAuthStore` | `"auth-storage"` | authToken, userRole, user, showInventory, products[] |
+| `useAgencyViewStore` | `"agency-view-storage"` | isAgencyView, context: {agencyName, merchantUserId, merchantName, storeName, storeId, allowedStoreIds} |
+| `useGoldPlanStore` | `"gold-plan-storage"` | isGoldPlanActive, planExpiryTime |
+| `useInvoicesStore` | — | invoicesUploadReload (bool) |
+| `usePurchaseOrdersStore` | — | orders[], filteredOrders[], loading, filters, pagination |
+| `useReturnOrderStore` | — | Similar to purchase orders |
+
+## First-Time User Detection
+`useAuthStore.isFirstTimeUser()` returns `true` if user.createdAt < 24 hours ago. Controls onboarding flow redirect.
+
+## Agency Proxy Mode (for Agency users viewing seller data)
+When `useAgencyViewStore.isAgencyView === true`:
+- All API calls include `x-agency-context-store-id: <storeId>` header
+- Agency Context Banner shown at top of every page
+- Context cleared when navigating back to `/agency/portal/*`

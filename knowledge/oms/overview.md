@@ -30,13 +30,42 @@ After successful login, Admin/Agent lands on: `/orders-management/dashboard`
 - Unauthorized users are redirected to `/login`
 
 ## Tech Stack (Frontend)
-- React 18, TypeScript, Vite
-- React Router v7
-- Zustand (state)
-- TanStack React Query (server state, 5-min stale, 1 retry)
-- Tailwind CSS, Flowbite React
+- React 18 + TypeScript, bundled with Vite
+- React Router v7 (not Vue — CLAUDE.md is wrong about this)
+- Zustand (client state management, 14+ stores, localStorage persist middleware)
+- TanStack React Query (server state, 5-min staleTime, 1 retry)
+- Tailwind CSS + Flowbite React components
 - React Hook Form
-- React Toastify (top-right, 3s, max 4 toasts)
+- React Toastify (position: top-right, autoClose: 3s, max: 4 toasts)
+
+## Key Zustand Stores (OMS-relevant)
+| Store | Purpose |
+|-------|---------|
+| `useAuthStore` (`"auth-storage"`) | authToken, userRole, user object, showInventory, products |
+| `useOrdersStore` (`"orders-storage"`) | orders[], selectedOrders (Set), persistentSelectionMode; orders[] stripped from persist to avoid quota |
+| `useHighlightedTicketsStore` | highlightedTickets (Set), socketHighlightedTickets (Set) — for Socket.IO real-time notifications |
+| `useCountriesStore` | countries[], loading state |
+| `useWarehousesStore` | warehouses[], selectedWarehouseId |
+| `useCustomizerStore` | sidebar theme, language (isLanguage persisted) |
+
+## Real-time Notifications
+Socket.IO events trigger `useHighlightedTicketsStore` updates:
+- `ticket_status_changed` — status update
+- `seller_to_zambeel_ticket_created` — new seller ticket
+- `zambeel_to_seller_ticket_created` — new ticket for seller
+Sidebar ticketing badge shows notification dot when new tickets are present.
+
+## Backend Cron Jobs
+| Schedule | Timezone | Job |
+|----------|----------|-----|
+| `0 2 * * *` | Asia/Karachi (PKT, UTC+5) | `calculateProductRatios()` + `calculateStoreRatios()` |
+| `*/5 * * * *` | System time | `recoverStuckOrders()` (every 5 min) |
+
+## Customer.io Integration
+Backend triggers Customer.io events:
+- `user_signed_up` on `POST /signUp`
+- `profile_updated` on `PUT /user/profile`
+User identified by email address. Errors are swallowed (non-blocking).
 
 ## Sidebar Navigation (all items)
 | Menu Item | URL | Role Required |

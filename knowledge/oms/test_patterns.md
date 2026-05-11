@@ -150,6 +150,50 @@ FILL input[placeholder='John Doe'] | Test Agent
 CLICK button:has-text('Create')
 ```
 
+## Pattern 9: Edit Order Address
+
+```python
+NAVIGATE /orders-management/orders
+CLICK text='<order_id>'         # click order ID link in table to open modal
+ASSERT_VISIBLE div[role='dialog']
+ASSERT_TEXT Order Details
+CLICK button:has-text('Edit Order')
+# Fields are now editable inputs:
+FILL input[name='customer_name'] | Updated Customer Name
+FILL input[name='phone'] | 501234567
+CLICK button:has-text('Save')
+ASSERT_TOAST Order updated successfully
+```
+
+## Pattern 10: Bulk Upload Orders via CSV
+
+```python
+NAVIGATE /orders-management/orders
+CLICK button:has-text('Actions')
+CLICK button:has-text('Upload Orders')
+ASSERT_VISIBLE div[role='dialog']
+# Upload a CSV file — must have COD as payment_mode
+# File must be < size limit
+CLICK button[type='submit']   # or whatever submit button label is
+# Monitor for upload results popup
+```
+
+## Pattern 11: Dispatch Batch Generate + Download
+
+```python
+NAVIGATE /orders-management/dispatch-batches
+# Set country filter to target country
+ASSERT_TEXT Dispatch Batches
+# Find a batch with tracking_status 'New' or 'Partial'
+CLICK button:has-text('Generate Tracking ID')
+# Poll or wait for status to change to 'Generated'
+ASSERT_TEXT Generated
+CLICK button:has-text('Download Combined Doc')
+ASSERT_TOAST Document downloaded successfully
+# If status is 'Generating', expect warning toast:
+# 'Batch is already generating tracking IDs. Please wait.'
+```
+
 ## General OMS Test Rules
 
 1. Always assert page title text after navigation before interacting

@@ -94,9 +94,22 @@ text='Check your email for the reset link'    → success state
 - Clears Zustand store → Firebase `signOut()` → redirect to `/login`
 
 ## Token Storage
-- JWT stored in Zustand store (with `persist` plugin — localStorage key: varies)
-- `x-agency-context-store-id` header added when agency is in proxy mode
+- JWT stored in Zustand store (with `persist` plugin)
 - Authorization header format: `Bearer <JWT>`
+- `x-agency-context-store-id` header added when agency is in proxy mode
+
+## Zustand Auth Stores — localStorage Keys
+
+| Store | Key | Contents |
+|-------|-----|---------|
+| `useAuthStore` | `"auth-storage"` | `authToken`, `userRole`, `user`, `showInventory`, `products[]` |
+| `useOrdersStore` | `"orders-storage"` | `selectedOrders` (Set), `isPersistentSelectionMode` — orders[] stripped on persist to prevent quota overflow |
+| `useAgencyViewStore` | `"agency-view-storage"` | `isAgencyView`, `context: {agencyName, merchantUserId, merchantName, storeName, storeId, allowedStoreIds}` |
+| `useGoldPlanStore` | `"gold-plan-storage"` | `isGoldPlanActive`, `planExpiryTime` |
+| `useCustomizerStore` | `"customizer-storage"` | `isLanguage` (language preference only — other fields not persisted) |
+
+## First-Time User Detection
+`useAuthStore.isFirstTimeUser()` returns `true` if `user.createdAt` is within the last 24 hours. Used to show onboarding flows.
 
 ## Firebase Errors (client-side messages)
 | Firebase Error Code | Display Message |

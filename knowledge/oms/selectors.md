@@ -98,7 +98,7 @@ th:has-text('BATCH ID')
 th:has-text('TRACKING ID')
 ```
 
-### Actions Dropdown Items
+### Actions Dropdown Items (Confirmation Pending / standard view)
 ```
 # Click 'Actions' first, then:
 button:has-text('Update Statuses')
@@ -108,6 +108,36 @@ button:has-text('Cancel')
 button:has-text('Update Tag')
 button:has-text('Update Remarks')
 button:has-text('Assign Courier')
+```
+
+### Approved Actions Dropdown (shown when on Approved tab)
+```
+button:has-text('Update Sub-status')
+button:has-text('Update Tag')
+button:has-text('Assign Courier')
+button:has-text('Assign Courier with Batch')
+button:has-text('Bulk Vendor Courier Upload')
+```
+
+### NDR Actions Dropdown (shown for Undelivered orders)
+```
+button:has-text('Update Remarks')
+button:has-text('Revert to Confirmation Pending')
+```
+
+### Edit Order Modal Fields (after clicking 'Edit Order')
+```
+input[name='customer_name']    → or label: Customer Name
+input[name='address']          → Address
+input[name='city']             → City
+input[name='phone']            → Phone Number
+```
+
+### WATI WhatsApp Link (in order row, Conversation tab)
+```
+# WATI icon visible for orders with WhatsApp conversation:
+a[href*='wati']:has-text('Open in WATI')  → or icon button in row
+# Only visible if canShowWatiLink(order) returns true
 ```
 
 ### Opening an Order

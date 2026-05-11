@@ -152,9 +152,29 @@ ASSERT_VISIBLE input[placeholder='Search by Order ID']
 | "Country" | Missing delivery country in order |
 | "Phone Number" | Missing phone in order |
 | "Phone Number must contain only digits" | Non-numeric phone |
+| `"Phone number for {Country} must be {N} digits (excluding country code)"` | Country-specific phone validation |
+| `"Invalid city for {Country}. Please select a valid city from the dropdown."` | City not in valid list |
 | "Invalid Order item - SKU is missing" | Order has item with no SKU |
 | "Gold subscription required for order processing" | No gold plan |
 | "Maximum 3 files allowed" | >3 files in ticket upload |
-| "File {name} is too large. Maximum size is 5MB." | File >5MB |
+| `"File size exceeds 5MB limit"` | File >5MB |
 | "Store Nick name already exists..." | Duplicate store name |
 | "No orders selected for deletion" | Delete clicked with none selected |
+| `"Please fill all the required fields"` | Required form fields missing |
+| `"Store already exists"` | Duplicate store creation |
+
+## Toast Patterns (Seller)
+
+| Toast type | Message | Trigger |
+|-----------|---------|---------|
+| success | `"Profile completed successfully!"` | Profile setup complete |
+| success | `"Store settings updated successfully!"` | Save store settings |
+| success | `"Address updated successfully"` | Update delivery address |
+| success | `"Financial details updated"` | Update financial settings |
+| success | `"Bank account connected successfully"` | Connect bank |
+| error | `"Failed to load order remarks"` | Remarks API failure |
+| error | `"Failed to load order tags"` | Tags API failure |
+| error | `"Failed to update store"` | Store update failure |
+| error | `"Failed to proceed with Shopify integration"` | Shopify OAuth error |
+| error | `"Failed to initiate payment"` | Payment creation error |
+| error | `"File size exceeds 5MB limit"` | Upload >5MB |

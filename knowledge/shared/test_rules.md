@@ -84,17 +84,24 @@ button:has-text('option text')              # Flowbite dropdowns
 - Agency registration: select a commission model before clicking `Confirm Approve`.
 - Hold reason: must be ≥ 3 characters.
 - Reject reason: must be ≥ 3 characters.
+- Order edit: fields are read-only until `Edit Order` button clicked.
+- Dispatch batches: documents can only be downloaded when `tracking_status === "Generated"`.
+- CSV order upload: `payment_mode` must be `COD` — no other value accepted.
 
 ### Seller Portal Rules
 - Ticket description: min 10 chars, max 2000 chars.
 - File uploads in tickets: max 3 files, max 5MB each, images only.
-- Phone number: must match `/^\+\d{10,15}$/` in international format.
+- Phone number: country-specific validation — must match digit count from `countryData` (see `knowledge/shared/validations.md`).
+- City validation: must be from the `validCitiesByCountry` list for the order's country.
+- Store creation: requires at least one primary bank account first.
 
 ### Agency Portal Rules
 - Agency registration: both file uploads AND terms checkbox required to submit step 2.
 - City field: disabled until country is selected.
 - Agency settings `Save` button: only enabled when form is dirty (changed).
 - `Add Member` button is currently DISABLED — do not attempt to click it in happy-path tests.
+- Agency IDs format: `ZMB-AG-XXXXXX` (6 alphanumeric chars after prefix).
+- Merchant connection: one agency per merchant at a time.
 
 ---
 
@@ -148,8 +155,14 @@ When generating tests, consult these files for exact information:
 | Seller test examples | `knowledge/seller/test_patterns.md` |
 | Agency test examples | `knowledge/agency/test_patterns.md` |
 | API endpoints | `knowledge/shared/api_endpoints.md` |
-| Auth setup | `knowledge/shared/auth.md` |
+| Auth setup + Zustand store keys | `knowledge/shared/auth.md` |
 | Jira transitions | `knowledge/shared/jira_statuses.md` |
+| All toast/notification messages | `knowledge/shared/notifications.md` |
+| All validation rules (Joi + frontend) | `knowledge/shared/validations.md` |
+| All error messages | `knowledge/shared/error_messages.md` |
+| Business rules (order lifecycle, etc.) | `knowledge/shared/business_rules.md` |
+| State machines (order/agency/etc.) | `knowledge/shared/state_machines.md` |
+| Database schema | `knowledge/shared/database.md` |
 
 ---
 
@@ -158,8 +171,13 @@ When generating tests, consult these files for exact information:
 - NEVER guess a button text — always look it up in the selectors file.
 - NEVER use `#id` selectors — the app has none.
 - NEVER assert elements from the wrong portal (e.g., OMS selectors in a seller test).
-- NEVER assume a sub-category without checking the ticketing constants.
+- NEVER assume a sub-category without checking the ticketing constants (see `knowledge/shared/business_rules.md`).
 - NEVER assert a route that doesn't exist in the pages files.
 - NEVER write duplicate country rules in a commission model test.
 - NEVER click `Add Member` — it is currently disabled.
 - NEVER test production environment with write operations.
+- NEVER use `payment_mode` other than `"COD"` in CSV order uploads.
+- NEVER use `[data-testid]` selectors — none exist in this codebase.
+- NEVER treat "In Delivery" as a status tab — it is displayed as "Shipped" in the UI.
+- NEVER use Vue-specific patterns — the frontend is React, not Vue (despite CLAUDE.md).
+- NEVER call `db_tool.run_write()` with `env="production"` — it raises PermissionError.
