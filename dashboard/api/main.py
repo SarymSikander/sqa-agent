@@ -1069,6 +1069,10 @@ _ZAMBEEL_SELECTOR_FIXES = [
     # ASSERT_TEXT pipe value wrapped in quotes — strip the quotes
     ("| 'TKT-", "| TKT-"),
     ('| "TKT-', '| TKT-'),
+    # Ticketing evidence selector: table header compound >> text is wrong; use text= directly
+    ("th:has-text('TICKET ID') >> text='TKT", "text='TKT"),
+    # Invalid Playwright locator API used as CSS — replace with FILL step
+    ("input >> 3", "FILL: input[aria-label='Go to page'] | 3"),
 ]
 
 

@@ -145,7 +145,11 @@ button:has-text('Previous')                  # previous page  ⚠️ NOT '< Prev
 button:has-text('Next')                      # next page      ⚠️ NOT 'Next >'
 button:has-text('1')                         # page number buttons
 text=/Page \d+ of/                           # page info (regex — text lives in nested spans)
-input                                         # go-to-page input (near 'Go to page' label)
+input[type='number']                          # go-to-page input  ⚠️ NOT 'input >> 3' (invalid)
+                                             # (near 'Go to page' label in pagination area)
+
+# ⚠️ After CLICK_OPTION: 100, add WAIT: 2000 before ASSERT_TEXT: text=/Page \d+ of/
+# The page briefly reloads and the text disappears during the reload.
 ```
 
 ---
@@ -189,10 +193,17 @@ th:has-text('STATUS')
 th:has-text('ACTIONS')
 ```
 
+### Search Result Evidence
+```
+text='TKT-XXXXX'                             # row appears in table after searching by ticket ID
+                                             # ⚠️ NOT th:has-text('TICKET ID') >> text='TKT-XXXXX'
+```
+
 ### Pagination
 ```
-button:has-text('Previous')
-button:has-text('Next')
+# ⚠️ Ticketing uses page NUMBER BUTTONS only — there are NO 'Next' / 'Previous' buttons
+button:has-text('1')                         # page number buttons
+button:has-text('2')
 ```
 
 ---
