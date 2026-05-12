@@ -261,7 +261,11 @@ ABSOLUTE RULES — VIOLATION MEANS THE TEST SUITE IS WORTHLESS:
 8. Input placeholder for ticket number search is EXACTLY: 'Search by ticket number...' — three dots, nothing else. Any other spelling is wrong.
 9. ALWAYS REFER TO THE KNOWLEDGE BASE BEFORE GENERATING ANY SELECTOR OR EVIDENCE. If it is not in the knowledge base and not visible in the screenshot, do not use it.
 
-MANDATORY: Use ONLY selectors from the KNOWLEDGE BASE. Do NOT use data-testid. Do NOT invent routes, button labels, or input placeholders.
+MANDATORY: You MUST use ONLY selectors from the KNOWLEDGE BASE provided below.
+Do NOT invent selectors.
+Do NOT use data-testid unless you see it in the knowledge base.
+Do NOT use placeholder text unless you see the EXACT text in the knowledge base.
+If you cannot find the exact selector in the knowledge base, use ASSERT_EXISTS: text="Page Title" as evidence instead.
 """.strip()
 
 ZAMBEEL_OMS_ROUTES = """
