@@ -1089,20 +1089,30 @@ def _parse_test_cases(output: str) -> list:
         tc.setdefault("expected_result", "Feature works as expected")
         tc.setdefault("evidence_selector", "")
         # Apply selector + route fixes to all steps
-        tc["steps"] = [
-            next(
-                (s.replace(wrong, right) for wrong, right in _ZAMBEEL_SELECTOR_FIXES if wrong in s),
-                s,
-            )
-            for s in tc.get("steps", [])
-            if s
-        ]
+        fixed_steps = []
+        for s in tc.get("steps", []):
+            if not s:
+                continue
+            for wrong, right in _ZAMBEEL_SELECTOR_FIXES:
+                if wrong not in s:
+                    continue
+                # For route corrections: skip if the route is already correctly prefixed
+                if (right and right.startswith('/orders-management')
+                        and wrong.startswith('/')
+                        and ('/orders-management' + wrong) in s):
+                    continue
+                s = s.replace(wrong, right)
+                break
+            fixed_steps.append(s)
+        tc["steps"] = fixed_steps
         # Drop empty steps produced by fixes that replace with ''
         tc["steps"] = [s for s in tc["steps"] if s.strip()]
         # Apply route fixes to the top-level url_path field
         for wrong, right in _ZAMBEEL_SELECTOR_FIXES:
             if right and wrong in tc["url_path"]:
-                tc["url_path"] = tc["url_path"].replace(wrong, right)
+                # Guard: don't double-prepend /orders-management
+                if not tc["url_path"].startswith('/orders-management'):
+                    tc["url_path"] = tc["url_path"].replace(wrong, right)
                 break
         valid.append(tc)
 

@@ -310,6 +310,21 @@ def run_tests(portal, env):
 # AI test case executor
 # ---------------------------------------------------------------------------
 
+_STEP_KEYWORDS = [
+    "NAVIGATE", "ASSERT_TEXT", "ASSERT_EXISTS", "ASSERT_NOT_EXISTS",
+    "ASSERT_DISABLED", "ASSERT_URL", "CLICK_OPTION", "SELECT_OPTION",
+    "SCREENSHOT", "FILL", "CLICK", "WAIT",
+]
+
+def _normalize_step(step: str) -> str:
+    """Add colon after keyword when GPT-4o omitted it (e.g. 'NAVIGATE /path' → 'NAVIGATE: /path')."""
+    step = step.strip()
+    for kw in _STEP_KEYWORDS:
+        if step.startswith(kw + " ") and not step.startswith(kw + ":"):
+            return kw + ": " + step[len(kw):].lstrip()
+    return step
+
+
 def run_qa_test_cases(portal: str, env: str, test_cases: list) -> dict:
     """
     Execute AI-generated structured test cases for a single portal/env.
@@ -436,7 +451,7 @@ def run_qa_test_cases(portal: str, env: str, test_cases: list) -> dict:
                     tc_pass = False
 
                 for step_str in (tc.get("steps") or []):
-                    step_str = step_str.strip()
+                    step_str = _normalize_step(step_str.strip())
                     if not step_str:
                         continue
                     try:
@@ -499,18 +514,26 @@ def run_qa_test_cases(portal: str, env: str, test_cases: list) -> dict:
                             steps_executed += 1
 
                         elif step_str.startswith("ASSERT_TEXT:"):
-                            parts    = step_str[12:].split("|", 1)
-                            sel      = parts[0].strip()
-                            expected = parts[1].strip() if len(parts) > 1 else ""
+                            payload = step_str[12:].strip()
+                            if "|" in payload:
+                                parts    = payload.split("|", 1)
+                                sel      = parts[0].strip()
+                                expected = parts[1].strip()
+                            else:
+                                sel      = payload  # text embedded in selector e.g. h2:has-text('...')
+                                expected = ""
                             el = page.query_selector(sel)
                             if el:
-                                actual = el.inner_text()
-                                if expected.lower() in actual.lower():
-                                    _log(f"ASSERT_TEXT: {sel}", "pass", f"Found '{expected}'")
+                                if expected:
+                                    actual = el.inner_text()
+                                    if expected.lower() in actual.lower():
+                                        _log(f"ASSERT_TEXT: {sel}", "pass", f"Found '{expected}'")
+                                    else:
+                                        _log(f"ASSERT_TEXT: {sel}", "fail",
+                                             f"Expected '{expected}' in '{actual[:100]}'")
+                                        tc_pass = False
                                 else:
-                                    _log(f"ASSERT_TEXT: {sel}", "fail",
-                                         f"Expected '{expected}' in '{actual[:100]}'")
-                                    tc_pass = False
+                                    _log(f"ASSERT_TEXT: {sel}", "pass", "Element exists")
                             else:
                                 _log(f"ASSERT_TEXT: {sel}", "fail", "Element not found")
                                 tc_pass = False
