@@ -140,13 +140,12 @@ th:has-text('DATE')
 
 ### Pagination
 ```
-page.locator('select').last()                # rows per page — last <select> on page
-                                             # options: 10, 25, 50, 100
-button:has-text('< Previous')               # previous page
-button:has-text('Next >')                   # next page
-button:has-text('1')                        # page number buttons
-text='Page 1 of'                            # page info text
-input                                        # go-to-page input (near text 'Go to page')
+CLICK_OPTION: 100                            # rows per page — targets last <select> (options: 10, 25, 50, 100)
+button:has-text('Previous')                  # previous page  ⚠️ NOT '< Previous'
+button:has-text('Next')                      # next page      ⚠️ NOT 'Next >'
+button:has-text('1')                         # page number buttons
+text=/Page \d+ of/                           # page info (regex — text lives in nested spans)
+input                                         # go-to-page input (near 'Go to page' label)
 ```
 
 ---

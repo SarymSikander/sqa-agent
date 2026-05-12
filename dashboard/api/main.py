@@ -1047,6 +1047,28 @@ _ZAMBEEL_SELECTOR_FIXES = [
     ('/inventory-management', '/orders-management/inventory-movements'),
     ('/ticketing', '/orders-management/ticketing'),
     ('/orders', '/orders-management/orders'),
+    # GPT-4o writes Python locator API as if it were a CSS selector — convert to CLICK_OPTION
+    ("ASSERT_EXISTS: page.locator('select').last()", "CLICK_OPTION: 100"),
+    ("CLICK: page.locator('select').last()", "CLICK_OPTION: 100"),
+    # Wrong heading level for Ticketing Management
+    ("h1:has-text('Ticketing Management')", "h2:has-text('Ticketing Management')"),
+    ('h1:has-text("Ticketing Management")', 'h2:has-text("Ticketing Management")'),
+    # Wrong placeholder — inventory search vs ticketing search
+    ("input[placeholder='Search Movement ID']", "input[placeholder='Search by store name...']"),
+    ('input[placeholder="Search Movement ID"]', 'input[placeholder="Search by store name..."]'),
+    # Next/Previous button exact text (no arrows)
+    ("button:has-text('Next >')", "button:has-text('Next')"),
+    ('button:has-text("Next >")', 'button:has-text("Next")'),
+    ("button:has-text('< Previous')", "button:has-text('Previous')"),
+    ('button:has-text("< Previous")', 'button:has-text("Previous")'),
+    # Page info text — partial regex match (nested spans mean exact text= fails)
+    ("text='Page 1 of'", r"text=/Page \d+ of/"),
+    ('text="Page 1 of"', r"text=/Page \d+ of/"),
+    ("text='Page 2 of'", r"text=/Page \d+ of/"),
+    ('text="Page 2 of"', r"text=/Page \d+ of/"),
+    # ASSERT_TEXT pipe value wrapped in quotes — strip the quotes
+    ("| 'TKT-", "| TKT-"),
+    ('| "TKT-', '| TKT-'),
 ]
 
 
