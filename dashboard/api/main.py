@@ -248,14 +248,21 @@ def get_portal_knowledge(portal):
     return result
 
 
-_MANDATORY_SELECTOR_INSTRUCTION = (
-    "MANDATORY: You MUST use ONLY selectors from the KNOWLEDGE BASE provided below. "
-    "Do NOT invent selectors. "
-    "Do NOT use data-testid unless you see it in the knowledge base. "
-    "Do NOT use placeholder text unless you see the EXACT text in the knowledge base. "
-    "If you cannot find the exact selector in the knowledge base, use "
-    'ASSERT_EXISTS: text="Page Title" as evidence instead.'
-)
+_MANDATORY_SELECTOR_INSTRUCTION = """
+ABSOLUTE RULES — VIOLATION MEANS THE TEST SUITE IS WORTHLESS:
+
+1. NEVER use placeholder text as evidence. Evidence must be something that appears AFTER an action — e.g. a result row, a success message, a changed heading. An input placeholder is NOT evidence.
+2. NEVER invent text like 'Showing X to Y' or '100 movements displayed' — only use text that actually exists on the page. Always verify against the KNOWLEDGE BASE before using any text as evidence.
+3. For pagination evidence on Inventory Movements: ONLY use text=/Page \\d+ of \\d+/ — never 'Showing X to Y' on that page.
+4. For ticketing search evidence: ONLY use text='TKT-XXXXX' where XXXXX is the actual ticket number you searched — never a column header, never a compound selector.
+5. NEVER use button[type='submit'] — the ticketing search button is button:has-text('Search').
+6. NEVER use select >> text='100' or any >> chaining on a select — always use CLICK_OPTION: 100.
+7. For ticketing search by ticket number, ALWAYS include CLICK_OPTION: Ticket Number as the VERY FIRST step before any FILL. Without this, the input targets the wrong field.
+8. Input placeholder for ticket number search is EXACTLY: 'Search by ticket number...' — three dots, nothing else. Any other spelling is wrong.
+9. ALWAYS REFER TO THE KNOWLEDGE BASE BEFORE GENERATING ANY SELECTOR OR EVIDENCE. If it is not in the knowledge base and not visible in the screenshot, do not use it.
+
+MANDATORY: Use ONLY selectors from the KNOWLEDGE BASE. Do NOT use data-testid. Do NOT invent routes, button labels, or input placeholders.
+""".strip()
 
 ZAMBEEL_OMS_ROUTES = """
 MANDATORY ROUTE REFERENCE — USE EXACTLY THESE ROUTES, NEVER INVENT ROUTES:
@@ -1209,8 +1216,8 @@ def generate_test_cases(ticket_key, title, description, screenshots: list = None
 
     pages_summary = ", ".join(s.get("url_path", s.get("url", "")) for s in valid_shots)
     vision_text = (
-        f"{ZAMBEEL_OMS_ROUTES}\n\n"
         f"{_MANDATORY_SELECTOR_INSTRUCTION}\n\n"
+        f"{ZAMBEEL_OMS_ROUTES}\n\n"
         "You are a senior QA engineer. I am showing you screenshot(s) of live web pages "
         f"from the Zambeel platform.\n\n"
         f"Ticket: {ticket_key}\n"
