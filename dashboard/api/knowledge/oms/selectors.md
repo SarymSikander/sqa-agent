@@ -161,6 +161,12 @@ input[type='number']                          # go-to-page input  ⚠️ NOT 'in
 h2:has-text('Ticketing Management')          # ⚠️ h2, NOT h1
 ```
 
+### Stats Cards (top of page)
+```
+# Five cards — text labels only, no fixed selectors needed:
+# Total Tickets | Pending | In Progress | Awaiting Seller Action | Resolved
+```
+
 ### Tab Buttons
 ```
 button:has-text('Tickets Assigned to Zambeel')
@@ -171,24 +177,37 @@ button:has-text('Tickets Assigned by Zambeel')
 ```
 select                                       # filter type — native <select>
 # Filter type options (verified live):
-# Store Name, Store ID, Status, Team ID, Ticket Number
-
-input[placeholder='Search by store name...']  # placeholder changes with filter type
-button:has-text('Search')
+# Store Name | Store ID | Status | Team ID | Ticket Number
 ```
 
-### Filter Behaviour — Search by Ticket ID
+### Filter — Input / second control changes by selection
 ```
-# ⚠️ Default dropdown is 'Store Name' — it searches by store name ONLY.
-# To search by Ticket ID, first change the dropdown to 'Ticket Number' (if available).
-# Evidence after searching by ticket ID:
-text='TKT-'                                  # partial match — row appears with TKT- prefix
-                                             # ⚠️ NOT text='TKT-20055' (exact) in evidence_selector
+# Store Name   → input[placeholder='Search by store name...']
+# Store ID     → input[placeholder='Search by store ID...']
+# Ticket Number → input[placeholder='Search by ticket number...']
+
+# Status       → shows a SECOND native <select> (NOT a text input)
+#                options: All Statuses | Pending | In Progress | Awaiting Seller Action | Resolved
+
+# Team ID      → shows a SECOND native <select> (NOT a text input)
+#                options: All Teams | AM Team | NDR Team | OP Team
+
+button:has-text('Search')                    # submit search
 ```
 
 ### Primary Action Button
 ```
-button:has-text('Create New Ticket')         # ⚠️ NO '+' prefix
+button:has-text('+ Create New Ticket')       # ⚠️ HAS '+' prefix
+```
+
+### Correct Flow — Search by Ticket Number
+```
+# ⚠️ Default dropdown is 'Store Name' — switching to 'Ticket Number' is required first.
+# Step sequence:
+CLICK_OPTION: Ticket Number                  # change filter type dropdown
+FILL: input[placeholder='Search by ticket number...'] | TKT-20085
+CLICK: button:has-text('Search')
+ASSERT_EXISTS: text='TKT-20085'
 ```
 
 ### Table Column Headers (OMS admin view — verified live)
@@ -202,17 +221,28 @@ th:has-text('STATUS')
 th:has-text('ACTIONS')
 ```
 
+### Status Badges
+```
+# Pending (yellow) | In Progress (blue) | Resolved (green) | Awaiting Seller Action (orange)
+```
+
 ### Search Result Evidence
 ```
-text='TKT-XXXXX'                             # row appears in table after searching by ticket ID
-                                             # ⚠️ NOT th:has-text('TICKET ID') >> text='TKT-XXXXX'
+text='TKT-'                                  # partial match — ⚠️ NOT th:has-text('TICKET ID') >> text='TKT-'
+```
+
+### Results Text
+```
+text='Showing'                               # e.g. 'Showing 1 to 50 of 388 results'
 ```
 
 ### Pagination
 ```
-# ⚠️ Ticketing uses page NUMBER BUTTONS only — there are NO 'Next' / 'Previous' buttons
+button:has-text('Previous')                  # previous page
 button:has-text('1')                         # page number buttons
 button:has-text('2')
+button:has-text('Next')                      # next page
+# ⚠️ No 'Page X of Y' text on ticketing — use 'Showing 1 to 50 of {total} results' instead
 ```
 
 ---
@@ -727,7 +757,7 @@ th:has-text('BUDGET')
 | Field | Old (incorrect) | Correct (verified live) |
 |-------|----------------|------------------------|
 | Ticketing heading | `h1:has-text('Ticketing System')` | **`h2:has-text('Ticketing Management')`** |
-| Ticketing "Create" button | had `+` prefix guessed | **`button:has-text('Create New Ticket')`** (no `+`) |
+| Ticketing "Create" button | various guesses | **`button:has-text('+ Create New Ticket')`** (has `+` prefix) |
 | Ticketing table: order column | `th:has-text('ORDER NUMBER')` | **`th:has-text('ORDER ID')`** (OMS view; seller uses ORDER NUMBER) |
 | Ticketing filter type options | unknown | **Store Name, Store ID, Status, Team ID, Ticket Number** |
 | Commission model "New" button | `button:has-text('Create Commission Model')` | **`button:has-text('+ New Model')`** |

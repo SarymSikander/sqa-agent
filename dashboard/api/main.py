@@ -1074,6 +1074,11 @@ _ZAMBEEL_SELECTOR_FIXES = [
     ("th:has-text('TICKET ID') >> text='TKT", "text='TKT"),
     # Invalid Playwright locator API used as CSS — replace with FILL step
     ("input >> 3", "FILL: input[aria-label='Go to page'] | 3"),
+    # Ticketing: wrong placeholder for ticket number search input
+    ("input[placeholder='Search by Ticket ID']", "input[placeholder='Search by ticket number...']"),
+    ("input[placeholder='Search by ticket number']", "input[placeholder='Search by ticket number...']"),
+    # Ticketing: store name placeholder used when ticket number input is needed
+    ("input[placeholder='Search by store name...'] | TKT", "input[placeholder='Search by ticket number...'] | TKT"),
 ]
 
 
