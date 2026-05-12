@@ -758,74 +758,138 @@ def _extract_relevant_context(title: str, description: str, max_chars: int = 400
     return "\n\n".join(result)[:max_chars]
 
 
-_PORTAL_ROUTES = {
-    "admin": [
-        "/orders-management/dashboard",
-        "/orders-management/commission-models",
-        "/orders-management/agency-management",
-        "/orders-management/seller-management",
-        "/orders-management/all-orders",
-        "/orders-management/dispatch-batches",
-        "/orders-management/purchase-orders",
-        "/orders-management/team-management",
-    ],
-    "seller": [
-        "/get-started",
-        "/dashboard",
-        "/orders",
-        "/orders-analytics",
-        "/ticketing",
-        "/settings",
-        "/stores/integration",
-        "/my-invoices",
-        "/seller/inventory",
-        "/profile",
-        "/gold-subscription",
-        "/academy",
-    ],
-    "agency": [
-        "/get-started",
-        "/agency/portal/dashboard",
-        "/agency/portal/sellers",
-        "/agency/portal/ticketing",
-        "/agency/portal/settings",
-    ],
+# Maps each portal route to the keywords that indicate a ticket is about that page.
+# Longer / more specific phrases are listed first so they score higher than substrings.
+_ROUTE_KEYWORDS: dict[str, dict[str, list]] = {
+    "admin": {
+        "/orders-management/inventory-movements": [
+            "inventory movement", "inventory movements", "stock movement", "stock movements",
+            "warehouse movement", "inventory log",
+        ],
+        "/orders-management/commission-models": [
+            "commission model", "commission models", "new model", "add rule",
+            "flat per order", "commission rate", "commission", "revenue model",
+        ],
+        "/orders-management/agency-management": [
+            "agency management", "approve agency", "reject agency", "agency application",
+            "agency registration", "onboard agency", "agency",
+        ],
+        "/orders-management/seller-management": [
+            "seller management", "manage seller", "seller list", "seller profile",
+        ],
+        "/orders-management/dispatch-batches": [
+            "dispatch batch", "dispatch batches", "tracking generated", "manifest",
+            "shipment batch", "dispatch", "batch",
+        ],
+        "/orders-management/purchase-orders": [
+            "purchase order", "purchase orders", "po ", "procurement",
+        ],
+        "/orders-management/team-management": [
+            "team management", "team member", "team members", "invite member",
+            "add member", "team", "staff role",
+        ],
+        "/orders-management/ticketing": [
+            "oms ticketing", "support ticket", "ticketing", "ticket management",
+            "ticket", "issue report",
+        ],
+        "/orders-management/all-orders": [
+            "all orders", "order list", "update status", "upload orders", "edit order",
+            "order details", "ndr", "put on hold", "cancel order", "process order",
+            "approve order", "order", "orders",
+        ],
+        "/orders-management/dashboard": [
+            "dashboard", "overview", "summary", "stats", "statistics", "kpi", "metrics",
+        ],
+    },
+    "seller": {
+        "/seller/inventory": [
+            "seller inventory", "inventory management", "product inventory", "sku code",
+            "inventory movement", "stock in warehouse", "inventory", "stock",
+        ],
+        "/stores/integration": [
+            "store integration", "connect shopify", "connect easyorder", "connect store",
+            "light funnels", "youcan", "manual store", "disconnect store",
+            "store connection", "store", "integration",
+        ],
+        "/ticketing": [
+            "create ticket", "ticket management", "seller ticket", "ticketing",
+            "ticket", "support",
+        ],
+        "/settings": [
+            "bank account", "payment method", "add account", "iban", "usdt", "paypal",
+            "payment settings", "bank", "payment",
+        ],
+        "/orders": [
+            "send to zambeel", "delete order", "csv upload", "order processing",
+            "unprocessed orders", "processed orders", "orders dashboard", "order",
+        ],
+        "/orders-analytics": [
+            "orders analytics", "order analytics", "analytics", "analysis",
+        ],
+        "/my-invoices": [
+            "my invoices", "invoice", "invoices", "billing", "download invoice",
+        ],
+        "/profile": [
+            "profile settings", "personal information", "update profile", "phone number",
+            "agency connection", "disconnect agency", "profile",
+        ],
+        "/gold-subscription": [
+            "gold subscription", "gold plan", "unlock gold", "gold", "subscription",
+        ],
+        "/academy": [
+            "zambeel academy", "academy", "tutorial", "learning",
+        ],
+        "/dashboard": [
+            "dashboard", "overview", "total orders", "kpi", "stats",
+        ],
+        "/get-started": [
+            "get started", "onboarding", "dropshipping", "zambeel 360", "3pl",
+        ],
+    },
+    "agency": {
+        "/agency/portal/sellers": [
+            "manage sellers", "seller list", "merchant list", "connect merchant",
+            "seller management", "sellers", "merchants",
+        ],
+        "/agency/portal/ticketing": [
+            "agency ticket", "create ticket", "ticket management", "ticketing",
+            "ticket", "support",
+        ],
+        "/agency/portal/settings": [
+            "agency settings", "agency profile", "team member", "add member",
+            "agency information", "settings",
+        ],
+        "/agency/portal/dashboard": [
+            "dashboard", "overview", "summary", "stats", "metrics",
+        ],
+        "/get-started": [
+            "get started", "registration", "apply", "onboarding",
+        ],
+    },
 }
 
 
 def _identify_pages_from_ticket(title: str, description: str, portal: str) -> list:
-    """Uses GPT-4o to identify which page URL paths the ticket refers to."""
-    routes = _PORTAL_ROUTES.get(portal, [])
-    prompt = (
-        f"You are a QA engineer for the Zambeel platform.\n"
-        f"Based on the ticket below, identify which page URL paths need to be tested.\n"
-        f"Available routes for the '{portal}' portal: {routes}\n\n"
-        f"Ticket title: {title}\n"
-        f"Ticket description: {description}\n\n"
-        f"Return ONLY a JSON array of strings from the available routes list, e.g. "
-        f'["/orders-management/commission-models"]. '
-        f"Return at most 3 paths. If unsure, return the single most likely path."
-    )
-    try:
-        client = OpenAI(
-            base_url="https://models.inference.ai.azure.com",
-            api_key=os.getenv("GITHUB_TOKEN"),
-        )
-        response = client.chat.completions.create(
-            model="gpt-4o",
-            messages=[{"role": "user", "content": prompt}],
-            max_tokens=200,
-        )
-        output = (response.choices[0].message.content or "").strip()
-        arr_match = re.search(r'\[.*?\]', output, re.DOTALL)
-        if arr_match:
-            paths = json.loads(arr_match.group(0))
-            valid = [p for p in paths if isinstance(p, str) and p in routes]
-            if valid:
-                return valid[:3]
-    except Exception as e:
-        print(f"[_identify_pages_from_ticket] ERROR: {e}")
-    return routes[:1]
+    """Score each known route by keyword hits in the ticket text; return top matches."""
+    text = f"{title} {description}".lower()
+    keyword_map = _ROUTE_KEYWORDS.get(portal, {})
+
+    scores: dict[str, int] = {}
+    for route, keywords in keyword_map.items():
+        score = sum(1 for kw in keywords if kw in text)
+        if score > 0:
+            scores[route] = score
+
+    if scores:
+        ranked = sorted(scores, key=lambda r: scores[r], reverse=True)
+        result = ranked[:3]
+        print(f"[_identify_pages] keyword scores: {[(r, scores[r]) for r in result]}")
+        return result
+
+    # No keywords matched — fall back to the first route for the portal
+    fallback = next(iter(keyword_map), None)
+    print(f"[_identify_pages] no keyword match, fallback={fallback}")
+    return [fallback] if fallback else []
 
 
 def screenshot_page(portal: str, env: str, url_path: str) -> dict:
@@ -851,6 +915,13 @@ def screenshot_page(portal: str, env: str, url_path: str) -> dict:
             page = ctx.new_page()
             page.goto(full_url, timeout=30000, wait_until="networkidle")
             page.wait_for_timeout(2000)
+
+            # Auth guard — if the app redirected to login, the session has expired
+            if "/login" in page.url:
+                print(f"[screenshot_page] Auth failed — redirected to {page.url}")
+                browser.close()
+                return {"error": "auth_failed", "url": page.url, "url_path": url_path}
+
             png_bytes = page.screenshot(full_page=True)
             browser.close()
 
@@ -1052,6 +1123,9 @@ def generate_test_cases(ticket_key, title, description, screenshots: list = None
                 f"Title: {title}\n"
                 f"Description: {description}\n\n"
                 f"Pages captured: {pages_summary}\n\n"
+                f"CRITICAL: Generate test cases ONLY for the feature described in the ticket. "
+                f"Do NOT generate tests for login, navigation, or unrelated features. "
+                f"Every test case must directly test: {title}\n\n"
                 "Look at the screenshot(s) carefully. Based on ONLY what you can SEE:\n"
                 "1. Identify every relevant UI element for this ticket — exact button labels, "
                 "input placeholder text, dropdown option text, heading text.\n"
