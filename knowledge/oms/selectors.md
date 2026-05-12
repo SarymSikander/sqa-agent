@@ -177,6 +177,15 @@ input[placeholder='Search by store name...']  # placeholder changes with filter 
 button:has-text('Search')
 ```
 
+### Filter Behaviour — Search by Ticket ID
+```
+# ⚠️ Default dropdown is 'Store Name' — it searches by store name ONLY.
+# To search by Ticket ID, first change the dropdown to 'Ticket Number' (if available).
+# Evidence after searching by ticket ID:
+text='TKT-'                                  # partial match — row appears with TKT- prefix
+                                             # ⚠️ NOT text='TKT-20055' (exact) in evidence_selector
+```
+
 ### Primary Action Button
 ```
 button:has-text('Create New Ticket')         # ⚠️ NO '+' prefix

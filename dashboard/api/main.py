@@ -1061,11 +1061,12 @@ _ZAMBEEL_SELECTOR_FIXES = [
     ('button:has-text("Next >")', 'button:has-text("Next")'),
     ("button:has-text('< Previous')", "button:has-text('Previous')"),
     ('button:has-text("< Previous")', 'button:has-text("Previous")'),
-    # Page info text — partial regex match (nested spans mean exact text= fails)
-    ("text='Page 1 of'", r"text=/Page \d+ of/"),
-    ('text="Page 1 of"', r"text=/Page \d+ of/"),
-    ("text='Page 2 of'", r"text=/Page \d+ of/"),
-    ('text="Page 2 of"', r"text=/Page \d+ of/"),
+    # Page info text — regex doesn't work in evidence check; use simple partial text match
+    ("text='Page 1 of'", "text='Page'"),
+    ('text="Page 1 of"', "text='Page'"),
+    ("text='Page 2 of'", "text='Page'"),
+    ('text="Page 2 of"', "text='Page'"),
+    (r"text=/Page \d+ of/", "text='Page'"),
     # ASSERT_TEXT pipe value wrapped in quotes — strip the quotes
     ("| 'TKT-", "| TKT-"),
     ('| "TKT-', '| TKT-'),

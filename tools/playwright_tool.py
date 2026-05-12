@@ -513,7 +513,7 @@ def run_qa_test_cases(portal: str, env: str, test_cases: list) -> dict:
                             if "|" in payload:
                                 parts    = payload.split("|", 1)
                                 sel      = parts[0].strip()
-                                expected = parts[1].strip()
+                                expected = parts[1].strip().strip("'")
                             else:
                                 sel      = payload  # text embedded in selector e.g. h2:has-text('...')
                                 expected = ""
