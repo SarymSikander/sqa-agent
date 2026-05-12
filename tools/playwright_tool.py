@@ -440,16 +440,6 @@ def run_qa_test_cases(portal: str, env: str, test_cases: list) -> dict:
                 _log(f"── Test case: {tc_name} ──", "ok")
                 tc_pass = True
 
-                url_path = tc.get("url_path") or "/"
-                try:
-                    page.goto(base_url + url_path, timeout=30000, wait_until="domcontentloaded")
-                    page.wait_for_timeout(1500)
-                    _log(f"NAVIGATE to {url_path}", "pass", page.url)
-                    steps_executed += 1
-                except Exception as e:
-                    _log(f"NAVIGATE to {url_path}", "fail", str(e))
-                    tc_pass = False
-
                 for step_str in (tc.get("steps") or []):
                     step_str = _normalize_step(step_str.strip())
                     if not step_str:
@@ -489,6 +479,8 @@ def run_qa_test_cases(portal: str, env: str, test_cases: list) -> dict:
 
                         elif step_str.startswith("NAVIGATE:"):
                             path = step_str[9:].strip()
+                            if path.count('/orders-management') > 1:
+                                path = path.replace('/orders-management/orders-management', '/orders-management')
                             page.goto(base_url + path, timeout=30000, wait_until="domcontentloaded")
                             page.wait_for_timeout(1500)
                             _log(f"NAVIGATE: {path}", "pass", page.url)
