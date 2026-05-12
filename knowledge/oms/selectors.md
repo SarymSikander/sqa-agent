@@ -97,21 +97,25 @@ select                                       # per-page: 10, 15, 20, 25, 50, 100
 
 ## Inventory Movements (`/orders-management/inventory-movements`)
 
+> Source: verified from zambeel-fe source code + live staging DOM extraction + screenshots 2026-05-12
+
 ### Page Header
 ```
 h2:has-text('Inventory Movements')
 ```
 
-### Search
+### Search Bar
 ```
-select                                       # search type — native <select> LEFT of input
-# options: Movement ID, SKU Code, Warehouse
+# Search type — native <select> immediately LEFT of the search input:
+select
+# Verified option values and labels:
+# value='movement_id'    label='Movement ID'   → input[placeholder='Search Movement ID']
+# value='sku'            label='SKU Code'       → input[placeholder='Search SKU code']
+# value='warehouse_name' label='Warehouse'      → input[placeholder='Search warehouse name']
 
-input[placeholder='Search Movement ID']     # text search input
-# ⚠️ input[placeholder='Search by store name...'] does NOT exist here — that is ticketing only
-
-# Search is submitted via the blue search icon button (not a text button):
-button[type='submit']                        # blue search icon button next to input
+# ⚠️ input[placeholder='Search by store name...'] does NOT exist on this page — ticketing only
+# ⚠️ The search submit button is ICON-ONLY (no text) — button:has-text('Search') will NOT work
+#    Submit search by pressing Enter in the input (component handles onKeyDown → Enter)
 ```
 
 ### Other Controls
@@ -134,7 +138,7 @@ button:has-text('Filters')                  # opens Filters panel
 # Variant Consolidation, Internal Adjustment
 ```
 
-### Table Column Headers (verified live)
+### Table Column Headers (verified from source + live DOM)
 ```
 th:has-text('MOVEMENT ID')
 th:has-text('TYPE')
@@ -144,26 +148,46 @@ th:has-text('MOVED BY')
 th:has-text('DATE')
 ```
 
-### Pagination
+### Empty State
 ```
-select                                        # rows per page — LAST select on page
-# Options: 10 | 15 | 20 | 25 | 50 | 100      # ⚠️ NOT just 10, 25, 50, 100
+# h3 text (exact from source EmptyState.tsx):
+text='No Inventory Movements Found'
+# With active filters also shows:
+text='No movements match your current filters:'
+# Without filters shows:
+text='No inventory movements are available at this time.'
+```
 
-button:has-text('Previous')                  # previous page  ⚠️ NOT '< Previous'
-button:has-text('Next')                      # next page      ⚠️ NOT 'Next >'
+### Pagination (verified from PaginationControls.tsx + live DOM)
+```
+# Page info — rendered in <h2 class="text-gray-700">:
+h2:has-text('Page')                          # e.g. 'Page 1 of 5'
+text=/Page \d+ of \d+/                       # regex form — same element
+# ⚠️ NOT 'Showing X to Y' — that format is ticketing only. Inventory uses 'Page X of Y'.
+
+# Go to page — exact label text and input:
+# <span>Go to page:</span>  +  <input type="number" ...>
+input[type='number']                         # go-to-page input  ⚠️ NOT 'input >> 3' (invalid)
+
+# Page size — native <select> (LAST select on page):
+select
+# Verified options: 10 | 15 | 20 | 25 | 50 | 100
+
+# Navigation buttons (from DynamicPagination.tsx — Flowbite Button):
+button:has-text('Previous')                  # previous page
+button:has-text('Next')                      # next page
 button:has-text('1')                         # page number buttons
-text=/Page \d+ of \d+/                       # page info (e.g. 'Page 1 of 39')
-                                             # ⚠️ NOT 'Showing X to Y' — inventory uses 'Page X of Y'
-input[type='number']                         # go-to-page input (next to 'Go to page:' label)
-                                             # ⚠️ NOT 'input >> 3' (invalid)
+button:has-text('2')
 
-# ⚠️ After CLICK_OPTION selecting rows per page, add WAIT: 2000 before
-#    ASSERT_TEXT: text=/Page \d+ of \d+/ — page briefly reloads after selection.
+# ⚠️ After changing rows-per-page, add WAIT: 2000 before asserting page info —
+#    the page briefly reloads.
 ```
 
 ---
 
 ## Ticketing Page (`/orders-management/ticketing`)
+
+> Source: verified from zambeel-fe source code (SearchBar.tsx, TicketContent.tsx, Pagination.tsx, ticketing.constants.ts) + live staging DOM extraction + screenshots 2026-05-12
 
 ### Page Header
 ```
@@ -172,41 +196,49 @@ h2:has-text('Ticketing Management')          # ⚠️ h2, NOT h1
 
 ### Stats Cards (top of page)
 ```
-# Five cards — text labels only, no fixed selectors needed:
+# Five cards — text labels only:
 # Total Tickets | Pending | In Progress | Awaiting Seller Action | Resolved
 ```
 
-### Tab Buttons
+### Tab Buttons (for OMS admin — assigned-to shown first)
 ```
 button:has-text('Tickets Assigned to Zambeel')
 button:has-text('Tickets Assigned by Zambeel')
 ```
 
-### Filter Controls
+### Filter Controls — Search Type Dropdown (verified from live DOM)
 ```
 select                                       # filter type — native <select>
-# Filter type options (verified live):
-# Store Name | Store ID | Status | Team ID | Ticket Number
+# Verified options (value → display label):
+# store_name    → Store Name
+# store_id      → Store ID
+# status        → Status
+# team_id       → Team ID
+# ticket_number → Ticket Number
 ```
 
-### Filter — Input / second control changes by selection
+### Filter — Input or second select changes per filter type (verified from live DOM)
 ```
-# Store Name   → input[placeholder='Search by store name...']
-# Store ID     → input[placeholder='Search by store ID...']
-# Ticket Number → input[placeholder='Search by ticket number...']
+# store_name    → input[placeholder='Search by store name...']
+# store_id      → input[placeholder='Search by store ID...']
+# ticket_number → input[placeholder='Search by ticket number...']
 
-# Status       → shows a SECOND native <select> (NOT a text input)
-#                options: All Statuses | Pending | In Progress | Awaiting Seller Action | Resolved
+# status        → SECOND native <select> appears (NO text input)
+#                 Verified options: All Statuses | Pending | In Progress | Awaiting Seller Action | Resolved
 
-# Team ID      → shows a SECOND native <select> (NOT a text input)
-#                options: All Teams | AM Team | NDR Team | OP Team
+# team_id       → SECOND native <select> appears (NO text input)
+#                 Verified options: All Teams | Account Managers | AM Team | Call Center |
+#                                   Development Team | Marketing Team | NDR Team | OP Team |
+#                                   Sales Team | Support Team
 
-button:has-text('Search')                    # submit search
+button:has-text('Search')                    # submit search — text button (confirmed from source)
 ```
 
 ### Primary Action Button
 ```
-button:has-text('+ Create New Ticket')       # ⚠️ HAS '+' prefix
+button:has-text('Create New Ticket')
+# ⚠️ The '+' before the text is a <Plus> SVG icon — NOT text. has-text('+ Create New Ticket') FAILS.
+# ⚠️ Correct: button:has-text('Create New Ticket')
 ```
 
 ### Correct Flow — Search by Ticket Number (MANDATORY order)
@@ -214,8 +246,8 @@ button:has-text('+ Create New Ticket')       # ⚠️ HAS '+' prefix
 # ⚠️ MUST select filter type FIRST — without this, input stays as 'Search by store name...'
 #    and the search hits the wrong field.
 CLICK_OPTION: Ticket Number                  # STEP 1 — switch dropdown to Ticket Number
-FILL: input[placeholder='Search by ticket number...'] | TKT-20085   # STEP 2 — now fill
-CLICK: button:has-text('Search')             # STEP 3
+FILL: input[placeholder='Search by ticket number...'] | TKT-20085   # STEP 2 — fill input
+CLICK: button:has-text('Search')             # STEP 3 — submit
 ASSERT_EXISTS: text='TKT-20085'             # STEP 4 — evidence
 ```
 
@@ -240,28 +272,29 @@ th:has-text('ACTIONS')
 text='TKT-'                                  # partial match — ⚠️ NOT th:has-text('TICKET ID') >> text='TKT-'
 ```
 
-### Empty State (no results)
+### Empty State (verified from TicketContent.tsx source)
 ```
-# Exact empty-state text is unverified — use negative assertion:
-ASSERT_NOT_EXISTS: text='TKT-'               # preferred: confirm no TKT- row in table
-# If you need a positive assertion, try any of these (first match wins):
-text=/Showing 0/                             # e.g. 'Showing 0 results'
-text='0 results'
-text=/No.*found/i                            # e.g. 'No tickets found'
-```
-
-### Results Text
-```
-text='Showing'                               # e.g. 'Showing 1 to 50 of 388 results'
+# Tab 'Tickets Assigned to Zambeel' — exact h3 text:
+text='No tickets assigned to Zambeel'
+# Tab 'Tickets Assigned by Zambeel' — exact h3 text:
+text='No tickets assigned by Zambeel'
+# For automation, prefer negative assertion:
+ASSERT_NOT_EXISTS: text='TKT-'
 ```
 
-### Pagination
+### Results Text & Pagination (verified from Pagination.tsx source)
 ```
-button:has-text('Previous')                  # previous page
+# Results count — rendered as <p> with spans:
+# "Showing {startItem} to {endItem} of {totalItems} results"
+text=/Showing \d+ to \d+ of \d+/            # recommended regex form
+text=/Showing/                               # simpler partial match
+
+# Navigation buttons (Pagination.tsx — Previous/Next have sr-only text → has-text works):
+button:has-text('Previous')                  # icon button with sr-only 'Previous' text
+button:has-text('Next')                      # icon button with sr-only 'Next' text
 button:has-text('1')                         # page number buttons
 button:has-text('2')
-button:has-text('Next')                      # next page
-text=/Showing/                               # pagination evidence (e.g. 'Showing 1 to 50 of 388 results')
+
 # ⚠️ NO 'Page X of Y' text on ticketing — that format is Inventory Movements only
 ```
 
@@ -777,7 +810,7 @@ th:has-text('BUDGET')
 | Field | Old (incorrect) | Correct (verified live) |
 |-------|----------------|------------------------|
 | Ticketing heading | `h1:has-text('Ticketing System')` | **`h2:has-text('Ticketing Management')`** |
-| Ticketing "Create" button | various guesses | **`button:has-text('+ Create New Ticket')`** (has `+` prefix) |
+| Ticketing "Create" button | various guesses | **`button:has-text('Create New Ticket')`** — `+` is a `<Plus>` SVG icon, NOT text |
 | Ticketing table: order column | `th:has-text('ORDER NUMBER')` | **`th:has-text('ORDER ID')`** (OMS view; seller uses ORDER NUMBER) |
 | Ticketing filter type options | unknown | **Store Name, Store ID, Status, Team ID, Ticket Number** |
 | Commission model "New" button | `button:has-text('Create Commission Model')` | **`button:has-text('+ New Model')`** |

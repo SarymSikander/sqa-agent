@@ -242,9 +242,14 @@ def get_portal_knowledge(portal):
     content = ''
     for f in files_to_load:
         if f.exists():
-            content += f.read_text()[:5000]  # max 5000 chars per file
-    result = content[:12000]  # total max 12000 chars
-    print(f"[knowledge] get_portal_knowledge portal={portal} → {portal_dir}/ → {len(result):,} chars")
+            text = f.read_text()
+            # selectors.md is loaded in full — it is the primary reference and must not be truncated
+            cap = len(text) if f.name == 'selectors.md' else 5000
+            content += text[:cap]
+    result = content[:30000]  # raised from 12000 — selectors.md alone is ~21k chars
+    print(f"[knowledge] get_portal_knowledge portal={portal} → {portal_dir}/ → {len(result):,} chars (MUST be >5000 or knowledge is missing)")
+    if len(result) < 5000:
+        print(f"[knowledge] WARNING: knowledge context is suspiciously short ({len(result)} chars) — check knowledge files exist")
     return result
 
 
@@ -253,7 +258,7 @@ ABSOLUTE RULES — VIOLATION MEANS THE TEST SUITE IS WORTHLESS:
 
 1. NEVER use placeholder text as evidence. Evidence must be something that appears AFTER an action — e.g. a result row, a success message, a changed heading. An input placeholder is NOT evidence.
 2. NEVER invent text like 'Showing X to Y' or '100 movements displayed' — only use text that actually exists on the page. Always verify against the KNOWLEDGE BASE before using any text as evidence.
-3. For pagination evidence on Inventory Movements: ONLY use text=/Page \\d+ of \\d+/ — never 'Showing X to Y' on that page.
+3. Pagination evidence is PAGE-SPECIFIC: Inventory Movements uses text=/Page \\d+ of \\d+/ (rendered in an <h2>). Ticketing uses text=/Showing \\d+ to \\d+ of \\d+/ (rendered in a <p>). NEVER mix these up.
 4. For ticketing search evidence: ONLY use text='TKT-XXXXX' where XXXXX is the actual ticket number you searched — never a column header, never a compound selector.
 5. NEVER use button[type='submit'] — the ticketing search button is button:has-text('Search').
 6. NEVER use select >> text='100' or any >> chaining on a select — always use CLICK_OPTION: 100.
@@ -1097,8 +1102,9 @@ _ZAMBEEL_SELECTOR_FIXES = [
     ("text='No tickets found'", "text=/Showing 0/"),
     # Inventory movements has its own search input — not the store name placeholder
     ("input[placeholder='Search by store name...'] | MOVE", "input[placeholder='Search Movement ID'] | MOVE"),
-    # Ticketing pagination evidence — uses 'Showing X to Y', NOT 'Page X of Y'
-    (r"text=/Page \d+ of \d+/", "text=/Showing/"),
+    # Ticketing Create button — '+' is a <Plus> SVG icon, NOT text. has-text('+...') will never match.
+    ("button:has-text('+ Create New Ticket')", "button:has-text('Create New Ticket')"),
+    ('button:has-text("+ Create New Ticket")', 'button:has-text("Create New Ticket")'),
 ]
 
 
