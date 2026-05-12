@@ -1143,6 +1143,9 @@ def generate_test_cases(ticket_key, title, description, screenshots: list = None
                 })
             content.append({"type": "text", "text": 'Return ONLY valid JSON: {"test_cases": [...]}'})
 
+            print(f"[VISION] prompt (first 500 chars): {vision_text[:500]}")
+            print(f"[VISION] sending {len(valid_shots)} image(s) to gpt-4o")
+
             try:
                 response = client.chat.completions.create(
                     model="gpt-4o",
@@ -1150,7 +1153,7 @@ def generate_test_cases(ticket_key, title, description, screenshots: list = None
                     max_tokens=3000,
                 )
                 output = (response.choices[0].message.content or "").strip()
-                print(f"[generate_test_cases] vision output ({len(output)} chars): {output[:400]}")
+                print(f"[VISION] raw response ({len(output)} chars): {output[:1000]}")
                 return _parse_test_cases(output)
             except Exception as e:
                 print(f"[generate_test_cases] Vision call failed: {e} — falling back to text path")
@@ -1398,6 +1401,9 @@ async def run_qa_endpoint(issue_key: str, body: RunQABody):
                 shot = await asyncio.to_thread(
                     screenshot_page, portal_for_inspect, run_env, url_path
                 )
+                print(f"[VISION] screenshot for {portal_for_inspect}/{run_env}{url_path}: "
+                      f"success={'error' not in shot}, "
+                      f"size={len(shot.get('base64', ''))} bytes")
                 if shot and not shot.get("error"):
                     screenshots.append(shot)
             yield evt({
