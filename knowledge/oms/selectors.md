@@ -140,16 +140,19 @@ th:has-text('DATE')
 
 ### Pagination
 ```
-CLICK_OPTION: 100                            # rows per page — targets last <select> (options: 10, 25, 50, 100)
+select                                        # rows per page — LAST select on page
+# Options: 10 | 15 | 20 | 25 | 50 | 100      # ⚠️ NOT just 10, 25, 50, 100
+
 button:has-text('Previous')                  # previous page  ⚠️ NOT '< Previous'
 button:has-text('Next')                      # next page      ⚠️ NOT 'Next >'
 button:has-text('1')                         # page number buttons
-text=/Page \d+ of/                           # page info (regex — text lives in nested spans)
-input[type='number']                          # go-to-page input  ⚠️ NOT 'input >> 3' (invalid)
-                                             # (near 'Go to page' label in pagination area)
+text=/Page \d+ of \d+/                       # page info (e.g. 'Page 1 of 39')
+                                             # ⚠️ NOT 'Showing X to Y' — inventory uses 'Page X of Y'
+input[type='number']                         # go-to-page input (next to 'Go to page:' label)
+                                             # ⚠️ NOT 'input >> 3' (invalid)
 
-# ⚠️ After CLICK_OPTION: 100, add WAIT: 2000 before ASSERT_TEXT: text=/Page \d+ of/
-# The page briefly reloads and the text disappears during the reload.
+# ⚠️ After CLICK_OPTION selecting rows per page, add WAIT: 2000 before
+#    ASSERT_TEXT: text=/Page \d+ of \d+/ — page briefly reloads after selection.
 ```
 
 ---
@@ -229,6 +232,16 @@ th:has-text('ACTIONS')
 ### Search Result Evidence
 ```
 text='TKT-'                                  # partial match — ⚠️ NOT th:has-text('TICKET ID') >> text='TKT-'
+```
+
+### Empty State (no results)
+```
+# Exact empty-state text is unverified — use negative assertion:
+ASSERT_NOT_EXISTS: text='TKT-'               # preferred: confirm no TKT- row in table
+# If you need a positive assertion, try any of these (first match wins):
+text=/Showing 0/                             # e.g. 'Showing 0 results'
+text='0 results'
+text=/No.*found/i                            # e.g. 'No tickets found'
 ```
 
 ### Results Text

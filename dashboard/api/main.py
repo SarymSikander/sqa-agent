@@ -1079,6 +1079,11 @@ _ZAMBEEL_SELECTOR_FIXES = [
     ("input[placeholder='Search by ticket number']", "input[placeholder='Search by ticket number...']"),
     # Ticketing: store name placeholder used when ticket number input is needed
     ("input[placeholder='Search by store name...'] | TKT", "input[placeholder='Search by ticket number...'] | TKT"),
+    # Inventory movements uses 'Page X of Y', not 'Showing X to Y of'
+    ("text='Showing 1 to 100 of'", r"text=/Page \d+ of \d+/"),
+    # Generic empty-state text fixes
+    ("text='No results found'", "text=/Showing 0/"),
+    ("text='No tickets found'", "text=/Showing 0/"),
 ]
 
 
