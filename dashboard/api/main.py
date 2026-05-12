@@ -232,6 +232,22 @@ def _portal_knowledge(portal: str) -> str:
     return kb
 
 
+def get_portal_knowledge(portal):
+    portal_dir = {'admin': 'oms', 'seller': 'seller', 'agency': 'agency'}.get(portal, 'oms')
+    files_to_load = [
+        KNOWLEDGE_DIR / portal_dir / 'selectors.md',
+        KNOWLEDGE_DIR / portal_dir / 'pages.md',
+        KNOWLEDGE_DIR / 'shared' / 'test_rules.md',
+    ]
+    content = ''
+    for f in files_to_load:
+        if f.exists():
+            content += f.read_text()[:5000]  # max 5000 chars per file
+    result = content[:12000]  # total max 12000 chars
+    print(f"[knowledge] get_portal_knowledge portal={portal} → {portal_dir}/ → {len(result):,} chars")
+    return result
+
+
 _MANDATORY_SELECTOR_INSTRUCTION = (
     "MANDATORY: You MUST use ONLY selectors from the KNOWLEDGE BASE provided below. "
     "Do NOT invent selectors. "
@@ -1138,7 +1154,7 @@ def generate_test_cases(ticket_key, title, description, screenshots: list = None
     else:
         portal_hint = "admin"
 
-    knowledge_base = _portal_knowledge(portal_hint)
+    knowledge_base = get_portal_knowledge(portal_hint)
 
     # ── Vision path ────────────────────────────────────────────────────────────
     if not screenshots:
