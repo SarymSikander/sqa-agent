@@ -108,12 +108,19 @@ except OSError:
 GITHUB_REPO = os.getenv("GITHUB_REPO", "SarymSikander/api-test-suite")
 GITHUB_WORKFLOW_FILE = os.getenv("GITHUB_WORKFLOW_FILE", "api-tests.yml")
 
+# Canonical knowledge directory — co-located with main.py so it works on HuggingFace (/app/)
+KNOWLEDGE_DIR = Path(__file__).parent / "knowledge"
+print(f"[startup] knowledge dir exists: {KNOWLEDGE_DIR.exists()}, "
+      f"files: {[str(p.relative_to(KNOWLEDGE_DIR)) for p in sorted(KNOWLEDGE_DIR.rglob('*.md'))[:5]]}")
+
+
 # Load knowledge base — concatenate all knowledge/*.md files, fall back to app_context.md
 def _load_knowledge_base() -> str:
     """Load all knowledge base markdown files and concatenate them into one context string."""
-    # Search for knowledge/ directory relative to this file or repo root
+    # Primary: co-located knowledge/ (works on HuggingFace and locally)
+    # Fallback: repo-root knowledge/ for legacy local layouts
     _candidates = [
-        Path(__file__).resolve().parent / "knowledge",
+        KNOWLEDGE_DIR,
         Path(__file__).resolve().parent.parent.parent / "knowledge",
     ]
     _knowledge_dir = next((p for p in _candidates if p.is_dir()), None)
@@ -193,7 +200,7 @@ print(f"[startup] APP_CONTEXT total: {len(APP_CONTEXT)} chars")
 def _load_knowledge_file(rel_path: str) -> str:
     """Read a single knowledge file by relative path (e.g. 'oms/selectors.md')."""
     for candidate in [
-        Path(__file__).resolve().parent / "knowledge",
+        KNOWLEDGE_DIR,
         Path(__file__).resolve().parent.parent.parent / "knowledge",
     ]:
         fpath = candidate / rel_path
