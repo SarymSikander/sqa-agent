@@ -828,72 +828,263 @@ def _identify_pages_from_ticket(title: str, description: str, portal: str) -> li
     return routes[:1]
 
 
-def inspect_page_dom(portal: str, env: str, url_path: str) -> dict:
-    """Navigate to the page using a saved auth session and return live DOM elements."""
+def screenshot_page(portal: str, env: str, url_path: str) -> dict:
+    """Log in via saved auth session and capture a full-page screenshot as base64 PNG."""
+    import base64
+
     auth_file = _HERE / "auth" / f"{portal}_{env}.json"
     if not auth_file.exists():
-        print(f"[inspect_page_dom] Auth file not found: {auth_file}")
+        print(f"[screenshot_page] Auth file not found: {auth_file}")
         return {}
 
     base_url = _ENV_ORIGINS.get(env, "https://staging.myzambeel.com")
     full_url = base_url.rstrip("/") + url_path
-    print(f"[inspect_page_dom] Inspecting {full_url} as {portal}/{env}")
+    print(f"[screenshot_page] Capturing {full_url} as {portal}/{env}")
 
     try:
         with sync_playwright() as p:
             browser = p.chromium.launch(headless=True)
-            ctx = browser.new_context(storage_state=str(auth_file))
+            ctx = browser.new_context(
+                storage_state=str(auth_file),
+                viewport={"width": 1440, "height": 900},
+            )
             page = ctx.new_page()
             page.goto(full_url, timeout=30000, wait_until="networkidle")
             page.wait_for_timeout(2000)
-
-            dom = page.evaluate("""() => {
-                const buttons = Array.from(document.querySelectorAll('button'))
-                    .map(b => b.innerText.trim()).filter(Boolean);
-                const inputs = Array.from(document.querySelectorAll('input'))
-                    .map(i => ({placeholder: i.placeholder, type: i.type, name: i.name}))
-                    .filter(i => i.placeholder || i.type);
-                const selects = Array.from(document.querySelectorAll('select'))
-                    .map(s => ({
-                        name: s.name,
-                        options: Array.from(s.options).map(o => o.text.trim()).filter(Boolean)
-                    }));
-                const headings = Array.from(document.querySelectorAll('h1, h2, h3'))
-                    .map(h => ({tag: h.tagName.toLowerCase(), text: h.innerText.trim()}))
-                    .filter(h => h.text);
-                const tabs = Array.from(
-                    document.querySelectorAll('[role="tab"], [role="tablist"] button')
-                ).map(t => t.innerText.trim()).filter(Boolean);
-                return {
-                    buttons: [...new Set(buttons)],
-                    inputs,
-                    selects,
-                    headings,
-                    tabs: [...new Set(tabs)],
-                    title: document.title,
-                };
-            }""")
-
-            result = {"url": full_url, "portal": portal, "env": env, **dom}
-            print(
-                f"[inspect_page_dom] {url_path}: "
-                f"{len(dom.get('buttons', []))} buttons, "
-                f"{len(dom.get('inputs', []))} inputs, "
-                f"{len(dom.get('headings', []))} headings"
-            )
+            png_bytes = page.screenshot(full_page=True)
             browser.close()
-            return result
+
+        b64 = base64.b64encode(png_bytes).decode("utf-8")
+        print(f"[screenshot_page] {url_path}: {len(png_bytes):,} bytes captured")
+        return {"url": full_url, "url_path": url_path, "portal": portal, "base64": b64}
     except Exception as e:
-        print(f"[inspect_page_dom] ERROR for {full_url}: {e}")
-        return {"url": full_url, "error": str(e)}
+        print(f"[screenshot_page] ERROR for {full_url}: {e}")
+        return {"url": full_url, "url_path": url_path, "error": str(e)}
 
 
-def generate_test_cases(ticket_key, title, description, live_dom_data: list = None):
+_ZAMBEEL_SELECTOR_FIXES = [
+    # Commission Models page — wrong button text
+    ('button:has-text("Create Commission Model")', 'button:has-text("+ New Model")'),
+    ("button:has-text('Create Commission Model')", "button:has-text('+ New Model')"),
+    # Generic save button — always needs 'Model' suffix on this page
+    ('button:has-text("Save")', 'button:has-text("Save Model")'),
+    ("button:has-text('Save')", "button:has-text('Save Model')"),
+    # Wrong model name input placeholders
+    ('input[placeholder="Model Name"]', 'input[placeholder="Enter model name"]'),
+    ("input[placeholder='Model Name']", "input[placeholder='Enter model name']"),
+    ('input[placeholder="Enter Name"]', 'input[placeholder="Enter model name"]'),
+    ("input[placeholder='Enter Name']", "input[placeholder='Enter model name']"),
+    ('input[placeholder="Name"]', 'input[placeholder="Enter model name"]'),
+    ("input[placeholder='Name']", "input[placeholder='Enter model name']"),
+    # Wrong placeholder for commission value input
+    ('input[placeholder="Amount"]', 'input[type="number"]'),
+    ("input[placeholder='Amount']", "input[type='number']"),
+    ('input[placeholder=\'Enter commission amount\']', 'input[type=\'number\']'),
+    ('input[placeholder="Enter commission amount"]', 'input[type="number"]'),
+    # Remove dialog-scoped Country/Type trigger clicks — use CLICK_OPTION directly
+    ("CLICK: div[role='dialog'] >> text='Country*'", ''),
+    ('CLICK: div[role="dialog"] >> text="Country*"', ''),
+    ("CLICK: div[role='dialog'] >> text='Country'", ''),
+    ('CLICK: div[role="dialog"] >> text="Country"', ''),
+    ("CLICK: div[role='dialog'] >> text='Type*'", ''),
+    ('CLICK: div[role="dialog"] >> text="Type*"', ''),
+    ("CLICK: div[role='dialog'] >> text='Type'", ''),
+    ('CLICK: div[role="dialog"] >> text="Type"', ''),
+    ("CLICK: text='Country*'", ''),
+    ('CLICK: text="Country*"', ''),
+    ("CLICK: text='Type*'", ''),
+    ('CLICK: text="Type*"', ''),
+    # Convert country CLICK steps to CLICK_OPTION (background table cells intercept clicks)
+    ("CLICK: text='Saudi Arabia'", 'CLICK_OPTION: Saudi Arabia'),
+    ('CLICK: text="Saudi Arabia"', 'CLICK_OPTION: Saudi Arabia'),
+    ("CLICK: text='Pakistan'", 'CLICK_OPTION: Pakistan'),
+    ('CLICK: text="Pakistan"', 'CLICK_OPTION: Pakistan'),
+    ("CLICK: text='UAE'", 'CLICK_OPTION: UAE'),
+    ('CLICK: text="UAE"', 'CLICK_OPTION: UAE'),
+    ("CLICK: text='Kuwait'", 'CLICK_OPTION: Kuwait'),
+    ('CLICK: text="Kuwait"', 'CLICK_OPTION: Kuwait'),
+    ("CLICK: text='Bahrain'", 'CLICK_OPTION: Bahrain'),
+    ('CLICK: text="Bahrain"', 'CLICK_OPTION: Bahrain'),
+    ("CLICK: text='Iraq'", 'CLICK_OPTION: Iraq'),
+    ('CLICK: text="Iraq"', 'CLICK_OPTION: Iraq'),
+    ("CLICK: text='Qatar'", 'CLICK_OPTION: Qatar'),
+    ('CLICK: text="Qatar"', 'CLICK_OPTION: Qatar'),
+    ("CLICK: text='Oman'", 'CLICK_OPTION: Oman'),
+    ('CLICK: text="Oman"', 'CLICK_OPTION: Oman'),
+    # Convert type CLICK steps to CLICK_OPTION + fix wrong type names
+    ("CLICK: text='% of Revenue'", 'CLICK_OPTION: % of Revenue'),
+    ('CLICK: text="% of Revenue"', 'CLICK_OPTION: % of Revenue'),
+    ("CLICK: text='Flat per Order'", 'CLICK_OPTION: Flat per Order'),
+    ('CLICK: text="Flat per Order"', 'CLICK_OPTION: Flat per Order'),
+    ("CLICK: text='Percentage'", 'CLICK_OPTION: % of Revenue'),
+    ('CLICK: text="Percentage"', 'CLICK_OPTION: % of Revenue'),
+    ("CLICK: text='Flat Rate'", 'CLICK_OPTION: Flat per Order'),
+    ('CLICK: text="Flat Rate"', 'CLICK_OPTION: Flat per Order'),
+    # Invalid className pseudo-method GPT-4o generates for disabled state
+    ('button:has-text(\'Save Model\').className(\'disabled\')', 'button.bg-indigo-300:has-text(\'Save Model\')'),
+    ('button:has-text("Save Model").className("disabled")', 'button.bg-indigo-300:has-text("Save Model")'),
+    # ASSERT_TEXT on dialog — dialog spans full page, use ASSERT_EXISTS
+    ('ASSERT_TEXT: div[role=\'dialog\']', 'ASSERT_EXISTS: div[role=\'dialog\']'),
+    ('ASSERT_TEXT: div[role="dialog"]', 'ASSERT_EXISTS: div[role="dialog"]'),
+    # No confirmation/success toast exists — remove these false assertions
+    ("ASSERT_EXISTS: text='Commission model saved successfully.'", ''),
+    ('ASSERT_EXISTS: text="Commission model saved successfully."', ''),
+    ("ASSERT_EXISTS: text='Model saved successfully.'", ''),
+    ('ASSERT_EXISTS: text="Model saved successfully."', ''),
+    ("ASSERT_EXISTS: text='Saved successfully.'", ''),
+    ('ASSERT_EXISTS: text="Saved successfully."', ''),
+    ("ASSERT_EXISTS: text='Success'", ''),
+    ('ASSERT_EXISTS: text="Success"', ''),
+    # Currency field is auto-populated — remove manual currency steps
+    ("CLICK_OPTION: USD", ''),
+    ('CLICK_OPTION: SAR', ''),
+    ('CLICK_OPTION: AED', ''),
+    ('CLICK_OPTION: PKR', ''),
+    # Invalid enabled-state selector — use class-based check instead
+    ("ASSERT_EXISTS: button:has-text('Save Model') :not(:disabled)", "ASSERT_EXISTS: button.bg-indigo-600:has-text('Save Model')"),
+    ('ASSERT_EXISTS: button:has-text("Save Model") :not(:disabled)', 'ASSERT_EXISTS: button.bg-indigo-600:has-text("Save Model")'),
+    # ASSERT_NOT_EXISTS on option text is unreliable
+    ("ASSERT_NOT_EXISTS: text='Flat Rate'", ''),
+    ('ASSERT_NOT_EXISTS: text="Flat Rate"', ''),
+    ("ASSERT_NOT_EXISTS: text='Percentage'", ''),
+    ('ASSERT_NOT_EXISTS: text="Percentage"', ''),
+    # Fabricated duplicate-country validation messages — strip them
+    ("ASSERT_EXISTS: text='Each country can only appear once inside the same model.'", ''),
+    ('ASSERT_EXISTS: text="Each country can only appear once inside the same model."', ''),
+    ("ASSERT_EXISTS: text='Duplicate country'", ''),
+    ('ASSERT_EXISTS: text="Duplicate country"', ''),
+    # Invalid Playwright syntax GPT-4o generates
+    ('| disabled', ''),
+    ('| not_exists', ''),
+]
+
+
+def _parse_test_cases(output: str) -> list:
+    """Parse GPT-4o JSON output into a validated list of test case dicts."""
+    import re as _re
+    code_match = _re.search(r"```(?:json)?\s*(\{.*?\}|\[.*?\])\s*```", output, _re.DOTALL)
+    if code_match:
+        output = code_match.group(1)
+    parsed = json.loads(output)
+    if isinstance(parsed, list):
+        raw_cases = parsed
+    elif isinstance(parsed, dict) and "test_cases" in parsed:
+        raw_cases = parsed["test_cases"]
+    else:
+        print(f"[_parse_test_cases] Unexpected JSON shape: {type(parsed)}")
+        return []
+
+    valid = []
+    for tc in raw_cases:
+        if not isinstance(tc, dict):
+            continue
+        if not tc.get("test_name") or not tc.get("steps"):
+            continue
+        tc.setdefault("url_path", "/")
+        tc.setdefault("portal", "seller")
+        tc.setdefault("expected_result", "Feature works as expected")
+        tc.setdefault("evidence_selector", "")
+        # Apply selector fixes
+        tc["steps"] = [
+            next(
+                (s.replace(wrong, right) for wrong, right in _ZAMBEEL_SELECTOR_FIXES if wrong in s),
+                s,
+            )
+            for s in tc.get("steps", [])
+            if s
+        ]
+        # Drop empty steps produced by fixes that replace with ''
+        tc["steps"] = [s for s in tc["steps"] if s.strip()]
+        valid.append(tc)
+
+    print(f"[_parse_test_cases] {len(valid)} valid test cases")
+    return valid
+
+
+_TEST_CASE_JSON_SCHEMA = (
+    "Each test case must be a JSON object with:\n"
+    '- "test_name": string\n'
+    '- "url_path": exact URL path (e.g. "/orders-management/commission-models")\n'
+    '- "portal": "admin", "seller", or "agency"\n'
+    '- "steps": array of strings, each starting with one of:\n'
+    "    CLICK: css-selector\n"
+    "    FILL: css-selector | value\n"
+    "    WAIT: css-selector\n"
+    "    NAVIGATE: /path\n"
+    "    ASSERT_EXISTS: css-selector\n"
+    "    ASSERT_NOT_EXISTS: css-selector\n"
+    "    ASSERT_TEXT: css-selector | expected text\n"
+    "    SCREENSHOT: label\n"
+    "    CLICK_OPTION: option value\n"
+    '- "expected_result": what success looks like\n'
+    '- "evidence_selector": ONE CSS selector that proves the feature works\n\n'
+    "Selector rules for this React/Tailwind app (NO element IDs exist):\n"
+    '- Buttons: button:has-text("exact text")\n'
+    '- Inputs:  input[placeholder="exact placeholder"]\n'
+    '- Text:    text="exact visible text"\n'
+    "- Modals:  div[role=\"dialog\"]\n"
+    "- Dropdowns: CLICK_OPTION: value  (not CLICK on the trigger)\n"
+    "- NEVER use #id selectors\n"
+    "- NEVER wrap FILL/CLICK_OPTION values in quotes inside the step string\n\n"
+    'Return ONLY valid JSON: {"test_cases": [...]}'
+)
+
+
+def generate_test_cases(ticket_key, title, description, screenshots: list = None):
     import re
 
+    client = OpenAI(
+        base_url="https://models.inference.ai.azure.com",
+        api_key=os.getenv("GITHUB_TOKEN"),
+    )
+
+    # ── Vision path: screenshots available ────────────────────────────────────
+    if screenshots:
+        valid_shots = [s for s in screenshots if s.get("base64")]
+        if valid_shots:
+            print(f"[generate_test_cases] Vision path — {len(valid_shots)} screenshot(s)")
+
+            pages_summary = ", ".join(s.get("url_path", s.get("url", "")) for s in valid_shots)
+            vision_text = (
+                "You are a senior QA engineer. I am showing you screenshot(s) of live web pages "
+                f"from the Zambeel platform.\n\n"
+                f"Ticket: {ticket_key}\n"
+                f"Title: {title}\n"
+                f"Description: {description}\n\n"
+                f"Pages captured: {pages_summary}\n\n"
+                "Look at the screenshot(s) carefully. Based on ONLY what you can SEE:\n"
+                "1. Identify every relevant UI element for this ticket — exact button labels, "
+                "input placeholder text, dropdown option text, heading text.\n"
+                "2. Generate 5 Playwright test cases using ONLY selectors whose text is "
+                "LITERALLY VISIBLE in the screenshot(s). Do NOT invent or guess any text.\n"
+                "3. For each step, use the exact text or placeholder you can read in the image.\n\n"
+                + _TEST_CASE_JSON_SCHEMA
+            )
+
+            content: list = [{"type": "text", "text": vision_text}]
+            for shot in valid_shots:
+                content.append({
+                    "type": "image_url",
+                    "image_url": {"url": f"data:image/png;base64,{shot['base64']}"},
+                })
+            content.append({"type": "text", "text": 'Return ONLY valid JSON: {"test_cases": [...]}'})
+
+            try:
+                response = client.chat.completions.create(
+                    model="gpt-4o",
+                    messages=[{"role": "user", "content": content}],
+                    max_tokens=3000,
+                )
+                output = (response.choices[0].message.content or "").strip()
+                print(f"[generate_test_cases] vision output ({len(output)} chars): {output[:400]}")
+                return _parse_test_cases(output)
+            except Exception as e:
+                print(f"[generate_test_cases] Vision call failed: {e} — falling back to text path")
+
+    # ── Text fallback path: no screenshots or vision failed ────────────────────
+    print("[generate_test_cases] Text path (no screenshots)")
     relevant_context = _extract_relevant_context(title, description)
 
-    # Extract keywords for source scan
     stopwords = {"that", "this", "with", "from", "have", "will", "been", "they",
                  "when", "what", "which", "where", "then", "also", "should", "would"}
     keywords = list(
@@ -902,229 +1093,43 @@ def generate_test_cases(ticket_key, title, description, live_dom_data: list = No
     selectors_context = extract_selectors_from_source(keywords)
     print(f"[generate_test_cases] selectors_context ({len(selectors_context)} chars)")
 
-    prompt = (
-        "You have access to a COMPLETE KNOWLEDGE BASE about the Zambeel platform extracted directly from source code.\n"
-        "The knowledge base is provided in the 'Relevant app context' section below.\n\n"
+    text_prompt = (
+        "You are a senior QA engineer for Zambeel, a B2B e-commerce platform.\n"
+        "You write Playwright test scripts in Python that run in a real browser.\n\n"
         "KNOWLEDGE BASE USAGE RULES:\n"
         "- Use knowledge/oms/selectors.md for EXACT OMS selectors — never guess button text.\n"
         "- Use knowledge/seller/selectors.md for EXACT seller portal selectors.\n"
         "- Use knowledge/agency/selectors.md for EXACT agency portal selectors.\n"
-        "- Use knowledge/oms/flows.md for step-by-step OMS flows — follow them exactly.\n"
-        "- Use knowledge/seller/flows.md for step-by-step seller flows.\n"
-        "- Use knowledge/agency/flows.md for step-by-step agency flows.\n"
-        "- Use knowledge/shared/test_rules.md for global rules that apply to ALL tests.\n"
-        "- Use knowledge/*/test_patterns.md for proven working test patterns to model your output on.\n\n"
-        "CRITICAL SELECTOR RULES FOR ZAMBEEL:\n"
+        "- Use knowledge/shared/test_rules.md for global rules that apply to ALL tests.\n\n"
+        "CRITICAL SELECTOR RULES:\n"
         "1. Never use WAIT: [role='option'] — skip this pattern entirely.\n"
         "2. After clicking a dropdown trigger, go straight to CLICK_OPTION — no waiting needed.\n"
-        "3. Never check disabled state using CSS pseudo-classes like :disabled — use class-based selectors only if you can confirm the exact CSS class from context.\n"
-        "4. After clicking Save/Submit/Confirm buttons, always add ASSERT_EXISTS with the expected result text to verify success.\n"
-        "5. Country options for Zambeel are only: Bahrain, Iraq, Kuwait, Oman, Pakistan, Qatar, Saudi Arabia, UAE.\n"
-        "6. After clicking Save and the modal closes, wait for the listing to update before asserting.\n"
-        "7. Keep test cases simple — test what the ticket describes, not edge cases around UI state.\n"
-        "8. Never generate a test case that checks if Save Model button is disabled after BOTH Country AND Type have been selected — at that point the number input auto-fills with 0 which is valid, so the button will be enabled. Only check disabled state when Country OR Type is still unselected.\n"
-        "9. The number input for commission value has NO placeholder text — always use input[type=\"number\"] never input[placeholder=\"...\"] for the value field.\n"
-        "10. Model name input placeholder is EXACTLY 'Enter model name' — never 'Enter Name', 'Name', or 'Model Name'.\n"
-        "11. After CLICK: button:has-text('+ New Model'), always add WAIT: input[placeholder='Enter model name'] before any other modal steps.\n"
-        "12. Never click a Country or Type dropdown trigger — use CLICK_OPTION: value directly. The selects are native HTML and select_option works without opening them.\n"
-        "13. Commission Type values are ONLY '% of Revenue' or 'Flat per Order' — never 'Flat Rate', 'Percentage', or any other value.\n"
-        "14. CRITICAL HAPPY FLOW — Save Model button enables as soon as Country is selected. Type and Value fields are NOT required to enable Save Model. Do NOT add steps that check Save is still disabled after filling only some fields.\n"
-        "15. There is NO confirmation message or toast after clicking Save Model. Never assert text='Commission model saved successfully.' or any success toast. After Save Model is clicked and the modal closes, assert the model name appears in the listing table: ASSERT_EXISTS: text='<the model name you filled in>'.\n"
-        "16. Currency is auto-populated when Country is selected — never add a step to fill or click the Currency field.\n"
-        "17. The correct happy flow steps are: NAVIGATE → CLICK + New Model → WAIT modal → FILL model name → CLICK_OPTION country → CLICK Save Model → ASSERT_EXISTS model name in table.\n"
-        "18. Never wrap FILL values or CLICK_OPTION values in quotes in the step string. Write FILL: selector | ModelName not FILL: selector | 'ModelName'. Write CLICK_OPTION: Saudi Arabia not CLICK_OPTION: 'Saudi Arabia'.\n"
-        "19. Never use ASSERT_NOT_EXISTS to check that a dropdown option is absent — option text like 'Flat Rate' may appear anywhere in the page body and cause false failures. Only use ASSERT_EXISTS to confirm options that ARE present.\n"
-        "20. To verify Save Model button is enabled after country selection, use ASSERT_EXISTS: button.bg-indigo-600:has-text('Save Model') — do not use :not(:disabled) or any pseudo-class.\n"
-        "21. Never generate a test case for 'prevent duplicate country' by selecting the same country twice on the same select — that is a no-op. To add a second country row you must first CLICK: button:has-text('+ Add Rule'). Do not generate duplicate-country tests unless you can confirm the exact validation message from context.\n"
-        "22. Never guess validation or error message text. Only use ASSERT_EXISTS for text that is explicitly stated in the ticket description, acceptance criteria, or the knowledge base selectors/flows files.\n\n"
-        "CRITICAL: This React app has NO element IDs. Use ONLY these selector formats:\n"
-        "- button:has-text(\"exact text\") for buttons\n"
-        "- input[placeholder=\"exact placeholder\"] for inputs\n"
-        "- text=\"exact visible text\" for any element by its text\n"
-        "- div[role=\"dialog\"] for modals\n"
-        "- Never use #id selectors. All selectors must come from the knowledge base or REAL UI ELEMENTS section below.\n\n"
-        "You are an expert QA engineer for Zambeel, a B2B e-commerce platform.\n"
-        "You write Playwright test scripts in Python that actually execute in a browser.\n\n"
+        "3. Never check disabled state using CSS pseudo-classes like :disabled.\n"
+        "4. After clicking Save/Submit/Confirm, always ASSERT_EXISTS the expected result.\n"
+        "5. Country options: Bahrain, Iraq, Kuwait, Oman, Pakistan, Qatar, Saudi Arabia, UAE.\n"
+        "6. Commission Type values are ONLY '% of Revenue' or 'Flat per Order'.\n"
+        "7. Model name input placeholder is EXACTLY 'Enter model name'.\n"
+        "8. The number input for commission value has NO placeholder — use input[type=\"number\"].\n"
+        "9. Currency is auto-populated when Country is selected — never fill it.\n"
+        "10. Never assert success toasts that don't exist (e.g. 'Commission model saved successfully.').\n"
+        "11. Never wrap FILL/CLICK_OPTION values in quotes inside the step string.\n\n"
         f"Ticket: {ticket_key}\n"
         f"Title: {title}\n"
         f"Description: {description}\n\n"
-        f"Relevant app context (includes full knowledge base):\n{relevant_context}\n\n"
+        f"Relevant app context:\n{relevant_context}\n\n"
         f"{selectors_context}\n\n"
-        + (
-            "REAL PAGE ELEMENTS CURRENTLY ON PAGE (extracted via live browser inspection):\n"
-            "CRITICAL: Prefer selectors that match button texts, input placeholders, and headings "
-            "listed here. Do NOT invent selectors absent from this live DOM snapshot.\n"
-            + json.dumps(live_dom_data, indent=2) + "\n\n"
-            if live_dom_data else ""
-        )
-        + "Generate 3-5 test cases as JSON. Each test case must have:\n"
-        "- test_name: string\n"
-        "- url_path: exact URL path to navigate to (e.g. /orders-management/dashboard)\n"
-        "- portal: which portal to test (admin/seller/agency)\n"
-        "- steps: array of Playwright actions as strings, each starting with one of:\n"
-        "  CLICK: css-selector\n"
-        "  FILL: css-selector | value\n"
-        "  WAIT: css-selector\n"
-        "  NAVIGATE: /path\n"
-        "  ASSERT_EXISTS: css-selector\n"
-        "  ASSERT_NOT_EXISTS: css-selector\n"
-        "  ASSERT_TEXT: css-selector | expected text\n"
-        "  SCREENSHOT: label\n"
-        "- expected_result: what success looks like\n"
-        "- evidence_selector: ONE valid CSS selector that proves the feature works\n\n"
-        "IMPORTANT: This is a React app that uses Tailwind CSS and rarely uses IDs. "
-        "Use ONLY these selector types: button:has-text(\"exact button text\"), "
-        "input[placeholder=\"exact placeholder\"], text=\"exact visible text\", "
-        ".className patterns from the source code provided. "
-        "Never use #id selectors unless you see them explicitly in the source code provided.\n"
-        "Return ONLY valid JSON: {\"test_cases\": [...]}"
+        + _TEST_CASE_JSON_SCHEMA
     )
 
     try:
-        client = OpenAI(
-            base_url="https://models.inference.ai.azure.com",
-            api_key=os.getenv("GITHUB_TOKEN"),
-        )
         response = client.chat.completions.create(
             model="gpt-4o",
-            messages=[{"role": "user", "content": prompt}],
+            messages=[{"role": "user", "content": text_prompt}],
             max_tokens=2500,
         )
         output = (response.choices[0].message.content or "").strip()
-        print(f"[generate_test_cases] gpt-4o output ({len(output)} chars): {output[:500]}")
-
-        # Strip markdown code fences
-        code_match = re.search(r"```(?:json)?\s*(\{.*?\}|\[.*?\])\s*```", output, re.DOTALL)
-        if code_match:
-            output = code_match.group(1)
-
-        parsed = json.loads(output)
-
-        if isinstance(parsed, list):
-            raw_cases = parsed
-        elif isinstance(parsed, dict) and "test_cases" in parsed:
-            raw_cases = parsed["test_cases"]
-        else:
-            print(f"[generate_test_cases] Unexpected JSON shape: {type(parsed)}")
-            return []
-
-        valid = []
-        for tc in raw_cases:
-            if not isinstance(tc, dict):
-                continue
-            if not tc.get("test_name") or not tc.get("steps"):
-                continue
-            tc.setdefault("url_path", "/")
-            tc.setdefault("portal", "seller")
-            tc.setdefault("expected_result", "Feature works as expected")
-            tc.setdefault("evidence_selector", "")
-            valid.append(tc)
-
-        ZAMBEEL_SELECTOR_FIXES = [
-            # Commission Models page — wrong button text
-            ('button:has-text("Create Commission Model")', 'button:has-text("+ New Model")'),
-            ("button:has-text('Create Commission Model')", "button:has-text('+ New Model')"),
-            # Generic save button — always needs 'Model' suffix on this page
-            ('button:has-text("Save")', 'button:has-text("Save Model")'),
-            ("button:has-text('Save')", "button:has-text('Save Model')"),
-            # Wrong model name input placeholders
-            ('input[placeholder="Model Name"]', 'input[placeholder="Enter model name"]'),
-            ("input[placeholder='Model Name']", "input[placeholder='Enter model name']"),
-            ('input[placeholder="Enter Name"]', 'input[placeholder="Enter model name"]'),
-            ("input[placeholder='Enter Name']", "input[placeholder='Enter model name']"),
-            ('input[placeholder="Name"]', 'input[placeholder="Enter model name"]'),
-            ("input[placeholder='Name']", "input[placeholder='Enter model name']"),
-            # Wrong placeholder for commission value input
-            ('input[placeholder="Amount"]', 'input[type="number"]'),
-            ("input[placeholder='Amount']", "input[type='number']"),
-            ('input[placeholder=\'Enter commission amount\']', 'input[type=\'number\']'),
-            ('input[placeholder="Enter commission amount"]', 'input[type="number"]'),
-            # Remove dialog-scoped Country/Type trigger clicks — use CLICK_OPTION directly
-            ("CLICK: div[role='dialog'] >> text='Country*'", ''),
-            ('CLICK: div[role="dialog"] >> text="Country*"', ''),
-            ("CLICK: div[role='dialog'] >> text='Country'", ''),
-            ('CLICK: div[role="dialog"] >> text="Country"', ''),
-            ("CLICK: div[role='dialog'] >> text='Type*'", ''),
-            ('CLICK: div[role="dialog"] >> text="Type*"', ''),
-            ("CLICK: div[role='dialog'] >> text='Type'", ''),
-            ('CLICK: div[role="dialog"] >> text="Type"', ''),
-            ("CLICK: text='Country*'", ''),
-            ('CLICK: text="Country*"', ''),
-            ("CLICK: text='Type*'", ''),
-            ('CLICK: text="Type*"', ''),
-            # Convert country CLICK steps to CLICK_OPTION (background table cells intercept clicks)
-            ("CLICK: text='Saudi Arabia'", 'CLICK_OPTION: Saudi Arabia'),
-            ('CLICK: text="Saudi Arabia"', 'CLICK_OPTION: Saudi Arabia'),
-            ("CLICK: text='Pakistan'", 'CLICK_OPTION: Pakistan'),
-            ('CLICK: text="Pakistan"', 'CLICK_OPTION: Pakistan'),
-            ("CLICK: text='UAE'", 'CLICK_OPTION: UAE'),
-            ('CLICK: text="UAE"', 'CLICK_OPTION: UAE'),
-            ("CLICK: text='Kuwait'", 'CLICK_OPTION: Kuwait'),
-            ('CLICK: text="Kuwait"', 'CLICK_OPTION: Kuwait'),
-            ("CLICK: text='Bahrain'", 'CLICK_OPTION: Bahrain'),
-            ('CLICK: text="Bahrain"', 'CLICK_OPTION: Bahrain'),
-            ("CLICK: text='Iraq'", 'CLICK_OPTION: Iraq'),
-            ('CLICK: text="Iraq"', 'CLICK_OPTION: Iraq'),
-            ("CLICK: text='Qatar'", 'CLICK_OPTION: Qatar'),
-            ('CLICK: text="Qatar"', 'CLICK_OPTION: Qatar'),
-            ("CLICK: text='Oman'", 'CLICK_OPTION: Oman'),
-            ('CLICK: text="Oman"', 'CLICK_OPTION: Oman'),
-            # Convert type CLICK steps to CLICK_OPTION + fix wrong type names
-            ("CLICK: text='% of Revenue'", 'CLICK_OPTION: % of Revenue'),
-            ('CLICK: text="% of Revenue"', 'CLICK_OPTION: % of Revenue'),
-            ("CLICK: text='Flat per Order'", 'CLICK_OPTION: Flat per Order'),
-            ('CLICK: text="Flat per Order"', 'CLICK_OPTION: Flat per Order'),
-            ("CLICK: text='Percentage'", 'CLICK_OPTION: % of Revenue'),
-            ('CLICK: text="Percentage"', 'CLICK_OPTION: % of Revenue'),
-            ("CLICK: text='Flat Rate'", 'CLICK_OPTION: Flat per Order'),
-            ('CLICK: text="Flat Rate"', 'CLICK_OPTION: Flat per Order'),
-            # Invalid className pseudo-method GPT-4o generates for disabled state
-            ('button:has-text(\'Save Model\').className(\'disabled\')', 'button.bg-indigo-300:has-text(\'Save Model\')'),
-            ('button:has-text("Save Model").className("disabled")', 'button.bg-indigo-300:has-text("Save Model")'),
-            # ASSERT_TEXT on dialog — dialog spans full page, use ASSERT_EXISTS
-            ('ASSERT_TEXT: div[role=\'dialog\']', 'ASSERT_EXISTS: div[role=\'dialog\']'),
-            ('ASSERT_TEXT: div[role="dialog"]', 'ASSERT_EXISTS: div[role="dialog"]'),
-            # No confirmation/success toast exists — remove these false assertions
-            ("ASSERT_EXISTS: text='Commission model saved successfully.'", ''),
-            ('ASSERT_EXISTS: text="Commission model saved successfully."', ''),
-            ("ASSERT_EXISTS: text='Model saved successfully.'", ''),
-            ('ASSERT_EXISTS: text="Model saved successfully."', ''),
-            ("ASSERT_EXISTS: text='Saved successfully.'", ''),
-            ('ASSERT_EXISTS: text="Saved successfully."', ''),
-            ("ASSERT_EXISTS: text='Success'", ''),
-            ('ASSERT_EXISTS: text="Success"', ''),
-            # Currency field is auto-populated — remove manual currency steps
-            ("CLICK_OPTION: USD", ''),
-            ('CLICK_OPTION: SAR', ''),
-            ('CLICK_OPTION: AED', ''),
-            ('CLICK_OPTION: PKR', ''),
-            # Invalid enabled-state selector — use class-based check instead
-            ("ASSERT_EXISTS: button:has-text('Save Model') :not(:disabled)", "ASSERT_EXISTS: button.bg-indigo-600:has-text('Save Model')"),
-            ('ASSERT_EXISTS: button:has-text("Save Model") :not(:disabled)', 'ASSERT_EXISTS: button.bg-indigo-600:has-text("Save Model")'),
-            # ASSERT_NOT_EXISTS on option text is unreliable — the text may appear in the page body
-            ("ASSERT_NOT_EXISTS: text='Flat Rate'", ''),
-            ('ASSERT_NOT_EXISTS: text="Flat Rate"', ''),
-            ("ASSERT_NOT_EXISTS: text='Percentage'", ''),
-            ('ASSERT_NOT_EXISTS: text="Percentage"', ''),
-            # Fabricated duplicate-country validation messages — strip them
-            ("ASSERT_EXISTS: text='Each country can only appear once inside the same model.'", ''),
-            ('ASSERT_EXISTS: text="Each country can only appear once inside the same model."', ''),
-            ("ASSERT_EXISTS: text='Duplicate country'", ''),
-            ('ASSERT_EXISTS: text="Duplicate country"', ''),
-            # Invalid Playwright syntax GPT-4o generates
-            ('| disabled', ''),
-            ('| not_exists', ''),
-        ]
-
-        # Apply Zambeel selector fixes to all generated test case steps
-        for tc in valid:
-            tc['steps'] = [
-                next((s.replace(wrong, right) for wrong, right in ZAMBEEL_SELECTOR_FIXES if wrong in s), s)
-                for s in tc.get('steps', [])
-            ]
-
-        print(f"[generate_test_cases] Parsed {len(valid)} valid test cases")
-        return valid
+        print(f"[generate_test_cases] text output ({len(output)} chars): {output[:400]}")
+        return _parse_test_cases(output)
 
     except Exception as e:
         print(f"[generate_test_cases] ERROR: {e}")
@@ -1303,8 +1308,8 @@ async def run_qa_endpoint(issue_key: str, body: RunQABody):
                 branches_switched = True
                 yield evt({"stage": "switching_branches", "status": "done"})
 
-        # ── Stage: inspect live page DOM ───────────────────────────────────────
-        live_dom_data: list = []
+        # ── Stage: screenshot relevant pages ──────────────────────────────────
+        screenshots: list = []
         yield evt({"stage": "inspecting_page", "status": "running"})
         try:
             portal_for_inspect = (
@@ -1316,26 +1321,26 @@ async def run_qa_endpoint(issue_key: str, body: RunQABody):
             print(f"[inspecting_page] Identified pages: {pages}")
             for url_path in pages:
                 yield f": keepalive\n\n"
-                dom = await asyncio.to_thread(
-                    inspect_page_dom, portal_for_inspect, run_env, url_path
+                shot = await asyncio.to_thread(
+                    screenshot_page, portal_for_inspect, run_env, url_path
                 )
-                if dom and not dom.get("error"):
-                    live_dom_data.append(dom)
+                if shot and not shot.get("error"):
+                    screenshots.append(shot)
             yield evt({
                 "stage": "inspecting_page",
                 "status": "done",
-                "pages_inspected": [d.get("url") for d in live_dom_data],
+                "pages_inspected": [s.get("url") for s in screenshots],
             })
         except Exception as e:
             print(f"[inspecting_page] ERROR: {e}")
             yield evt({"stage": "inspecting_page", "status": "error", "message": str(e)})
-            # Non-fatal — continue without live DOM data
+            # Non-fatal — vision path skipped, text fallback will be used
 
         # ── Stage: generate test cases ─────────────────────────────────────────
         yield evt({"stage": "generating_test_cases", "status": "running"})
         yield f": keepalive\n\n"
         test_cases = await asyncio.to_thread(
-            generate_test_cases, issue_key, summary, description, live_dom_data or None
+            generate_test_cases, issue_key, summary, description, screenshots or None
         )
         # save as Jira comment regardless of parse success
         if test_cases:
