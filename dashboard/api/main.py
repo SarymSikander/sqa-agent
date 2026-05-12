@@ -342,15 +342,6 @@ class PRReviewBody(BaseModel):
     repo: str
     pr_number: int
 
-class AuthRefreshBody(BaseModel):
-    portal: str
-    env: str
-
-class AuthUploadBody(BaseModel):
-    portal: str
-    env: str
-    auth_storage_value: str
-
 class RunQABody(BaseModel):
     env: str
     frontend_branch: str
@@ -397,9 +388,14 @@ def _adf_to_text(node) -> str:
 
 @app.get("/debug/auth")
 def debug_auth():
-    if os.path.exists("/app/auth"):
-        return {"source": "/app/auth", "files": os.listdir("/app/auth")}
-    return {"source": "/app", "files": os.listdir("/app")}
+    """Show which portal credentials are configured via env vars."""
+    creds = {}
+    for portal in ("seller", "admin", "agency"):
+        for env in ("staging", "production"):
+            suffix = "STAGING" if env == "staging" else "PRODUCTION"
+            email = os.getenv(f"{portal.upper()}_{suffix}_EMAIL", "").strip()
+            creds[f"{portal}_{env}"] = "configured" if email else "missing"
+    return {"credentials": creds}
 
 # ── /health ───────────────────────────────────────────────────────────────────
 
@@ -407,8 +403,7 @@ def debug_auth():
 def health():
     import os as _os
     app_contents = _os.listdir("/app") if _os.path.exists("/app") else None
-    auth_contents = _os.listdir("/app/auth") if _os.path.exists("/app/auth") else None
-    return {"status": "ok", "app_dir": app_contents, "auth_dir": auth_contents}
+    return {"status": "ok", "app_dir": app_contents}
 
 
 # ── User auth ─────────────────────────────────────────────────────────────────
@@ -458,72 +453,26 @@ async def me(request: Request):
 
 # ── /auth ─────────────────────────────────────────────────────────────────────
 
-@app.post("/auth/refresh")
-async def auth_refresh(body: AuthRefreshBody):
-    portal = body.portal.lower()
-    env    = body.env.lower()
-    if portal not in {"seller", "admin", "agency"}:
-        raise HTTPException(status_code=400, detail="portal must be seller, admin, or agency")
-    if env not in {"local", "staging", "production"}:
-        raise HTTPException(status_code=400, detail="env must be local, staging, or production")
-    auth_path = _HERE / "auth" / f"{portal}_{env}.json"
-    if not auth_path.exists():
-        raise HTTPException(status_code=404, detail=f"Auth file not found: {portal}_{env}.json")
-    try:
-        return {"portal": portal, "env": env, "auth": json.loads(auth_path.read_text())}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
 _ENV_ORIGINS = {
     "local":      "http://localhost:5173",
     "staging":    "https://staging.myzambeel.com",
     "production": "https://portal.myzambeel.com",
 }
 
-@app.post("/auth/upload")
-async def auth_upload(body: AuthUploadBody):
-    portal = body.portal.lower()
-    env    = body.env.lower()
-    if portal not in {"seller", "admin", "agency"}:
-        raise HTTPException(status_code=400, detail="portal must be seller, admin, or agency")
-    if env not in {"local", "staging", "production"}:
-        raise HTTPException(status_code=400, detail="env must be local, staging, or production")
-    try:
-        inner = json.loads(body.auth_storage_value)
-        if not (inner.get("state") or {}).get("authToken"):
-            raise HTTPException(status_code=400, detail="auth_storage_value must contain state.authToken")
-    except json.JSONDecodeError as e:
-        raise HTTPException(status_code=400, detail=f"Invalid JSON in auth_storage_value: {e}")
-    auth_doc = {
-        "origins": [{
-            "origin": _ENV_ORIGINS[env],
-            "localStorage": [{"name": "auth-storage", "value": body.auth_storage_value}],
-        }],
-    }
-    auth_dir = _HERE / "auth"
-    auth_dir.mkdir(exist_ok=True)
-    auth_path = auth_dir / f"{portal}_{env}.json"
-    try:
-        auth_path.write_text(json.dumps(auth_doc, indent=2))
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-    print(f"[auth/upload] Saved {auth_path.name} ({auth_path.stat().st_size} bytes)")
-    return {"success": True, "file": f"{portal}_{env}.json", "portal": portal, "env": env}
-
 @app.get("/auth/status")
 def auth_status():
-    auth_dir = _HERE / "auth"
+    """Report which portals have email/password credentials configured in env."""
     sessions = []
     for portal in ("seller", "admin", "agency"):
         for env in ("staging", "production"):
-            path   = auth_dir / f"{portal}_{env}.json"
-            exists = path.exists()
+            suffix = "STAGING" if env == "staging" else "PRODUCTION"
+            email    = os.getenv(f"{portal.upper()}_{suffix}_EMAIL", "").strip()
+            password = os.getenv(f"{portal.upper()}_{suffix}_PASSWORD", "").strip()
             sessions.append({
-                "portal":   portal,
-                "env":      env,
-                "file":     f"{portal}_{env}.json",
-                "exists":   exists,
-                "modified": datetime.fromtimestamp(path.stat().st_mtime).isoformat() if exists else None,
+                "portal":        portal,
+                "env":           env,
+                "credentials":   "configured" if (email and password) else "missing",
+                "email":         email if email else None,
             })
     return {"sessions": sessions}
 
@@ -962,30 +911,41 @@ def _identify_pages_from_ticket(title: str, description: str, portal: str) -> li
 
 
 def screenshot_page(portal: str, env: str, url_path: str) -> dict:
-    """Log in via saved auth session and capture a full-page screenshot as base64 PNG."""
+    """Log in via email/password and capture a full-page screenshot as base64 PNG."""
     import base64
 
-    auth_file = _HERE / "auth" / f"{portal}_{env}.json"
-    if not auth_file.exists():
-        print(f"[screenshot_page] Auth file not found: {auth_file}")
+    suffix   = {"staging": "STAGING", "production": "PRODUCTION", "local": "LOCAL"}.get(env, env.upper())
+    email    = os.getenv(f"{portal.upper()}_{suffix}_EMAIL", "").strip()
+    password = os.getenv(f"{portal.upper()}_{suffix}_PASSWORD", "").strip()
+
+    if not email or not password:
+        print(f"[screenshot_page] No credentials for {portal}/{env}")
         return {}
 
-    base_url = _ENV_ORIGINS.get(env, "https://staging.myzambeel.com")
-    full_url = base_url.rstrip("/") + url_path
+    base_url  = _ENV_ORIGINS.get(env, "https://staging.myzambeel.com")
+    login_url = base_url.rstrip("/") + "/login"
+    full_url  = base_url.rstrip("/") + url_path
     print(f"[screenshot_page] Capturing {full_url} as {portal}/{env}")
 
     try:
         with sync_playwright() as p:
             browser = p.chromium.launch(headless=True)
-            ctx = browser.new_context(
-                storage_state=str(auth_file),
-                viewport={"width": 1440, "height": 900},
-            )
+            ctx  = browser.new_context(viewport={"width": 1440, "height": 900})
             page = ctx.new_page()
+
+            # Login
+            page.goto(login_url, timeout=30000, wait_until="networkidle")
+            page.wait_for_selector('input[type="email"], input[type="text"]', timeout=15000)
+            page.fill('input[type="email"]', email)
+            page.fill('input[type="password"]', password)
+            page.click('button[type="submit"]')
+            page.wait_for_url(lambda u: "/login" not in u, timeout=30000)
+            page.wait_for_timeout(2000)
+
+            # Navigate to target
             page.goto(full_url, timeout=30000, wait_until="networkidle")
             page.wait_for_timeout(2000)
 
-            # Auth guard — if the app redirected to login, the session has expired
             if "/login" in page.url:
                 print(f"[screenshot_page] Auth failed — redirected to {page.url}")
                 browser.close()
