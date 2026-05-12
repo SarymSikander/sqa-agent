@@ -448,7 +448,10 @@ def run_qa_test_cases(portal: str, env: str, test_cases: list) -> dict:
                         if step_str.startswith("CLICK:"):
                             sel = step_str[6:].strip()
                             page.wait_for_selector(sel, timeout=8000)
-                            page.click(sel, timeout=8000)
+                            if sel.strip().startswith("select"):
+                                page.locator(sel).last.click(force=True)
+                            else:
+                                page.click(sel, timeout=8000)
                             _log(f"CLICK: {sel}", "pass")
                             steps_executed += 1
                             if "save" in sel.lower():
