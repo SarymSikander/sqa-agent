@@ -234,6 +234,23 @@ _MANDATORY_SELECTOR_INSTRUCTION = (
     'ASSERT_EXISTS: text="Page Title" as evidence instead.'
 )
 
+ZAMBEEL_OMS_ROUTES = """
+MANDATORY ROUTE REFERENCE — USE EXACTLY THESE ROUTES, NEVER INVENT ROUTES:
+
+- Inventory Movements:    /orders-management/inventory-movements
+- Ticketing:              /orders-management/ticketing
+- Orders:                 /orders-management/orders
+- Commission Models:      /orders-management/commission-models
+- Dispatch Batches:       /orders-management/dispatch-batches
+- Agents:                 /orders-management/agents
+- Agency Registrations:   /orders-management/agency-registrations
+- Gold Subscriptions:     /orders-management/gold-subscriptions
+- Ticker Config:          /orders-management/ticker-config
+- Stores Settings:        /orders-management/stores-settings
+- Purchase Orders:        /orders-management/purchase-orders
+- Return Orders:          /orders-management/return-orders
+"""
+
 app.mount("/screenshots", StaticFiles(directory=str(SCREENSHOTS_DIR)), name="screenshots")
 
 REPO_PATHS = {
@@ -1072,6 +1089,10 @@ _ZAMBEEL_SELECTOR_FIXES = [
     # Invalid Playwright syntax GPT-4o generates
     ('| disabled', ''),
     ('| not_exists', ''),
+    # Wrong route paths — GPT-4o invents short paths; correct to full OMS routes
+    ('/inventory-management', '/orders-management/inventory-movements'),
+    ('/ticketing', '/orders-management/ticketing'),
+    ('/orders', '/orders-management/orders'),
 ]
 
 
@@ -1100,7 +1121,7 @@ def _parse_test_cases(output: str) -> list:
         tc.setdefault("portal", "seller")
         tc.setdefault("expected_result", "Feature works as expected")
         tc.setdefault("evidence_selector", "")
-        # Apply selector fixes
+        # Apply selector + route fixes to all steps
         tc["steps"] = [
             next(
                 (s.replace(wrong, right) for wrong, right in _ZAMBEEL_SELECTOR_FIXES if wrong in s),
@@ -1111,6 +1132,11 @@ def _parse_test_cases(output: str) -> list:
         ]
         # Drop empty steps produced by fixes that replace with ''
         tc["steps"] = [s for s in tc["steps"] if s.strip()]
+        # Apply route fixes to the top-level url_path field
+        for wrong, right in _ZAMBEEL_SELECTOR_FIXES:
+            if right and wrong in tc["url_path"]:
+                tc["url_path"] = tc["url_path"].replace(wrong, right)
+                break
         valid.append(tc)
 
     print(f"[_parse_test_cases] {len(valid)} valid test cases")
@@ -1175,6 +1201,7 @@ def generate_test_cases(ticket_key, title, description, screenshots: list = None
 
             pages_summary = ", ".join(s.get("url_path", s.get("url", "")) for s in valid_shots)
             vision_text = (
+                f"{ZAMBEEL_OMS_ROUTES}\n\n"
                 f"{_MANDATORY_SELECTOR_INSTRUCTION}\n\n"
                 "You are a senior QA engineer. I am showing you screenshot(s) of live web pages "
                 f"from the Zambeel platform.\n\n"
@@ -1226,6 +1253,7 @@ def generate_test_cases(ticket_key, title, description, screenshots: list = None
           f"kb={len(knowledge_base):,} chars")
 
     text_prompt = (
+        f"{ZAMBEEL_OMS_ROUTES}\n\n"
         f"{_MANDATORY_SELECTOR_INSTRUCTION}\n\n"
         "You are a senior QA engineer for Zambeel, a B2B e-commerce platform.\n"
         "You write Playwright test scripts in Python that run in a real browser.\n\n"
