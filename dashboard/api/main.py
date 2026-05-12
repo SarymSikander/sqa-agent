@@ -910,56 +910,27 @@ def _identify_pages_from_ticket(title: str, description: str, portal: str) -> li
     return [fallback] if fallback else []
 
 
-def screenshot_page(portal: str, env: str, url_path: str) -> dict:
-    """Log in via email/password and capture a full-page screenshot as base64 PNG."""
+def screenshot_page(portal, env, url_path):
+    from playwright.sync_api import sync_playwright
     import base64
-
-    suffix   = {"staging": "STAGING", "production": "PRODUCTION", "local": "LOCAL"}.get(env, env.upper())
-    email    = os.getenv(f"{portal.upper()}_{suffix}_EMAIL", "").strip()
-    password = os.getenv(f"{portal.upper()}_{suffix}_PASSWORD", "").strip()
-
-    if not email or not password:
-        print(f"[screenshot_page] No credentials for {portal}/{env}")
-        return {}
-
-    base_url  = _ENV_ORIGINS.get(env, "https://staging.myzambeel.com")
-    login_url = base_url.rstrip("/") + "/login"
-    full_url  = base_url.rstrip("/") + url_path
-    print(f"[screenshot_page] Capturing {full_url} as {portal}/{env}")
-
-    try:
-        with sync_playwright() as p:
-            browser = p.chromium.launch(headless=True)
-            ctx  = browser.new_context(viewport={"width": 1440, "height": 900})
-            page = ctx.new_page()
-
-            # Login
-            page.goto(login_url, timeout=30000, wait_until="networkidle")
-            page.wait_for_selector('input[type="email"], input[type="text"]', timeout=15000)
-            page.fill('input[type="email"]', email)
-            page.fill('input[type="password"]', password)
-            page.click('button[type="submit"]')
-            page.wait_for_url(lambda u: "/login" not in u, timeout=30000)
-            page.wait_for_timeout(2000)
-
-            # Navigate to target
-            page.goto(full_url, timeout=30000, wait_until="networkidle")
-            page.wait_for_timeout(2000)
-
-            if "/login" in page.url:
-                print(f"[screenshot_page] Auth failed — redirected to {page.url}")
-                browser.close()
-                return {"error": "auth_failed", "url": page.url, "url_path": url_path}
-
-            png_bytes = page.screenshot(full_page=True)
-            browser.close()
-
-        b64 = base64.b64encode(png_bytes).decode("utf-8")
-        print(f"[screenshot_page] {url_path}: {len(png_bytes):,} bytes captured")
-        return {"url": full_url, "url_path": url_path, "portal": portal, "base64": b64}
-    except Exception as e:
-        print(f"[screenshot_page] ERROR for {full_url}: {e}")
-        return {"url": full_url, "url_path": url_path, "error": str(e)}
+    base_url = 'https://staging.myzambeel.com' if env == 'staging' else 'https://portal.myzambeel.com'
+    email    = os.getenv(f'{portal.upper()}_{env.upper()}_EMAIL', '').strip()
+    password = os.getenv(f'{portal.upper()}_{env.upper()}_PASSWORD', '').strip()
+    print(f'[screenshot_page] {portal}/{env} email={email} url={base_url}{url_path}')
+    with sync_playwright() as p:
+        browser = p.chromium.launch(headless=True)
+        page = browser.new_page(viewport={'width': 1440, 'height': 900})
+        page.goto(f'{base_url}/login')
+        page.fill('input[type="email"]', email)
+        page.fill('input[type="password"]', password)
+        page.click('button[type="submit"]')
+        page.wait_for_url(lambda url: '/login' not in url, timeout=30000)
+        page.goto(f'{base_url}{url_path}')
+        page.wait_for_load_state('networkidle')
+        page.wait_for_timeout(2000)
+        screenshot = page.screenshot(full_page=True)
+        browser.close()
+        return {'base64': base64.b64encode(screenshot).decode()}
 
 
 _ZAMBEEL_SELECTOR_FIXES = [
@@ -1169,104 +1140,61 @@ def generate_test_cases(ticket_key, title, description, screenshots: list = None
 
     knowledge_base = _portal_knowledge(portal_hint)
 
-    # ── Vision path: screenshots available ────────────────────────────────────
-    if screenshots:
-        valid_shots = [s for s in screenshots if s.get("base64")]
-        if valid_shots:
-            print(f"[generate_test_cases] Vision path — {len(valid_shots)} screenshot(s), "
-                  f"portal={portal_hint}, kb={len(knowledge_base):,} chars")
+    # ── Vision path ────────────────────────────────────────────────────────────
+    if not screenshots:
+        raise RuntimeError("generate_test_cases: no screenshots provided — cannot generate test cases")
+    valid_shots = [s for s in screenshots if s.get("base64")]
+    if not valid_shots:
+        errors = [s.get("error", "no base64") for s in screenshots]
+        raise RuntimeError(f"generate_test_cases: all screenshots failed — {errors}")
+    print(f"[generate_test_cases] Vision path — {len(valid_shots)} screenshot(s), "
+          f"portal={portal_hint}, kb={len(knowledge_base):,} chars")
 
-            pages_summary = ", ".join(s.get("url_path", s.get("url", "")) for s in valid_shots)
-            vision_text = (
-                f"{ZAMBEEL_OMS_ROUTES}\n\n"
-                f"{_MANDATORY_SELECTOR_INSTRUCTION}\n\n"
-                "You are a senior QA engineer. I am showing you screenshot(s) of live web pages "
-                f"from the Zambeel platform.\n\n"
-                f"Ticket: {ticket_key}\n"
-                f"Title: {title}\n"
-                f"Description: {description}\n\n"
-                f"Pages captured: {pages_summary}\n\n"
-                f"CRITICAL: Generate test cases ONLY for the feature described in the ticket. "
-                f"Do NOT generate tests for login, navigation, or unrelated features. "
-                f"Every test case must directly test: {title}\n\n"
-                "Look at the screenshot(s) carefully. Cross-reference what you SEE with the "
-                "KNOWLEDGE BASE below to confirm exact selector text:\n"
-                "1. Identify every relevant UI element — exact button labels, input placeholders, "
-                "dropdown option text, heading text.\n"
-                "2. Generate 5 Playwright test cases. For each selector, verify it exists in the "
-                "KNOWLEDGE BASE. If it does not appear there, use text= with the exact visible text.\n"
-                "3. Never invent placeholder text or button labels not present in the screenshot "
-                "or the KNOWLEDGE BASE.\n\n"
-                f"KNOWLEDGE BASE ({portal_hint} portal):\n"
-                f"{knowledge_base}\n\n"
-                + _TEST_CASE_JSON_SCHEMA
-            )
-
-            content: list = [{"type": "text", "text": vision_text}]
-            for shot in valid_shots:
-                content.append({
-                    "type": "image_url",
-                    "image_url": {"url": f"data:image/png;base64,{shot['base64']}"},
-                })
-            content.append({"type": "text", "text": 'Return ONLY valid JSON: {"test_cases": [...]}'})
-
-            print(f"[VISION] prompt (first 500 chars): {vision_text[:500]}")
-            print(f"[VISION] sending {len(valid_shots)} image(s) to gpt-4o")
-
-            try:
-                response = client.chat.completions.create(
-                    model="gpt-4o",
-                    messages=[{"role": "user", "content": content}],
-                    max_tokens=4000,
-                )
-                output = (response.choices[0].message.content or "").strip()
-                print(f"[VISION] raw response ({len(output)} chars): {output[:1000]}")
-                return _parse_test_cases(output)
-            except Exception as e:
-                print(f"[generate_test_cases] Vision call failed: {e} — falling back to text path")
-
-    # ── Text fallback path: no screenshots or vision failed ────────────────────
-    print(f"[generate_test_cases] Text path (no screenshots), portal={portal_hint}, "
-          f"kb={len(knowledge_base):,} chars")
-
-    text_prompt = (
+    pages_summary = ", ".join(s.get("url_path", s.get("url", "")) for s in valid_shots)
+    vision_text = (
         f"{ZAMBEEL_OMS_ROUTES}\n\n"
         f"{_MANDATORY_SELECTOR_INSTRUCTION}\n\n"
-        "You are a senior QA engineer for Zambeel, a B2B e-commerce platform.\n"
-        "You write Playwright test scripts in Python that run in a real browser.\n\n"
-        "CRITICAL SELECTOR RULES:\n"
-        "1. Never use WAIT: [role='option'] — skip this pattern entirely.\n"
-        "2. After clicking a dropdown trigger, go straight to CLICK_OPTION — no waiting needed.\n"
-        "3. Never check disabled state using CSS pseudo-classes like :disabled.\n"
-        "4. After clicking Save/Submit/Confirm, always ASSERT_EXISTS the expected result.\n"
-        "5. Country options: Bahrain, Iraq, Kuwait, Oman, Pakistan, Qatar, Saudi Arabia, UAE.\n"
-        "6. Commission Type values are ONLY '% of Revenue' or 'Flat per Order'.\n"
-        "7. Model name input placeholder is EXACTLY 'Enter model name'.\n"
-        "8. The number input for commission value has NO placeholder — use input[type=\"number\"].\n"
-        "9. Currency is auto-populated when Country is selected — never fill it.\n"
-        "10. Never assert success toasts that don't exist.\n"
-        "11. Never wrap FILL/CLICK_OPTION values in quotes inside the step string.\n\n"
+        "You are a senior QA engineer. I am showing you screenshot(s) of live web pages "
+        f"from the Zambeel platform.\n\n"
         f"Ticket: {ticket_key}\n"
         f"Title: {title}\n"
         f"Description: {description}\n\n"
-        f"KNOWLEDGE BASE ({portal_hint} portal — use ONLY selectors found here):\n"
+        f"Pages captured: {pages_summary}\n\n"
+        f"CRITICAL: Generate test cases ONLY for the feature described in the ticket. "
+        f"Do NOT generate tests for login, navigation, or unrelated features. "
+        f"Every test case must directly test: {title}\n\n"
+        "Look at the screenshot(s) carefully. Cross-reference what you SEE with the "
+        "KNOWLEDGE BASE below to confirm exact selector text:\n"
+        "1. Identify every relevant UI element — exact button labels, input placeholders, "
+        "dropdown option text, heading text.\n"
+        "2. Generate 5 Playwright test cases. For each selector, verify it exists in the "
+        "KNOWLEDGE BASE. If it does not appear there, use text= with the exact visible text.\n"
+        "3. Never invent placeholder text or button labels not present in the screenshot "
+        "or the KNOWLEDGE BASE.\n\n"
+        f"KNOWLEDGE BASE ({portal_hint} portal):\n"
         f"{knowledge_base}\n\n"
         + _TEST_CASE_JSON_SCHEMA
     )
 
-    try:
-        response = client.chat.completions.create(
-            model="gpt-4o",
-            messages=[{"role": "user", "content": text_prompt}],
-            max_tokens=2500,
-        )
-        output = (response.choices[0].message.content or "").strip()
-        print(f"[generate_test_cases] text output ({len(output)} chars): {output[:400]}")
-        return _parse_test_cases(output)
+    content: list = [{"type": "text", "text": vision_text}]
+    for shot in valid_shots:
+        content.append({
+            "type": "image_url",
+            "image_url": {"url": f"data:image/png;base64,{shot['base64']}"},
+        })
+    content.append({"type": "text", "text": 'Return ONLY valid JSON: {"test_cases": [...]}'})
 
-    except Exception as e:
-        print(f"[generate_test_cases] ERROR: {e}")
-        return []
+    print(f"[VISION] prompt (first 500 chars): {vision_text[:500]}")
+    print(f"[VISION] sending {len(valid_shots)} image(s) to gpt-4o")
+
+    response = client.chat.completions.create(
+        model="gpt-4o",
+        messages=[{"role": "user", "content": content}],
+        max_tokens=4000,
+    )
+    output = (response.choices[0].message.content or "").strip()
+    print(f"[VISION] raw response ({len(output)} chars): {output[:1000]}")
+    return _parse_test_cases(output)
 
 
 def _build_qa_report(*, issue_key, summary, env, frontend_branch, backend_branch,
