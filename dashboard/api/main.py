@@ -1084,6 +1084,10 @@ _ZAMBEEL_SELECTOR_FIXES = [
     # Generic empty-state text fixes
     ("text='No results found'", "text=/Showing 0/"),
     ("text='No tickets found'", "text=/Showing 0/"),
+    # Inventory movements has its own search input — not the store name placeholder
+    ("input[placeholder='Search by store name...'] | MOVE", "input[placeholder='Search Movement ID'] | MOVE"),
+    # Ticketing pagination evidence — uses 'Showing X to Y', NOT 'Page X of Y'
+    (r"text=/Page \d+ of \d+/", "text=/Showing/"),
 ]
 
 

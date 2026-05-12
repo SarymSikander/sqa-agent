@@ -102,17 +102,23 @@ select                                       # per-page: 10, 15, 20, 25, 50, 100
 h2:has-text('Inventory Movements')
 ```
 
-### Controls
+### Search
 ```
-input[placeholder='Search Movement ID']     # text search
+select                                       # search type — native <select> LEFT of input
+# options: Movement ID, SKU Code, Warehouse
+
+input[placeholder='Search Movement ID']     # text search input
+# ⚠️ input[placeholder='Search by store name...'] does NOT exist here — that is ticketing only
+
+# Search is submitted via the blue search icon button (not a text button):
+button[type='submit']                        # blue search icon button next to input
+```
+
+### Other Controls
+```
 button:has-text('Add Inventory Movement')   # opens Create modal
 button:has-text('Date')                     # date range picker
 button:has-text('Filters')                  # opens Filters panel
-```
-
-### Search Type Filter (native `<select>` left of search input)
-```
-select                                       # options: Movement ID, SKU Code, Warehouse
 ```
 
 ### Filters Panel (opens on button:has-text('Filters'))
@@ -203,14 +209,14 @@ button:has-text('Search')                    # submit search
 button:has-text('+ Create New Ticket')       # ⚠️ HAS '+' prefix
 ```
 
-### Correct Flow — Search by Ticket Number
+### Correct Flow — Search by Ticket Number (MANDATORY order)
 ```
-# ⚠️ Default dropdown is 'Store Name' — switching to 'Ticket Number' is required first.
-# Step sequence:
-CLICK_OPTION: Ticket Number                  # change filter type dropdown
-FILL: input[placeholder='Search by ticket number...'] | TKT-20085
-CLICK: button:has-text('Search')
-ASSERT_EXISTS: text='TKT-20085'
+# ⚠️ MUST select filter type FIRST — without this, input stays as 'Search by store name...'
+#    and the search hits the wrong field.
+CLICK_OPTION: Ticket Number                  # STEP 1 — switch dropdown to Ticket Number
+FILL: input[placeholder='Search by ticket number...'] | TKT-20085   # STEP 2 — now fill
+CLICK: button:has-text('Search')             # STEP 3
+ASSERT_EXISTS: text='TKT-20085'             # STEP 4 — evidence
 ```
 
 ### Table Column Headers (OMS admin view — verified live)
@@ -255,7 +261,8 @@ button:has-text('Previous')                  # previous page
 button:has-text('1')                         # page number buttons
 button:has-text('2')
 button:has-text('Next')                      # next page
-# ⚠️ No 'Page X of Y' text on ticketing — use 'Showing 1 to 50 of {total} results' instead
+text=/Showing/                               # pagination evidence (e.g. 'Showing 1 to 50 of 388 results')
+# ⚠️ NO 'Page X of Y' text on ticketing — that format is Inventory Movements only
 ```
 
 ---
