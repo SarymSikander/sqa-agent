@@ -189,6 +189,51 @@ def _load_knowledge_base() -> str:
 APP_CONTEXT = _load_knowledge_base()
 print(f"[startup] APP_CONTEXT total: {len(APP_CONTEXT)} chars")
 
+
+def _load_knowledge_file(rel_path: str) -> str:
+    """Read a single knowledge file by relative path (e.g. 'oms/selectors.md')."""
+    for candidate in [
+        Path(__file__).resolve().parent / "knowledge",
+        Path(__file__).resolve().parent.parent.parent / "knowledge",
+    ]:
+        fpath = candidate / rel_path
+        if fpath.exists():
+            return fpath.read_text()
+    print(f"[knowledge] File not found: {rel_path}")
+    return ""
+
+
+def _portal_knowledge(portal: str) -> str:
+    """Return the full selectors.md + test_rules.md for the given portal."""
+    selectors_file = {
+        "admin":  "oms/selectors.md",
+        "seller": "seller/selectors.md",
+        "agency": "agency/selectors.md",
+    }.get(portal.lower(), "oms/selectors.md")
+
+    selectors  = _load_knowledge_file(selectors_file)
+    test_rules = _load_knowledge_file("shared/test_rules.md")
+
+    parts = []
+    if selectors:
+        parts.append(f"# {selectors_file}\n{selectors}")
+    if test_rules:
+        parts.append(f"# shared/test_rules.md\n{test_rules}")
+
+    kb = "\n\n---\n\n".join(parts)
+    print(f"[knowledge] portal={portal} → {selectors_file} + test_rules: {len(kb):,} chars")
+    return kb
+
+
+_MANDATORY_SELECTOR_INSTRUCTION = (
+    "MANDATORY: You MUST use ONLY selectors from the KNOWLEDGE BASE provided below. "
+    "Do NOT invent selectors. "
+    "Do NOT use data-testid unless you see it in the knowledge base. "
+    "Do NOT use placeholder text unless you see the EXACT text in the knowledge base. "
+    "If you cannot find the exact selector in the knowledge base, use "
+    'ASSERT_EXISTS: text="Page Title" as evidence instead.'
+)
+
 app.mount("/screenshots", StaticFiles(directory=str(SCREENSHOTS_DIR)), name="screenshots")
 
 REPO_PATHS = {
@@ -1109,14 +1154,28 @@ def generate_test_cases(ticket_key, title, description, screenshots: list = None
         api_key=os.getenv("GITHUB_TOKEN"),
     )
 
+    # Detect portal from screenshots, then ticket key prefix, then default to admin
+    if screenshots and screenshots[0].get("portal"):
+        portal_hint = screenshots[0]["portal"].lower()
+    elif ticket_key.upper().startswith("ZSP"):
+        portal_hint = "seller"
+    elif ticket_key.upper().startswith("AGN"):
+        portal_hint = "agency"
+    else:
+        portal_hint = "admin"
+
+    knowledge_base = _portal_knowledge(portal_hint)
+
     # ── Vision path: screenshots available ────────────────────────────────────
     if screenshots:
         valid_shots = [s for s in screenshots if s.get("base64")]
         if valid_shots:
-            print(f"[generate_test_cases] Vision path — {len(valid_shots)} screenshot(s)")
+            print(f"[generate_test_cases] Vision path — {len(valid_shots)} screenshot(s), "
+                  f"portal={portal_hint}, kb={len(knowledge_base):,} chars")
 
             pages_summary = ", ".join(s.get("url_path", s.get("url", "")) for s in valid_shots)
             vision_text = (
+                f"{_MANDATORY_SELECTOR_INSTRUCTION}\n\n"
                 "You are a senior QA engineer. I am showing you screenshot(s) of live web pages "
                 f"from the Zambeel platform.\n\n"
                 f"Ticket: {ticket_key}\n"
@@ -1126,12 +1185,16 @@ def generate_test_cases(ticket_key, title, description, screenshots: list = None
                 f"CRITICAL: Generate test cases ONLY for the feature described in the ticket. "
                 f"Do NOT generate tests for login, navigation, or unrelated features. "
                 f"Every test case must directly test: {title}\n\n"
-                "Look at the screenshot(s) carefully. Based on ONLY what you can SEE:\n"
-                "1. Identify every relevant UI element for this ticket — exact button labels, "
-                "input placeholder text, dropdown option text, heading text.\n"
-                "2. Generate 5 Playwright test cases using ONLY selectors whose text is "
-                "LITERALLY VISIBLE in the screenshot(s). Do NOT invent or guess any text.\n"
-                "3. For each step, use the exact text or placeholder you can read in the image.\n\n"
+                "Look at the screenshot(s) carefully. Cross-reference what you SEE with the "
+                "KNOWLEDGE BASE below to confirm exact selector text:\n"
+                "1. Identify every relevant UI element — exact button labels, input placeholders, "
+                "dropdown option text, heading text.\n"
+                "2. Generate 5 Playwright test cases. For each selector, verify it exists in the "
+                "KNOWLEDGE BASE. If it does not appear there, use text= with the exact visible text.\n"
+                "3. Never invent placeholder text or button labels not present in the screenshot "
+                "or the KNOWLEDGE BASE.\n\n"
+                f"KNOWLEDGE BASE ({portal_hint} portal):\n"
+                f"{knowledge_base}\n\n"
                 + _TEST_CASE_JSON_SCHEMA
             )
 
@@ -1150,7 +1213,7 @@ def generate_test_cases(ticket_key, title, description, screenshots: list = None
                 response = client.chat.completions.create(
                     model="gpt-4o",
                     messages=[{"role": "user", "content": content}],
-                    max_tokens=3000,
+                    max_tokens=4000,
                 )
                 output = (response.choices[0].message.content or "").strip()
                 print(f"[VISION] raw response ({len(output)} chars): {output[:1000]}")
@@ -1159,25 +1222,13 @@ def generate_test_cases(ticket_key, title, description, screenshots: list = None
                 print(f"[generate_test_cases] Vision call failed: {e} — falling back to text path")
 
     # ── Text fallback path: no screenshots or vision failed ────────────────────
-    print("[generate_test_cases] Text path (no screenshots)")
-    relevant_context = _extract_relevant_context(title, description)
-
-    stopwords = {"that", "this", "with", "from", "have", "will", "been", "they",
-                 "when", "what", "which", "where", "then", "also", "should", "would"}
-    keywords = list(
-        set(re.findall(r'\b\w{4,}\b', f"{title} {description}".lower())) - stopwords
-    )[:25]
-    selectors_context = extract_selectors_from_source(keywords)
-    print(f"[generate_test_cases] selectors_context ({len(selectors_context)} chars)")
+    print(f"[generate_test_cases] Text path (no screenshots), portal={portal_hint}, "
+          f"kb={len(knowledge_base):,} chars")
 
     text_prompt = (
+        f"{_MANDATORY_SELECTOR_INSTRUCTION}\n\n"
         "You are a senior QA engineer for Zambeel, a B2B e-commerce platform.\n"
         "You write Playwright test scripts in Python that run in a real browser.\n\n"
-        "KNOWLEDGE BASE USAGE RULES:\n"
-        "- Use knowledge/oms/selectors.md for EXACT OMS selectors — never guess button text.\n"
-        "- Use knowledge/seller/selectors.md for EXACT seller portal selectors.\n"
-        "- Use knowledge/agency/selectors.md for EXACT agency portal selectors.\n"
-        "- Use knowledge/shared/test_rules.md for global rules that apply to ALL tests.\n\n"
         "CRITICAL SELECTOR RULES:\n"
         "1. Never use WAIT: [role='option'] — skip this pattern entirely.\n"
         "2. After clicking a dropdown trigger, go straight to CLICK_OPTION — no waiting needed.\n"
@@ -1188,13 +1239,13 @@ def generate_test_cases(ticket_key, title, description, screenshots: list = None
         "7. Model name input placeholder is EXACTLY 'Enter model name'.\n"
         "8. The number input for commission value has NO placeholder — use input[type=\"number\"].\n"
         "9. Currency is auto-populated when Country is selected — never fill it.\n"
-        "10. Never assert success toasts that don't exist (e.g. 'Commission model saved successfully.').\n"
+        "10. Never assert success toasts that don't exist.\n"
         "11. Never wrap FILL/CLICK_OPTION values in quotes inside the step string.\n\n"
         f"Ticket: {ticket_key}\n"
         f"Title: {title}\n"
         f"Description: {description}\n\n"
-        f"Relevant app context:\n{relevant_context}\n\n"
-        f"{selectors_context}\n\n"
+        f"KNOWLEDGE BASE ({portal_hint} portal — use ONLY selectors found here):\n"
+        f"{knowledge_base}\n\n"
         + _TEST_CASE_JSON_SCHEMA
     )
 
