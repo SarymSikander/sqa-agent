@@ -1024,6 +1024,7 @@ def extract_page_dom_live(portal, env, url_path) -> dict:
             browser.close()
         print(f'[extract_page_dom_live] done — buttons={len(dom["buttons"])} '
               f'inputs={len(dom["inputs"])} selects={len(dom["selects"])}')
+        print(f'[DOM] buttons={dom["buttons"][:5]}, inputs={dom["inputs"][:3]}, selects={dom["selects"]}')
         return {'dom': dom, 'portal': portal, 'env': env, 'url_path': url_path, 'url': full_url}
     except Exception as e:
         print(f'[extract_page_dom_live] ERROR: {e}')
@@ -1175,11 +1176,19 @@ _ZAMBEEL_SELECTOR_FIXES = [
 
 def _parse_test_cases(output: str) -> list:
     """Parse GPT-4o JSON output into a validated list of test case dicts."""
-    import re as _re
-    code_match = _re.search(r"```(?:json)?\s*(\{.*?\}|\[.*?\])\s*```", output, _re.DOTALL)
-    if code_match:
-        output = code_match.group(1)
-    parsed = json.loads(output)
+    if not output or not output.strip():
+        print('[_parse_test_cases] Empty output from AI')
+        return []
+    clean = output.strip()
+    if clean.startswith('```'):
+        clean = '\n'.join(clean.split('\n')[1:])
+    if clean.endswith('```'):
+        clean = '\n'.join(clean.split('\n')[:-1])
+    try:
+        parsed = json.loads(clean)
+    except json.JSONDecodeError as e:
+        print(f'[_parse_test_cases] JSON error: {e}, output: {clean[:200]}')
+        return []
     if isinstance(parsed, list):
         raw_cases = parsed
     elif isinstance(parsed, dict) and "test_cases" in parsed:
@@ -1341,7 +1350,7 @@ def generate_test_cases(ticket_key, title, description, dom_pages: list = None):
         max_tokens=2000,
     )
     output = (response.choices[0].message.content or "").strip()
-    print(f"[generate_test_cases] raw response ({len(output)} chars): {output[:1000]}")
+    print(f'[generate_test_cases] raw AI response: {output[:500] if output else "EMPTY"}')
     return _parse_test_cases(output)
 
 
