@@ -1163,6 +1163,9 @@ _ZAMBEEL_SELECTOR_FIXES = [
     ("th:has-text('TICKET ID') >> text='TKT", "text='TKT"),
     # Invalid Playwright locator API used as CSS — replace with FILL step
     ("input >> 3", "FILL: input[aria-label='Go to page'] | 3"),
+    # Ticketing: inject mandatory CLICK_OPTION: Ticket Number before ticket number FILL step
+    ("FILL: input[placeholder='Search by ticket number...']",
+     "CLICK_OPTION: Ticket Number\nFILL: input[placeholder='Search by ticket number...']"),
     # Ticketing: wrong placeholder for ticket number search input
     ("input[placeholder='Search by Ticket ID']", "input[placeholder='Search by ticket number...']"),
     ("input[placeholder='Search by ticket number']", "input[placeholder='Search by ticket number...']"),
@@ -1229,7 +1232,7 @@ def _parse_test_cases(output: str) -> list:
                     continue
                 s = s.replace(wrong, right)
                 break
-            fixed_steps.append(s)
+            fixed_steps.extend(line for line in s.split('\n') if line.strip())
         tc["steps"] = fixed_steps
         # Drop empty steps produced by fixes that replace with ''
         tc["steps"] = [s for s in tc["steps"] if s.strip()]
@@ -1276,11 +1279,14 @@ _TEST_CASE_JSON_SCHEMA = (
 
 
 def generate_test_cases(ticket_key, title, description, screenshots: list = None):
+    import re
+
     client = OpenAI(
         base_url="https://models.inference.ai.azure.com",
         api_key=os.getenv("GITHUB_TOKEN"),
     )
 
+    # Detect portal from screenshots, then ticket key prefix, then default to admin
     if screenshots and screenshots[0].get("portal"):
         portal_hint = screenshots[0]["portal"].lower()
     elif ticket_key.upper().startswith("ZSP"):
@@ -1290,58 +1296,62 @@ def generate_test_cases(ticket_key, title, description, screenshots: list = None
     else:
         portal_hint = "admin"
 
-    env_hint = (screenshots[0].get("env", "staging") if screenshots else "staging")
-    base_url  = "https://staging.myzambeel.com" if env_hint == "staging" else "https://portal.myzambeel.com"
+    knowledge_base = get_portal_knowledge(portal_hint)
 
-    valid = [s for s in (screenshots or []) if s.get("base64") and not s.get("error")]
-    if not valid:
-        errors = [s.get("error", "no base64") for s in (screenshots or [])]
-        raise RuntimeError(f"generate_test_cases: no valid screenshots — {errors}")
+    # ── Vision path ────────────────────────────────────────────────────────────
+    if not screenshots:
+        raise RuntimeError("generate_test_cases: no screenshots provided — cannot generate test cases")
+    valid_shots = [s for s in screenshots if s.get("base64")]
+    if not valid_shots:
+        errors = [s.get("error", "no base64") for s in screenshots]
+        raise RuntimeError(f"generate_test_cases: all screenshots failed — {errors}")
+    print(f"[generate_test_cases] Vision path — {len(valid_shots)} screenshot(s), "
+          f"portal={portal_hint}, kb={len(knowledge_base):,} chars")
 
-    print(f"[generate_test_cases] vision path — {len(valid)} screenshot(s), portal={portal_hint}")
-
-    text_prompt = (
-        f"Ticket {ticket_key}: {title}\n"
-        f"{description[:300]}\n"
-        f"Portal: {portal_hint} ({base_url})\n\n"
-        f"VALID STEP FORMATS — USE ONLY THESE:\n"
-        f"NAVIGATE: /path\n"
-        f"CLICK: button:has-text('text')\n"
-        f"CLICK: text='exact text'\n"
-        f"FILL: input[placeholder='exact placeholder'] | value\n"
-        f"CLICK_OPTION: option text\n"
-        f"ASSERT_EXISTS: selector\n"
-        f"ASSERT_TEXT: selector | expected text\n"
-        f"WAIT: selector\n"
-        f"SCREENSHOT: name\n\n"
-        f"INVALID — NEVER USE:\n"
-        f"css-selector[text()='...']\n"
-        f"xpath=...\n"
-        f"Any selector format not shown above\n\n"
-        f"Look at the screenshot(s) and generate 5 Playwright test cases.\n"
-        f"Use ONLY selectors visible in the screenshots.\n"
-        f"NEVER use #id selectors. NEVER invent elements not visible.\n\n"
-        f'Return ONLY valid JSON: {{"test_cases": [{{"test_name": "...", "url_path": "...", '
-        f'"portal": "{portal_hint}", "steps": ["NAVIGATE: /path", "..."], '
-        f'"expected_result": "...", "evidence_selector": "..."}}]}}'
+    pages_summary = ", ".join(s.get("url_path", s.get("url", "")) for s in valid_shots)
+    vision_text = (
+        f"{_MANDATORY_SELECTOR_INSTRUCTION}\n\n"
+        f"{ZAMBEEL_OMS_ROUTES}\n\n"
+        "You are a senior QA engineer. I am showing you screenshot(s) of live web pages "
+        f"from the Zambeel platform.\n\n"
+        f"Ticket: {ticket_key}\n"
+        f"Title: {title}\n"
+        f"Description: {description}\n\n"
+        f"Pages captured: {pages_summary}\n\n"
+        f"CRITICAL: Generate test cases ONLY for the feature described in the ticket. "
+        f"Do NOT generate tests for login, navigation, or unrelated features. "
+        f"Every test case must directly test: {title}\n\n"
+        "Look at the screenshot(s) carefully. Cross-reference what you SEE with the "
+        "KNOWLEDGE BASE below to confirm exact selector text:\n"
+        "1. Identify every relevant UI element — exact button labels, input placeholders, "
+        "dropdown option text, heading text.\n"
+        "2. Generate 5 Playwright test cases. For each selector, verify it exists in the "
+        "KNOWLEDGE BASE. If it does not appear there, use text= with the exact visible text.\n"
+        "3. Never invent placeholder text or button labels not present in the screenshot "
+        "or the KNOWLEDGE BASE.\n\n"
+        f"KNOWLEDGE BASE ({portal_hint} portal):\n"
+        f"{knowledge_base}\n\n"
+        + _TEST_CASE_JSON_SCHEMA
     )
 
-    content: list = [{"type": "text", "text": text_prompt}]
-    for s in valid:
+    content: list = [{"type": "text", "text": vision_text}]
+    for shot in valid_shots:
         content.append({
             "type": "image_url",
-            "image_url": {"url": f"data:image/png;base64,{s['base64']}"},
+            "image_url": {"url": f"data:image/png;base64,{shot['base64']}"},
         })
+    content.append({"type": "text", "text": 'Return ONLY valid JSON: {"test_cases": [...]}'})
 
-    print(f"[generate_test_cases] prompt chars: {len(text_prompt):,}, images: {len(valid)}")
+    print(f"[VISION] prompt (first 500 chars): {vision_text[:500]}")
+    print(f"[VISION] sending {len(valid_shots)} image(s) to gpt-4o")
 
     response = client.chat.completions.create(
         model="gpt-4o",
         messages=[{"role": "user", "content": content}],
-        max_tokens=2000,
+        max_tokens=4000,
     )
     output = (response.choices[0].message.content or "").strip()
-    print(f'[generate_test_cases] raw AI response: {output[:500] if output else "EMPTY"}')
+    print(f"[VISION] raw response ({len(output)} chars): {output[:1000]}")
     return _parse_test_cases(output)
 
 
