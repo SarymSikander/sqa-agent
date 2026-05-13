@@ -943,6 +943,7 @@ def _identify_pages_from_ticket(title: str, description: str, portal: str) -> li
 
 
 def screenshot_page(portal, env, url_path):
+    """Kept for reference — active flow now uses extract_page_dom_live."""
     from playwright.sync_api import sync_playwright
     import base64
     base_url = 'https://staging.myzambeel.com' if env == 'staging' else 'https://portal.myzambeel.com'
@@ -963,6 +964,70 @@ def screenshot_page(portal, env, url_path):
         screenshot = page.screenshot(full_page=True)
         browser.close()
         return {'base64': base64.b64encode(screenshot).decode()}
+
+
+def extract_page_dom(page) -> dict:
+    """Extract all interactive elements from an already-loaded Playwright page.
+
+    Also expands every native <select> to capture its full option list.
+    Returns a dict suitable for passing directly to generate_test_cases.
+    """
+    # Collect native select options by querying each element from Python
+    select_data = []
+    try:
+        selects = page.query_selector_all('select')
+        for s in selects:
+            options = s.query_selector_all('option')
+            select_data.append([o.inner_text().strip() for o in options if o.inner_text().strip()])
+    except Exception as e:
+        print(f'[extract_page_dom] select extraction error: {e}')
+
+    dom = page.evaluate('''() => ({
+        buttons:  [...document.querySelectorAll('button')]
+                      .map(b => b.innerText.trim()).filter(Boolean),
+        inputs:   [...document.querySelectorAll('input')].map(i => ({
+                      placeholder: i.placeholder, type: i.type, name: i.name
+                  })).filter(i => i.placeholder || i.name),
+        headings: [...document.querySelectorAll('h1,h2,h3')]
+                      .map(h => h.innerText.trim()).filter(Boolean),
+        pageText: document.body.innerText.slice(0, 1000)
+    })''')
+    dom['selects'] = select_data
+    return dom
+
+
+def extract_page_dom_live(portal, env, url_path) -> dict:
+    """Login, navigate to url_path, extract DOM, return structured data.
+
+    No screenshot is taken — DOM data is compact (<1000 tokens) and gives
+    GPT-4o the exact elements that exist on the live page.
+    """
+    from playwright.sync_api import sync_playwright
+    base_url = 'https://staging.myzambeel.com' if env == 'staging' else 'https://portal.myzambeel.com'
+    email    = os.getenv(f'{portal.upper()}_{env.upper()}_EMAIL', '').strip()
+    password = os.getenv(f'{portal.upper()}_{env.upper()}_PASSWORD', '').strip()
+    full_url = f'{base_url}{url_path}'
+    print(f'[extract_page_dom_live] {portal}/{env} → {full_url}')
+    try:
+        with sync_playwright() as p:
+            browser = p.chromium.launch(headless=True)
+            page = browser.new_page(viewport={'width': 1440, 'height': 900})
+            page.goto(f'{base_url}/login')
+            page.fill('input[type="email"]', email)
+            page.fill('input[type="password"]', password)
+            page.click('button[type="submit"]')
+            page.wait_for_url(lambda u: '/login' not in u, timeout=30000)
+            page.goto(full_url)
+            page.wait_for_load_state('networkidle')
+            page.wait_for_timeout(2000)
+            dom = extract_page_dom(page)
+            browser.close()
+        print(f'[extract_page_dom_live] done — buttons={len(dom["buttons"])} '
+              f'inputs={len(dom["inputs"])} selects={len(dom["selects"])}')
+        return {'dom': dom, 'portal': portal, 'env': env, 'url_path': url_path, 'url': full_url}
+    except Exception as e:
+        print(f'[extract_page_dom_live] ERROR: {e}')
+        return {'error': str(e), 'portal': portal, 'env': env, 'url_path': url_path}
 
 
 _ZAMBEEL_SELECTOR_FIXES = [
@@ -1194,17 +1259,15 @@ _TEST_CASE_JSON_SCHEMA = (
 )
 
 
-def generate_test_cases(ticket_key, title, description, screenshots: list = None):
-    import re
-
+def generate_test_cases(ticket_key, title, description, dom_pages: list = None):
     client = OpenAI(
         base_url="https://models.inference.ai.azure.com",
         api_key=os.getenv("GITHUB_TOKEN"),
     )
 
-    # Detect portal from screenshots, then ticket key prefix, then default to admin
-    if screenshots and screenshots[0].get("portal"):
-        portal_hint = screenshots[0]["portal"].lower()
+    # Detect portal from dom_pages, then ticket key prefix, then default to admin
+    if dom_pages and dom_pages[0].get("portal"):
+        portal_hint = dom_pages[0]["portal"].lower()
     elif ticket_key.upper().startswith("ZSP"):
         portal_hint = "seller"
     elif ticket_key.upper().startswith("AGN"):
@@ -1212,62 +1275,73 @@ def generate_test_cases(ticket_key, title, description, screenshots: list = None
     else:
         portal_hint = "admin"
 
-    knowledge_base = get_portal_knowledge(portal_hint)
+    env_hint = (dom_pages[0].get("env", "staging") if dom_pages else "staging")
+    base_url  = "https://staging.myzambeel.com" if env_hint == "staging" else "https://portal.myzambeel.com"
 
-    # ── Vision path ────────────────────────────────────────────────────────────
-    if not screenshots:
-        raise RuntimeError("generate_test_cases: no screenshots provided — cannot generate test cases")
-    valid_shots = [s for s in screenshots if s.get("base64")]
-    if not valid_shots:
-        errors = [s.get("error", "no base64") for s in screenshots]
-        raise RuntimeError(f"generate_test_cases: all screenshots failed — {errors}")
-    print(f"[generate_test_cases] Vision path — {len(valid_shots)} screenshot(s), "
-          f"portal={portal_hint}, kb={len(knowledge_base):,} chars")
+    if not dom_pages:
+        raise RuntimeError("generate_test_cases: no DOM pages provided — cannot generate test cases")
+    valid_pages = [p for p in dom_pages if p.get("dom")]
+    if not valid_pages:
+        errors = [p.get("error", "no dom") for p in dom_pages]
+        raise RuntimeError(f"generate_test_cases: all DOM extractions failed — {errors}")
 
-    pages_summary = ", ".join(s.get("url_path", s.get("url", "")) for s in valid_shots)
-    vision_text = (
-        f"{_MANDATORY_SELECTOR_INSTRUCTION}\n\n"
-        f"{ZAMBEEL_OMS_ROUTES}\n\n"
-        "You are a senior QA engineer. I am showing you screenshot(s) of live web pages "
-        f"from the Zambeel platform.\n\n"
-        f"Ticket: {ticket_key}\n"
-        f"Title: {title}\n"
-        f"Description: {description}\n\n"
-        f"Pages captured: {pages_summary}\n\n"
-        f"CRITICAL: Generate test cases ONLY for the feature described in the ticket. "
-        f"Do NOT generate tests for login, navigation, or unrelated features. "
-        f"Every test case must directly test: {title}\n\n"
-        "Look at the screenshot(s) carefully. Cross-reference what you SEE with the "
-        "KNOWLEDGE BASE below to confirm exact selector text:\n"
-        "1. Identify every relevant UI element — exact button labels, input placeholders, "
-        "dropdown option text, heading text.\n"
-        "2. Generate 5 Playwright test cases. For each selector, verify it exists in the "
-        "KNOWLEDGE BASE. If it does not appear there, use text= with the exact visible text.\n"
-        "3. Never invent placeholder text or button labels not present in the screenshot "
-        "or the KNOWLEDGE BASE.\n\n"
-        f"KNOWLEDGE BASE ({portal_hint} portal):\n"
-        f"{knowledge_base}\n\n"
-        + _TEST_CASE_JSON_SCHEMA
+    print(f"[generate_test_cases] DOM path — {len(valid_pages)} page(s), portal={portal_hint}")
+
+    # Build one DOM block per page
+    dom_blocks = []
+    for p in valid_pages:
+        dom   = p["dom"]
+        block = (
+            f"PAGE: {p.get('url_path', p.get('url', ''))}\n"
+            f"  Headings: {dom.get('headings', [])}\n"
+            f"  Buttons:  {dom.get('buttons', [])}\n"
+            f"  Inputs:   {dom.get('inputs', [])}\n"
+            f"  Dropdowns and their options: {dom.get('selects', [])}\n"
+            f"  Page text snippet: {dom.get('pageText', '')[:500]}"
+        )
+        dom_blocks.append(block)
+    dom_section = "\n\n".join(dom_blocks)
+
+    prompt = (
+        f"You are a senior QA engineer for Zambeel.\n\n"
+        f"TICKET: {ticket_key}\n"
+        f"TITLE: {title}\n"
+        f"DESCRIPTION: {description}\n"
+        f"PORTAL: {portal_hint} ({base_url})\n\n"
+        f"LIVE PAGE ELEMENTS (extracted from the actual live page right now):\n"
+        f"{dom_section}\n\n"
+        f"RULES:\n"
+        f"- Use ONLY elements listed above. If a button/input/selector is not in the lists above, do NOT use it.\n"
+        f"- For dropdown filters: use CLICK_OPTION with the exact option text shown in the dropdowns list above.\n"
+        f"- Evidence selector must be something that appears AFTER the action completes — never an input placeholder.\n"
+        f"- Generate 5 Playwright test cases for the feature described in the ticket.\n"
+        f"- NEVER use #id selectors — this app has none.\n"
+        f"- NEVER wrap FILL/CLICK_OPTION values in quotes inside the step string.\n\n"
+        f"Step format — each step must start with one of:\n"
+        f"  NAVIGATE: /path\n"
+        f"  CLICK: css-selector\n"
+        f"  FILL: css-selector | value\n"
+        f"  CLICK_OPTION: option text\n"
+        f"  ASSERT_EXISTS: css-selector\n"
+        f"  ASSERT_NOT_EXISTS: css-selector\n"
+        f"  ASSERT_TEXT: css-selector | expected text\n"
+        f"  WAIT: milliseconds\n"
+        f"  SCREENSHOT: label\n\n"
+        f'Return ONLY valid JSON: {{"test_cases": [{{"test_name": "...", "url_path": "...", '
+        f'"portal": "{portal_hint}", "steps": ["NAVIGATE: /path", "..."], '
+        f'"expected_result": "...", "evidence_selector": "..."}}]}}'
     )
 
-    content: list = [{"type": "text", "text": vision_text}]
-    for shot in valid_shots:
-        content.append({
-            "type": "image_url",
-            "image_url": {"url": f"data:image/png;base64,{shot['base64']}"},
-        })
-    content.append({"type": "text", "text": 'Return ONLY valid JSON: {"test_cases": [...]}'})
-
-    print(f"[VISION] prompt (first 500 chars): {vision_text[:500]}")
-    print(f"[VISION] sending {len(valid_shots)} image(s) to gpt-4o")
+    print(f"[generate_test_cases] prompt length: {len(prompt):,} chars")
+    print(f"[generate_test_cases] prompt (first 500 chars): {prompt[:500]}")
 
     response = client.chat.completions.create(
         model="gpt-4o",
-        messages=[{"role": "user", "content": content}],
-        max_tokens=4000,
+        messages=[{"role": "user", "content": prompt}],
+        max_tokens=2000,
     )
     output = (response.choices[0].message.content or "").strip()
-    print(f"[VISION] raw response ({len(output)} chars): {output[:1000]}")
+    print(f"[generate_test_cases] raw response ({len(output)} chars): {output[:1000]}")
     return _parse_test_cases(output)
 
 
@@ -1443,8 +1517,8 @@ async def run_qa_endpoint(issue_key: str, body: RunQABody):
                 branches_switched = True
                 yield evt({"stage": "switching_branches", "status": "done"})
 
-        # ── Stage: screenshot relevant pages ──────────────────────────────────
-        screenshots: list = []
+        # ── Stage: extract live DOM from relevant pages ────────────────────────
+        dom_pages: list = []
         yield evt({"stage": "inspecting_page", "status": "running"})
         try:
             portal_for_inspect = (
@@ -1456,29 +1530,29 @@ async def run_qa_endpoint(issue_key: str, body: RunQABody):
             print(f"[inspecting_page] Identified pages: {pages}")
             for url_path in pages:
                 yield f": keepalive\n\n"
-                shot = await asyncio.to_thread(
-                    screenshot_page, portal_for_inspect, run_env, url_path
+                dom_page = await asyncio.to_thread(
+                    extract_page_dom_live, portal_for_inspect, run_env, url_path
                 )
-                print(f"[VISION] screenshot for {portal_for_inspect}/{run_env}{url_path}: "
-                      f"success={'error' not in shot}, "
-                      f"size={len(shot.get('base64', ''))} bytes")
-                if shot and not shot.get("error"):
-                    screenshots.append(shot)
+                print(f"[DOM] extracted for {portal_for_inspect}/{run_env}{url_path}: "
+                      f"success={'error' not in dom_page}, "
+                      f"buttons={len((dom_page.get('dom') or {}).get('buttons', []))}")
+                if dom_page and not dom_page.get("error"):
+                    dom_pages.append(dom_page)
             yield evt({
                 "stage": "inspecting_page",
                 "status": "done",
-                "pages_inspected": [s.get("url") for s in screenshots],
+                "pages_inspected": [p.get("url") for p in dom_pages],
             })
         except Exception as e:
             print(f"[inspecting_page] ERROR: {e}")
             yield evt({"stage": "inspecting_page", "status": "error", "message": str(e)})
-            # Non-fatal — vision path skipped, text fallback will be used
+            # Non-fatal — DOM extraction skipped, generate_test_cases will raise
 
         # ── Stage: generate test cases ─────────────────────────────────────────
         yield evt({"stage": "generating_test_cases", "status": "running"})
         yield f": keepalive\n\n"
         test_cases = await asyncio.to_thread(
-            generate_test_cases, issue_key, summary, description, screenshots or None
+            generate_test_cases, issue_key, summary, description, dom_pages or None
         )
         # save as Jira comment regardless of parse success
         if test_cases:
