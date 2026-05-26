@@ -2244,6 +2244,77 @@ async def get_api_test_perf_metrics():
     return data or []
 
 
+# ── /ai/chat ──────────────────────────────────────────────────────────────────
+
+class ChatBody(BaseModel):
+    message: str
+
+
+def _find_relevant_sections(question: str, max_chars: int = 6000) -> str:
+    """Score APP_CONTEXT sections by keyword overlap with the question."""
+    import re as _re
+    if not APP_CONTEXT:
+        return ""
+
+    stopwords = {
+        "that", "this", "with", "from", "have", "will", "been", "they",
+        "when", "what", "which", "where", "then", "also", "should", "would",
+        "does", "about", "how", "the", "and", "for", "are", "you", "can",
+        "tell", "show", "give", "list", "what",
+    }
+    keywords = set(_re.findall(r'\b\w{3,}\b', question.lower())) - stopwords
+
+    sections = _re.split(r'\n{2,}', APP_CONTEXT)
+    scored = sorted(
+        ((sum(1 for kw in keywords if kw in s.lower()), s) for s in sections if s.strip()),
+        key=lambda x: x[0], reverse=True,
+    )
+
+    result, total = [], 0
+    for score, section in scored:
+        if total >= max_chars:
+            break
+        chunk = section[: max_chars - total]
+        result.append(chunk)
+        total += len(chunk)
+    return "\n\n".join(result)[:max_chars]
+
+
+@app.post("/ai/chat")
+async def ai_chat(body: ChatBody):
+    if not body.message or not body.message.strip():
+        raise HTTPException(status_code=400, detail="message is required")
+
+    def _answer():
+        context = _find_relevant_sections(body.message)
+        system_prompt = (
+            "You are a knowledgeable assistant for the Zambeel SQA platform. "
+            "Answer questions about the Zambeel project, its portals (seller, admin, agency), "
+            "Jira tickets, test flows, and QA processes based on the knowledge base below. "
+            "Be concise but thorough. If the answer is not in the knowledge base, say so.\n\n"
+            f"KNOWLEDGE BASE:\n{context}"
+        )
+        client = OpenAI(
+            base_url="https://models.inference.ai.azure.com",
+            api_key=os.getenv("GITHUB_TOKEN"),
+        )
+        response = client.chat.completions.create(
+            model="gpt-4o",
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": body.message},
+            ],
+            max_tokens=800,
+        )
+        return (response.choices[0].message.content or "").strip()
+
+    try:
+        answer = await asyncio.to_thread(_answer)
+        return {"answer": answer}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @app.post("/api-tests/create-jira-bugs")
 async def create_api_test_jira_bugs(body: CreateJiraBugsBody):
     created, errors = [], []
