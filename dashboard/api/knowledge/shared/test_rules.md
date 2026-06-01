@@ -87,8 +87,6 @@ button:has-text('option text')              # Flowbite dropdowns
 - Order edit: fields are read-only until `Edit Order` button clicked.
 - Dispatch batches: documents can only be downloaded when `tracking_status === "Generated"`.
 - CSV order upload: `payment_mode` must be `COD` — no other value accepted.
-- Inventory movements pagination: after `CLICK_OPTION` selecting rows per page, verify with `text=/Page \d+ of \d+/` NOT `Showing X to Y`. Page count varies by total records — use the regex form, never a hardcoded page number. Add `WAIT: 2000` before the assert — the page briefly reloads after selection.
-- Ticketing search: ALWAYS select the filter type first using `CLICK_OPTION` before filling the search input. Without selecting `Ticket Number` first, the input placeholder stays as `Search by store name...` and searches the wrong field. The mandatory sequence is: `CLICK_OPTION: Ticket Number` → `FILL: input[placeholder='Search by ticket number...']` → `CLICK: button:has-text('Search')`.
 
 ### Seller Portal Rules
 - Ticket description: min 10 chars, max 2000 chars.

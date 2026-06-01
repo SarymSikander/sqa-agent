@@ -50,7 +50,11 @@
       "Bash(cp /Users/sarimsikandar/Desktop/api-test-suite/api-inventory.json /Users/sarimsikandar/Desktop/sqa-agent/dashboard/api/static/api-inventory.json)",
       "Bash(cp /Users/sarimsikandar/Desktop/api-test-suite/sla-config.json /Users/sarimsikandar/Desktop/sqa-agent/dashboard/api/static/sla-config.json)",
       "Bash(cp /Users/sarimsikandar/Desktop/api-test-suite/docs/baseline-log.md /Users/sarimsikandar/Desktop/sqa-agent/dashboard/api/static/baseline-log.md)",
-      "Bash(grep -n \"mount.*frontend\\\\|frontend.*mount\\\\|@app.get.*html\\\\|@app.get.*/$\\\\|spa\\\\|catch_all\\\\|FileResponse.*index\" /Users/sarimsikandar/Desktop/sqa-agent/dashboard/api/main.py)"
+      "Bash(grep -n \"mount.*frontend\\\\|frontend.*mount\\\\|@app.get.*html\\\\|@app.get.*/$\\\\|spa\\\\|catch_all\\\\|FileResponse.*index\" /Users/sarimsikandar/Desktop/sqa-agent/dashboard/api/main.py)",
+      "Bash(/Users/sarimsikandar/Desktop/sqa-agent/venv/bin/python3 *)",
+      "Bash(GIT_ASKPASS=echo git *)",
+      "Bash(GIT_TRACE_PACKET=1 git fetch hf main)",
+      "Bash(GIT_PROTOCOL=\"\" git *)"
     ]
   }
 }

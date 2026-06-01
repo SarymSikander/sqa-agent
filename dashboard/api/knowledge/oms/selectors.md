@@ -1,7 +1,7 @@
-# OMS — UI Selectors Reference (VERIFIED from live staging portal)
+# OMS — UI Selectors Reference (VERIFIED from source code)
 
-> Source: Playwright live exploration of https://staging.myzambeel.com as admin
-> Last updated: 2026-05-12
+> Source: zambeel-fe source code `/src/pages/orders-management/` and related components.
+> Last updated: 2026-05-11
 
 ## Selector Rules (React + Tailwind — No IDs)
 - **Buttons:** `button:has-text('exact text')`
@@ -44,33 +44,45 @@ a:has-text('Update Invoice')         → /orders-management/invoice-update
 h1:has-text('Orders Management')
 ```
 
-### Status Filter Buttons (top row — these are buttons, NOT tabs)
+### Country Filter (top right dropdown)
+```
+# Opens a country dropdown — options confirmed from source:
+button:has-text('Saudi Arabia')
+button:has-text('United Arab Emirates')
+button:has-text('Kuwait')
+button:has-text('Qatar')
+button:has-text('Pakistan')
+button:has-text('Oman')
+button:has-text('Bahrain')
+button:has-text('Iraq')
+button:has-text('United States (USA)')    # ⚠️ NEW — includes "(USA)" suffix
+```
+
+### Status Tabs (confirmed exact text from STATUS_DISPLAY_NAMES in source)
 ```
 button:has-text('All Orders')
 button:has-text('Confirmation Pending')
 button:has-text('Approved')
-button:has-text('Dispatching in Process')
-button:has-text('Shipped')
+button:has-text('Dispatching in Process')    # ⚠️ lowercase 'i' in "in"
+button:has-text('Shipped')                   # ⚠️ NOT 'In Delivery' — source uses 'Shipped'
 button:has-text('Undelivered')
 button:has-text('Delivered')
 button:has-text('Return in Transit')
 button:has-text('Return')
 button:has-text('Cancelled')
 ```
+> ⚠️ Tab 4 exact text is **'Dispatching in Process'** (lowercase 'i') — source STATUS_DISPLAY_NAMES confirmed.
+> ⚠️ Previous documentation said 'Dispatching In Process' (capital I) — that is WRONG.
+> ⚠️ Tab 5 is **'Shipped'** — NOT 'In Delivery'. Source maps "In Delivery" → "Shipped".
 
-### Filter Controls
+### Search & Action Controls
 ```
-input[placeholder='Search orders']          # text search
-select                                       # Country filter — native <select>
-# Country options (verified):
-# Saudi Arabia (KSA), United Arab Emirates (UAE), Kuwait, Qatar,
-# Pakistan, Oman, Bahrain, Iraq, United States (USA)
-
-button:has-text('Filter')                   # opens advanced filter panel
-button:has-text('Actions')                  # bulk actions dropdown
+input[placeholder='Search orders']
+button:has-text('Filter')
+button:has-text('Actions')
 ```
 
-### Table Column Headers (verified live)
+### Table Column Headers (All Orders tab)
 ```
 th:has-text('ORDER ID')
 th:has-text('TICKET')
@@ -81,477 +93,273 @@ th:has-text('PHONE NUMBER')
 th:has-text('AMOUNT')
 th:has-text('TAG')
 th:has-text('TRUSTED')
-th:has-text('Status')
-th:has-text('SUB-STATUS')
+th:has-text('STATUS')          # All Orders tab uses STATUS column (not SUB-STATUS)
 th:has-text('COURIER')
 th:has-text('BATCH ID')
 th:has-text('TRACKING ID')
 ```
 
-### Pagination
+### Table Column Headers (Confirmation Pending / Undelivered tabs — additional columns)
 ```
-select                                       # per-page: 10, 15, 20, 25, 50, 100
-```
-
----
-
-## Inventory Movements (`/orders-management/inventory-movements`)
-
-> Source: verified from zambeel-fe source code + live staging DOM extraction + screenshots 2026-05-12
-
-### Page Header
-```
-h2:has-text('Inventory Movements')
+th:has-text('WATI')            # ⚠️ Only shown on Confirmation Pending and Undelivered tabs
+th:has-text('SUB-STATUS')      # shown on CP tab
 ```
 
-### Search Bar
+### Table Column Headers (Dispatching in Process tab — additional columns)
 ```
-# Search type — native <select> immediately LEFT of the search input:
-select
-# Verified option values and labels:
-# value='movement_id'    label='Movement ID'   → input[placeholder='Search Movement ID']
-# value='sku'            label='SKU Code'       → input[placeholder='Search SKU code']
-# value='warehouse_name' label='Warehouse'      → input[placeholder='Search warehouse name']
-
-# ⚠️ input[placeholder='Search by store name...'] does NOT exist on this page — ticketing only
-# ⚠️ The search submit button is ICON-ONLY (no text) — button:has-text('Search') will NOT work
-#    Submit search by pressing Enter in the input (component handles onKeyDown → Enter)
+th:has-text('EDIT')            # ⚠️ Only shown on Dispatching in Process tab
 ```
 
-### Other Controls
+### Table Column Headers (Undelivered tab — additional columns)
 ```
-button:has-text('Add Inventory Movement')   # opens Create modal
-button:has-text('Date')                     # date range picker
-button:has-text('Filters')                  # opens Filters panel
+th:has-text('SHIPPED DATE')    # ⚠️ Only shown on Undelivered tab
 ```
 
-### Filters Panel (opens on button:has-text('Filters'))
+### Actions Dropdown — All Orders Tab
 ```
-# Movement Type native <select> — options:
-# SKU → SKU, Warehouse → Warehouse, To Damaged Bin
+# Click 'Actions' first, then:
+button:has-text('Update Statuses')
+button:has-text('Upload Orders')
+```
+> ⚠️ All Orders tab has ONLY these 2 actions — previous docs listed more items incorrectly.
 
-# Warehouse native <select> — options:
-# Bahrain, Iraq, Karachi, KSA, Kuwait, Oman, Qatar, UAE, United States
-
-# Reason native <select> — options (SKU→SKU only):
-# SKU Merge, Wrong SKU Mapping, Repackaging, Services Deal,
-# Variant Consolidation, Internal Adjustment
+### Actions Dropdown — Confirmation Pending Tab
+```
+button:has-text('Update Tag')
+button:has-text('Update Remarks')
+button:has-text('Approve')
+button:has-text('Cancel')
 ```
 
-### Table Column Headers (verified from source + live DOM)
+### Actions Dropdown — Cancelled Tab
 ```
-th:has-text('MOVEMENT ID')
-th:has-text('TYPE')
-th:has-text('WAREHOUSE')
-th:has-text('STATUS')
-th:has-text('MOVED BY')
-th:has-text('DATE')
+button:has-text('Revert to Confirmation Pending')
+```
+
+### Actions Dropdown — Approved Tab
+```
+button:has-text('Update Tag')
+button:has-text('Update Substatus')        # ⚠️ NOT 'Update Sub-status' — one word
+button:has-text('Move Processable Orders') # ⚠️ NOT 'Assign Courier'
+button:has-text('Cancel')
+button:has-text('Revert to Confirmation Pending')
+# Also conditionally:
+button:has-text('Assign Courier')          # shown when showAssignCourier=true
+```
+
+### Actions Dropdown — Dispatching in Process Tab (DIP)
+```
+# DIP-specific standalone buttons (above the table, NOT in the dropdown):
+button:has-text('Upload Courier + Vendor File')   # ⚠️ NEW button
+button:has-text('Generate Batches')               # ⚠️ NEW button
+button:has-text('Clear Courier Assignment')       # ⚠️ NEW button
+```
+
+### Actions Dropdown — Undelivered (NDR) Tab
+```
+button:has-text('Update Tag')
+button:has-text('Update Remarks')
+```
+
+### Opening an Order
+```
+# Click the order ID link (plain text link in the ORDER ID column):
+text='651501'               # example — use the actual order ID value
+# The Order Details modal opens after the click.
 ```
 
 ### Empty State
 ```
-# h3 text (exact from source EmptyState.tsx):
-text='No Inventory Movements Found'
-# With active filters also shows:
-text='No movements match your current filters:'
-# Without filters shows:
-text='No inventory movements are available at this time.'
+text='No orders found'
 ```
 
-### Pagination (verified from PaginationControls.tsx + live DOM)
+### Loading State
 ```
-# Page info — rendered in <h2 class="text-gray-700">:
-h2:has-text('Page')                          # e.g. 'Page 1 of 5'
-text=/Page \d+ of \d+/                       # regex form — same element
-# ⚠️ NOT 'Showing X to Y' — that format is ticketing only. Inventory uses 'Page X of Y'.
-
-# Go to page — exact label text and input:
-# <span>Go to page:</span>  +  <input type="number" ...>
-input[type='number']                         # go-to-page input  ⚠️ NOT 'input >> 3' (invalid)
-
-# Page size — native <select> (LAST select on page):
-select
-# Verified options: 10 | 15 | 20 | 25 | 50 | 100
-
-# Navigation buttons (from DynamicPagination.tsx — Flowbite Button):
-button:has-text('Previous')                  # previous page
-button:has-text('Next')                      # next page
-button:has-text('1')                         # page number buttons
-button:has-text('2')
-
-# ⚠️ After changing rows-per-page, add WAIT: 2000 before asserting page info —
-#    the page briefly reloads.
+text='Loading orders...'
 ```
 
 ---
 
-## Ticketing Page (`/orders-management/ticketing`)
+## Orders Filter Modal
 
-> Source: verified from zambeel-fe source code (SearchBar.tsx, TicketContent.tsx, Pagination.tsx, ticketing.constants.ts) + live staging DOM extraction + screenshots 2026-05-12
-
-### Page Header
+### Modal Header
 ```
-h2:has-text('Ticketing Management')          # ⚠️ h2, NOT h1
-```
-
-### Stats Cards (top of page)
-```
-# Five cards — text labels only:
-# Total Tickets | Pending | In Progress | Awaiting Seller Action | Resolved
+div[role='dialog'] h2:has-text('Filters')
+text='Filters'
 ```
 
-### Tab Buttons (for OMS admin — assigned-to shown first)
+### Filter Fields (exact placeholders confirmed from source)
 ```
-button:has-text('Tickets Assigned to Zambeel')
-button:has-text('Tickets Assigned by Zambeel')
+input[placeholder='Order ID (comma-separated for multiple)']
+input[placeholder='Order # (comma-separated for multiple)']
+input[placeholder='Tracking #']
+input[placeholder='Customer Name']
+input[placeholder='Phone Number']
+input[placeholder='Store URL']
+input[placeholder='Activity Counter']
+input[placeholder='Assigned Agent']
+
+# Search inputs within dropdown filters:
+input[placeholder='Search city']
+input[placeholder='Search courier']
+input[placeholder='Search batch id']
+
+# Dropdown triggers (Flowbite select — click then select option):
+button:has-text('Select Tags')
+button:has-text('Select Sub-Status')
+button:has-text('Select Remarks')
+button:has-text('Select Platform')
+button:has-text('Select Store')
+button:has-text('Select Bifurcation')
+button:has-text('Select City')
+button:has-text('Select Courier')
+button:has-text('Select Batch ID')
+
+# Date range — ⚠️ use input[type='date'], NOT input[placeholder='dd/mm/yyyy']
+input[type='date']            # from date
+input[type='date']            # to date (second occurrence)
 ```
 
-### Filter Controls — Search Type Dropdown (verified from live DOM)
+### Bifurcation Dropdown Options (confirmed from source)
 ```
-select                                       # filter type — native <select>
-# Verified options (value → display label):
-# store_name    → Store Name
-# store_id      → Store ID
-# status        → Status
-# team_id       → Team ID
-# ticket_number → Ticket Number
+option:has-text('360')
+option:has-text('3PL')
+option:has-text('Dropshipper')
+option:has-text('Partner')
+option:has-text('Seller-Lift')
 ```
 
-### Filter — Input or second select changes per filter type (verified from live DOM)
+### Filter Modal Buttons
 ```
-# store_name    → input[placeholder='Search by store name...']
-# store_id      → input[placeholder='Search by store ID...']
-# ticket_number → input[placeholder='Search by ticket number...']
-
-# status        → SECOND native <select> appears (NO text input)
-#                 Verified options: All Statuses | Pending | In Progress | Awaiting Seller Action | Resolved
-
-# team_id       → SECOND native <select> appears (NO text input)
-#                 Verified options: All Teams | Account Managers | AM Team | Call Center |
-#                                   Development Team | Marketing Team | NDR Team | OP Team |
-#                                   Sales Team | Support Team
-
-button:has-text('Search')                    # submit search — text button (confirmed from source)
-```
-
-### Primary Action Button
-```
-button:has-text('Create New Ticket')
-# ⚠️ The '+' before the text is a <Plus> SVG icon — NOT text. has-text('+ Create New Ticket') FAILS.
-# ⚠️ Correct: button:has-text('Create New Ticket')
-```
-
-### Correct Flow — Search by Ticket Number (MANDATORY order)
-```
-# ⚠️ MUST select filter type FIRST — without this, input stays as 'Search by store name...'
-#    and the search hits the wrong field.
-CLICK_OPTION: Ticket Number                  # STEP 1 — switch dropdown to Ticket Number
-FILL: input[placeholder='Search by ticket number...'] | TKT-20085   # STEP 2 — fill input
-CLICK: button:has-text('Search')             # STEP 3 — submit
-ASSERT_EXISTS: text='TKT-20085'             # STEP 4 — evidence
-```
-
-### Table Column Headers (OMS admin view — verified live)
-```
-th:has-text('TICKET ID')
-th:has-text('CATEGORY')
-th:has-text('SUB-CATEGORY')
-th:has-text('ORDER ID')                      # ⚠️ OMS uses 'ORDER ID', seller uses 'ORDER NUMBER'
-th:has-text('DATE')
-th:has-text('STATUS')
-th:has-text('ACTIONS')
-```
-
-### Status Badges
-```
-# Pending (yellow) | In Progress (blue) | Resolved (green) | Awaiting Seller Action (orange)
-```
-
-### Search Result Evidence
-```
-text='TKT-'                                  # partial match — ⚠️ NOT th:has-text('TICKET ID') >> text='TKT-'
-```
-
-### Empty State (verified from TicketContent.tsx source)
-```
-# Tab 'Tickets Assigned to Zambeel' — exact h3 text:
-text='No tickets assigned to Zambeel'
-# Tab 'Tickets Assigned by Zambeel' — exact h3 text:
-text='No tickets assigned by Zambeel'
-# For automation, prefer negative assertion:
-ASSERT_NOT_EXISTS: text='TKT-'
-```
-
-### Results Text & Pagination (verified from Pagination.tsx source)
-```
-# Results count — rendered as <p> with spans:
-# "Showing {startItem} to {endItem} of {totalItems} results"
-text=/Showing \d+ to \d+ of \d+/            # recommended regex form
-text=/Showing/                               # simpler partial match
-
-# Navigation buttons (Pagination.tsx — Previous/Next have sr-only text → has-text works):
-button:has-text('Previous')                  # icon button with sr-only 'Previous' text
-button:has-text('Next')                      # icon button with sr-only 'Next' text
-button:has-text('1')                         # page number buttons
-button:has-text('2')
-
-# ⚠️ NO 'Page X of Y' text on ticketing — that format is Inventory Movements only
+button:has-text('Clear all filters')
+button:has-text('Apply filter')          # ⚠️ lowercase 'f'
 ```
 
 ---
 
-## Commission Models (`/orders-management/commission-models`)
+## Order Details Modal
 
-### Page Header
+### Modal Header
 ```
-h1:has-text('Commission Models')
-```
-
-### List Actions
-```
-button:has-text('+ New Model')               # opens Create modal
-button:has-text('Edit')                      # edit existing model (per-row)
+# ⚠️ Uses h3 NOT h2 (Flowbite Modal.Header)
+div[role='dialog'] h3:has-text('Order Details')
+text='Order #2223'        # format: 'Order #NNNN'
 ```
 
-### Table Column Headers (inside each model card)
+### Loading State
 ```
-th:has-text('Country')
-th:has-text('Commission Type')
-th:has-text('Value')
-th:has-text('Currency')
+text='Loading order details...'
 ```
 
-### Create / Edit Model Modal
+### Tabs Inside Modal
 ```
-div[role='dialog']
-
-# Close:
-button:has-text('✕')
-
-# Form fields:
-label:has-text('Model Name*')
-input[placeholder='Enter model name']
-
-label:has-text('Commission Rules')
-button:has-text('+ Add Rule')
-button:has-text('Remove rule')
-
-# Per-rule fields:
-label:has-text('Country*')
-select                     # options: Select, Bahrain, Iraq, Kuwait, Oman, Pakistan,
-                           #          Qatar, Saudi Arabia, UAE, United States
-
-label:has-text('Type*')
-select                     # options: % of Revenue, Flat per Order
-
-label:has-text('Value* (%)')
-input[type='number']       # commission value
-
-label:has-text('Currency*')
-input[placeholder='AED']   # currency code text input (e.g. AED, SAR, KWD)
-
-# Actions:
-button:has-text('Cancel')
-button:has-text('Save Model')
+button:has-text('Overview')
+button:has-text('Timeline')
+button:has-text('Conversation')
 ```
 
----
-
-## Dispatch Batches (`/orders-management/dispatch-batches`)
-
-### Page Header
+### Warning Alert (non-editable orders)
 ```
-h1:has-text('Dispatch Batches')
+text='This order can no longer be edited as it\'s not in Confirmation Pending or Undelivered status.'
 ```
 
-### Filter Controls (all native `<select>` elements)
+### Edit Mode Banner
 ```
-input[placeholder='Search orders...']
-
-select    # Country: Select Country, Bahrain, Iraq, Kuwait, Oman, Pakistan,
-          #          Qatar, Saudi Arabia, UAE, United States
-
-select    # Status: Status, New, Generating, Partial, Generated, Failed
-
-select    # Vendor (e.g. Zambeel Bahrain Warehouse)
-
-select    # Courier
-
-input[placeholder='From']     # type='date'
-input[placeholder='To']       # type='date'
+# Shown when Edit Mode is active:
+text='Edit mode is active. You can now modify order details. Click "Save" to apply changes or "Cancel Edit" to discard changes.'
 ```
 
-### Table Column Headers (verified live)
+### Overview Tab — Field Labels
 ```
-th:has-text('BATCH ID')
-th:has-text('CREATED BY')
-th:has-text('CREATED DATE/TIME')
-th:has-text('VENDOR ID')
-th:has-text('COURIER NAME')
-th:has-text('TOTAL ORDERS')
-th:has-text('TRACKING STATUS')
-th:has-text('GENERATE TRACKING ID')
-th:has-text('DOWNLOAD DOCUMENT')    # only enabled when TRACKING STATUS = 'Generated'
+text='Store Name'
+text='Customer Name'
+text='Order#'
+text='Order Date'
+text='Payment Method'
 ```
 
-### Status Values (Tracking Status)
+### Order Items Section
 ```
-# New, Generating, Partial, Generated, Failed
-```
-
-### Pagination
-```
-select    # per-page: 10, 15, 20, 25, 50, 100
-```
-
----
-
-## Purchase Orders (`/orders-management/purchase-orders`)
-
-### Page Header
-```
-h2:has-text('Purchase Orders')
+text='Order Items'
+th:has-text('PRODUCT')
+th:has-text('SKU')
+th:has-text('QUANTITY')
+th:has-text('PRICE')
 ```
 
-### Controls
+### Delivery Address Section
 ```
-input[placeholder='Search PO ID or Country']
-button:has-text('Create Purchase Order')
-button:has-text('Date')
-button:has-text('Filters')
-button:has-text('Export')
+text='Delivery Address'
+text='Address'
+text='Phone Number'
+text='Country'
+text='City'
+text='Area Name'
+text='Building/Society'
+text='National Address Short Code'
 ```
+> ⚠️ These fields display as **read-only text** by default.
+> They become editable inputs ONLY after clicking `button:has-text('Edit Order')`.
 
-### Table Column Headers (verified live)
+### Financial Summary Section
 ```
-th:has-text('PO ID')
-th:has-text('DATE')
-th:has-text('COUNTRY')
-th:has-text('CREATED BY')
-th:has-text('STATUS')
-th:has-text('ACTIONS')
-```
-
-### Create Purchase Order (opens full page, not dialog)
-```
-button:has-text('Back to Purchase Orders')
-
-label:has-text('Country')
-select    # options: 🇧🇭 Bahrain, 🇮🇶 Iraq, 🇰🇼 Kuwait, 🇴🇲 Oman, 🇵🇰 Pakistan,
-          #          🇶🇦 Qatar, 🇸🇦 Saudi Arabia, 🇦🇪 UAE, 🇺🇸 United States
-
-label:has-text('Date')
-label:has-text('Target Location')
-select    # warehouse options (country-dependent)
-
-label:has-text('SKU')
-input[placeholder='Search for SKU...']
-
-label:has-text('Quantity')
-
-button:has-text('Add')
-button:has-text('Browse files')
-button:has-text('Cancel')
-button:has-text('Save a Draft')
-button:has-text('Submit Purchase Order')
+text='Financial Summary'
+text='Subtotal'
+text='Discount'
+text='Tax'
+text='Shipping'
+text='Total'
+text='Website Price'
 ```
 
-### Pagination
+### Bottom Controls (MiscFields)
 ```
-select    # per-page: 10, 15, 20, 25, 50, 100
-```
-
----
-
-## Return Orders (`/orders-management/return-orders`)
-
-### Page Header
-```
-h2:has-text('Return Orders')
+text='Update Tag'
+text='Activity Counter'
 ```
 
-### Controls
+### Modal Action Buttons
 ```
-input[placeholder='Search Return ID or Country']
-button:has-text('Create Return Order')
-button:has-text('Date')
-button:has-text('Export')
-```
-
-### Table Column Headers (verified live)
-```
-th:has-text('RETURN ID')
-th:has-text('DATE')
-th:has-text('COUNTRY')
-th:has-text('CREATED BY')
-th:has-text('ACTIONS')
+button:has-text('Edit Order')           # toggle — enter edit mode
+button:has-text('Cancel Edit')          # toggle — exit edit mode
+button:has-text('Approve Order')        # Confirmation Pending status only
+button:has-text('Approving...')         # loading state
+button:has-text('Process Order')        # ⚠️ Approved status (NOT 'Approve Order')
+button:has-text('Assigning...')         # loading state for Process Order / Assign Courier
+button:has-text('Assign Courier')       # when courier assignment shown
+button:has-text('Cancel Order')
+button:has-text('Cancelling...')        # loading state
+button:has-text('Save')
+button:has-text('Saving...')            # loading state
 ```
 
-### Create Return Order (opens full page, not dialog)
+### Cancel Order Popup (inside modal)
 ```
-button:has-text('Back to Return Orders')
-
-label:has-text('Country')
-select    # options: 🇧🇭 Bahrain, 🇮🇶 Iraq, 🇰🇼 Kuwait, 🇴🇲 Oman, 🇵🇰 Pakistan,
-          #          🇶🇦 Qatar, 🇸🇦 Saudi Arabia, 🇦🇪 UAE, 🇺🇸 United States
-
-label:has-text('Date')
-label:has-text('Target Location')
-label:has-text('SKU')
-input[placeholder='Search for SKU...']
-label:has-text('Quantity')
-
-button:has-text('Add')
-button:has-text('Browse files')
-button:has-text('Cancel')
-button:has-text('Submit Return Order')
-```
-
-### Pagination
-```
-select    # per-page: 10, 15, 20, 25, 50, 100
-```
-
----
-
-## Agency Registrations (`/orders-management/agency-registrations`)
-
-### Page Header
-```
-h1:has-text('Agency Registrations')
-```
-
-### Status Filter Buttons
-```
-button:has-text('All')
-button:has-text('Pending')
-button:has-text('Approved')
-button:has-text('OnHold')
-button:has-text('Rejected')
-button:has-text('Review')
-```
-
-### Table Column Headers (verified live)
-```
-th:has-text('Name')
-th:has-text('Country')
-th:has-text('POC')
-th:has-text('Status')
-th:has-text('License')
-th:has-text('Submitted')
+h2:has-text('Against which tag do you want to Cancel the order?')
+select                                  # cancel tag selector
+option:has-text('Select a tag')         # placeholder
+text='Loading cancellation tags...'    # while fetching
+button:has-text('Back')                 # ⚠️ NOT 'Cancel' — returns without cancelling
+button:has-text('Confirm Cancel')
+button:has-text('Cancelling...')        # in-progress state
 ```
 
 ---
 
 ## Agents (`/orders-management/agents`)
 
+### Page Header
+```
+h1:has-text('Agents')
+```
+
 ### Controls
 ```
 input[placeholder='Search by Name, Email or Country']
-button:has-text('Create Agent')
+button:has-text('+ Create Agent')       # ⚠️ note the '+' prefix
 ```
 
-### Table Column Headers (verified live)
+### Table Column Headers (confirmed from source)
 ```
 th:has-text('Name')
 th:has-text('Email')
@@ -564,86 +372,59 @@ th:has-text('Team')
 ### Create Agent Modal
 ```
 div[role='dialog']
+# Modal header:
+text='Create Agent'
 
-label:has-text('Full Name')
-input[placeholder='John Doe']
+# Fields:
+input[placeholder='John Doe']           → Full Name
+input[placeholder='johndoe@example.com'] → Email
+input[placeholder='+1234567890']        → Phone Number
+# Country — Flowbite select:
+text='Select Country'
+# Team — Flowbite select:
+text='Select a Team'
 
-label:has-text('Email')
-input[placeholder='johndoe@example.com']
-
-label:has-text('Phone Number')
-input[placeholder='+1234567890']
-
-label:has-text('Country')
-input[placeholder='Select Country']
-
-label:has-text('Team')
-select[name='team']
-# Team options: Select a Team, Account Managers, AM Team, Call Center,
-#   Development Team, Marketing Team, NDR Team, OP Team, Sales Team, Support Team
-
-button:has-text('Create Agent')
+# Footer buttons:
 button:has-text('Cancel')
-```
+button:has-text('Create Agent')
 
-### Pagination
-```
-select    # per-page: 10, 15, 20, 25, 50, 100
-```
-
----
-
-## Gold Subscriptions (`/orders-management/gold-subscriptions`)
-
-### Page Header
-```
-h1:has-text('Gold Subscription Management')
-```
-
-### Filter Controls
-```
-select              # search type: Email, Phone, User ID
-input[placeholder='Enter user email']
-button:has-text('Search')
-button:has-text('Clear')
-```
-
-### User Filter Tabs
-```
-button:has-text('All users')
-button:has-text('Gold users')
-```
-
-### Table Column Headers (verified live)
-```
-th:has-text('USER ID')
-th:has-text('EMAIL')
-th:has-text('TOTAL STORES')
-th:has-text('SUBSCRIPTION STATUS')
-th:has-text('EXPIRY DATE')
-th:has-text('ACTIONS')
-```
-
-### Per-Row Action
-```
-button:has-text('View Details')
+# Validation messages:
+text='Name is required'
+text='Name must be at least 2 characters long'
 ```
 
 ---
 
-## Ticker Config (`/orders-management/ticker-config`)
+## Ratings Settings (`/orders-management/ratings-settings`)
 
 ### Page Header
 ```
-h1:has-text('Global Ticker Configuration')
+# ⚠️ NEW PAGE — not previously documented
+h1:has-text('Ratings Settings')
 ```
 
-### Form Fields
+### Table Column Headers (confirmed from source)
 ```
-label:has-text('Ticker Message')
-label:has-text('Ticker Background Color')
-label:has-text('Ticker Text Color')
-button:has-text('Update Global Ticker')
+th:has-text('Country')
+th:has-text('Product Threshold % (Delivery Ratio)')
+th:has-text('Store Threshold % (Delivery Ratio)')
+th:has-text('Actions')
+```
+
+### Edit Threshold Modal
+```
+div[role='dialog']
+# Title (dynamic with country name):
+text='Edit Thresholds for Saudi Arabia'   # example
+
+# Field labels:
+text='Country'
+text='Product Threshold % (Delivery Ratio)'
+text='Store Threshold % (Delivery Ratio)'
+
+# Buttons:
+button:has-text('Cancel')
+button:has-text('Save Changes')
 ```
 
 ---
@@ -655,24 +436,15 @@ button:has-text('Update Global Ticker')
 h1:has-text('Integrated Stores')
 ```
 
-### Filter Controls
+### Controls
 ```
+label:has-text('Show untrusted Manual stores only')
+input[type='checkbox']              → same checkbox
+
 input[placeholder='Search by Store Name or URL']
 ```
 
-### Bifurcation Filter Buttons
-```
-button:has-text('Dropshipper')
-button:has-text('Default')
-button:has-text('3PL')
-```
-
-### Confirmation Settings Toggle
-```
-button:has-text('Off')     # toggles confirmation auto-approval
-```
-
-### Table Column Headers (verified live)
+### Table Column Headers (confirmed)
 ```
 th:has-text('STORE URL')
 th:has-text('STORE ID')
@@ -684,142 +456,537 @@ th:has-text('CONFIRMATION SETTINGS')
 th:has-text('TRUSTED')
 ```
 
-### Pagination
+---
+
+## Dispatch Batches (`/orders-management/dispatch-batches`)
+
+### Page Header
 ```
-select    # per-page: 5, 10, 20, 50
+h1:has-text('Dispatch Batches')
+p:has-text('Generate tracking IDs and download combined courier documents.')
+```
+
+### Filters
+```
+button:has-text('Status')
+button:has-text('Vendor')
+button:has-text('Courier')
+input[type='date']                  # from date
+input[type='date']                  # to date
+```
+
+### Search
+```
+input[placeholder='Search orders...']    # ⚠️ with ellipsis
+```
+
+### Table Column Headers (confirmed)
+```
+th:has-text('BATCH ID')
+th:has-text('CREATED BY')
+th:has-text('CREATED DATE/TIME')
+th:has-text('VENDOR ID')
+th:has-text('COURIER NAME')
+th:has-text('COURIER REQUEST ID')
+th:has-text('TOTAL ORDERS')
+th:has-text('TRACKING STATUS')
+th:has-text('GENERATE TRACKING ID')
+th:has-text('DOWNLOAD DOCUMENT')
+```
+
+### Tracking Status Badges
+```
+span:has-text('Generated')          # green
+span:has-text('Partial')            # orange
+span:has-text('New')
+span:has-text('Generating')
+span:has-text('Failed')
+```
+
+### Per-Row Action Buttons
+```
+button:has-text('Generate Tracking ID')
+button:has-text('Generate & Download')
+button:has-text('Download Combined Doc')
 ```
 
 ---
 
-## Ratings Settings (`/orders-management/ratings-settings`)
+## Ticketing (`/orders-management/ticketing`)
 
 ### Page Header
 ```
-h1:has-text('Maintain Country-wise Thresholds')
+h2:has-text('Ticketing Management')    # ⚠️ h2 NOT h1 (source uses h2)
 ```
 
-### Controls
+### Loading / Error States
 ```
-input[placeholder='Search by country']
-```
-
-### Table Column Headers (verified live)
-```
-th:has-text('Country')
-th:has-text('Product Threshold % (Delivery Ratio)')
-th:has-text('Store Threshold % (Delivery Ratio)')
-th:has-text('Actions')
+text='Loading tickets...'
+text='Failed to load tickets'
+text='An error occurred while fetching tickets'
+button:has-text('Try Again')
 ```
 
----
-
-## Tags Management (`/orders-management/tags-management`)
-
-### Page Header
+### Stats Cards
 ```
-h1:has-text('Manage Tags')
-h2:has-text('Tags List')
-```
-
-### Controls
-```
-button:has-text('Create New Tag')
+text='Total Tickets'
+text='Pending'
+text='In Progress'
+text='Awaiting Seller Action'
+text='Resolved'
 ```
 
-### Table Column Headers (verified live)
+### Tabs
 ```
-th:has-text('TAG')
-th:has-text('SUB STATUS')
+button:has-text('Tickets Assigned to Zambeel')
+button:has-text('Tickets Assigned by Zambeel')
+```
+> Note: Tab order depends on user role — admin sees "by Zambeel" first, seller sees "to Zambeel" first.
+
+### Filter Controls
+```
+# Filter type selector — options:
+select:has-text('Store Name')       # default
+# Other options in the select:
+option:has-text('Store Name')
+option:has-text('Store ID')
+option:has-text('Status')
+option:has-text('Team ID')
+
+# Input placeholder changes by type:
+input[placeholder='Search by store name...']
+input[placeholder='Search by store ID...']
+input[placeholder='Select status...']
+input[placeholder='Select team...']
+
+button:has-text('Search')
+```
+
+### Primary Button
+```
+button:has-text('Create New Ticket')    # ⚠️ NO '+' prefix (unlike other pages)
+```
+
+### Table Column Headers
+```
+th:has-text('TICKET ID')
+th:has-text('CATEGORY')
+th:has-text('SUB-CATEGORY')
+th:has-text('ORDER ID')             # ⚠️ admin view shows 'ORDER ID'
+th:has-text('DATE')
 th:has-text('STATUS')
-th:has-text('ACTIVE')
 th:has-text('ACTIONS')
 ```
 
-### Create New Tag Modal
+### Status Badges
 ```
-div[role='dialog']
-
-label:has-text('Tag Name')
-input[placeholder='Enter tag name']
-
-label:has-text('Status')
-select    # options: Select status, Received, Confirmation Pending, Cancelled,
-          #   Approved, Dispatching in Process, Shipped, Delivered,
-          #   Undelivered, Return in Transit, Return
-
-label:has-text('Sub Status')
-select    # sub-status options (depend on Status selection)
-
-label:has-text('Active Status')
-select    # options: Active, Inactive
-
-label:has-text('Tag Color')
-label:has-text('Custom Color')
-input[placeholder='#RRGGBB']
-
-button:has-text('Apply')
-button:has-text('Cancel')
-button:has-text('Create')
-button:has-text('Close')
+span:has-text('Pending')            # yellow
+span:has-text('In Progress')        # blue
+span:has-text('Awaiting Seller Action')  # orange
+span:has-text('Resolved')           # green
 ```
 
-### Pagination
+### Row Action
 ```
-select    # per-page: 5, 10, 20, 50
+# Eye icon button (gray):
+button[title='View']                # or unlabeled button with Eye icon
 ```
 
 ---
 
-## Invoice Upload (`/orders-management/invoice-upload`)
+## Gold Subscription Management (`/orders-management/gold-subscriptions`)
 
 ### Page Header
 ```
-h1:has-text('Invoice PDF Upload')
-h3:has-text('Upload PDF Invoice Files')
+h1:has-text('Gold Subscription Management')
+p:has-text('View all users, search in the database, and manage Gold access from OMS.')
 ```
 
-### Controls
+### Search Controls
 ```
-label:has-text('Choose Files')
-# File input — accepts PDF files
+# Search-by type selector (label: "Search by")
+# Options confirmed from SEARCH_OPTIONS in source:
+option:has-text('Email')
+option:has-text('Phone')
+option:has-text('User ID')
+
+# Input placeholder changes by type:
+input[placeholder='Enter user email']       # Email (default)
+input[placeholder='Enter phone number']     # Phone
+input[placeholder='Enter user ID']          # User ID
+
+button:has-text('Search')
+button:has-text('Searching...')             # loading state
+button:has-text('Clear')
+```
+
+### Tabs
+```
+button:has-text('All users')
+button:has-text('Gold users')
+```
+
+### Table Column Headers
+```
+th:has-text('USER ID')
+th:has-text('EMAIL')
+th:has-text('TOTAL STORES')
+th:has-text('SUBSCRIPTION STATUS')
+th:has-text('EXPIRY DATE')
+th:has-text('ACTIONS')
+```
+
+### Row Action
+```
+button:has-text('View Details')
 ```
 
 ---
 
-## Dashboard (`/orders-management/dashboard`)
+## Commission Models (`/orders-management/commission-models`)
 
-### KPI Cards
+### Page Header
 ```
-# Cards show numeric values (h4) — no fixed text selectors
-# Month selector (native <select>):
-select    # options: Sep 2024, Oct 2024, Nov 2024 (historical months)
+h1:has-text('Commission Models')
+p:has-text('Define per-country commission rates for agencies.')
 ```
 
-### Team Tasks Table
+### Primary Button
 ```
-th:has-text('ASSIGNED')
-th:has-text('PROGRESS')
-th:has-text('PRIORITY')
-th:has-text('BUDGET')
+button:has-text('+ New Model')
+```
+
+### Model Card Elements
+```
+# Each card shows:
+# Model name (dynamic text)
+text='agencies assigned'            # e.g. '2 agencies assigned' or '1 agency assigned'
+text='agency assigned'              # singular form when count = 1
+
+# Edit button — has Pencil icon + "Edit" text (NOT emoji):
+button:has-text('Edit')             # ⚠️ plain text 'Edit' with Pencil lucide icon
+# Previous docs incorrectly documented as '✏ Edit' (unicode emoji) — that is WRONG
+```
+
+### Table Inside Each Model Card
+```
+th:has-text('Country')
+th:has-text('Commission Type')
+th:has-text('Value')
+th:has-text('Currency')
+```
+
+### Commission Type Values
+```
+text='Flat per Order'
+text='% of Revenue'
+```
+
+### Create / Edit Drawer
+```
+# Drawer title:
+text='Create Commission Model'      # when creating
+text='Edit Commission Model'        # when editing
+
+# Model Name field:
+input[placeholder='Enter model name']     # label: "Model Name*"
+
+# Country dropdown (Flowbite select):
+text='Loading countries...'         # while loading
+text='Select'                       # when loaded (placeholder)
+
+# Commission Type dropdown options:
+option:has-text('% of Revenue')
+option:has-text('Flat per Order')
+
+# Value input (number):
+input[type='number']                # no placeholder text
+
+# Currency input:
+input[placeholder='AED']            # label: "Currency*"
+
+# Rule management buttons:
+button:has-text('+ Add Rule')
+button:has-text('Remove rule')      # red button per rule
+
+# Drawer footer:
+button:has-text('Save Model')
+button:has-text('Cancel')
+
+# Empty state (no models yet):
+text='No commission models yet'
+button:has-text('Create First Model')
+
+# Validation alert inside drawer:
+text='Each country can only appear once inside the same model.'
 ```
 
 ---
 
-## ⚠️ Verified Corrections
+## Agency Registrations (`/orders-management/agency-registrations`)
 
-| Field | Old (incorrect) | Correct (verified live) |
-|-------|----------------|------------------------|
-| Ticketing heading | `h1:has-text('Ticketing System')` | **`h2:has-text('Ticketing Management')`** |
-| Ticketing "Create" button | various guesses | **`button:has-text('Create New Ticket')`** — `+` is a `<Plus>` SVG icon, NOT text |
-| Ticketing table: order column | `th:has-text('ORDER NUMBER')` | **`th:has-text('ORDER ID')`** (OMS view; seller uses ORDER NUMBER) |
-| Ticketing filter type options | unknown | **Store Name, Store ID, Status, Team ID, Ticket Number** |
-| Commission model "New" button | `button:has-text('Create Commission Model')` | **`button:has-text('+ New Model')`** |
-| Commission model "Save" | `button:has-text('Save')` | **`button:has-text('Save Model')`** |
-| Commission model name input | various guesses | **`input[placeholder='Enter model name']`** |
-| Commission type values | unknown | **`% of Revenue`** / **`Flat per Order`** |
-| Agency reg status filter | unknown | **All, Pending, Approved, OnHold, Rejected, Review** |
-| Inventory movement types | unknown | **SKU → SKU, Warehouse → Warehouse, To Damaged Bin** |
-| Inventory movement reasons | unknown | **SKU Merge, Wrong SKU Mapping, Repackaging, Services Deal, Variant Consolidation, Internal Adjustment** |
-| Dispatch batch statuses | unknown | **New, Generating, Partial, Generated, Failed** |
-| Tags modal status values | unknown | **Received, Confirmation Pending, Cancelled, Approved, Dispatching in Process, Shipped, Delivered, Undelivered, Return in Transit, Return** |
-| Agents team options | unknown | **Account Managers, AM Team, Call Center, Development Team, Marketing Team, NDR Team, OP Team, Sales Team, Support Team** |
+### Page Header
+```
+h1:has-text('Agency Registrations')
+p:has-text('Review and manage agency applications.')
+```
+
+### Status Tabs
+```
+button:has-text('All')
+button:has-text('Pending')
+button:has-text('Approved')
+button:has-text('OnHold')
+button:has-text('Rejected')
+```
+
+### Table Column Headers
+```
+th:has-text('Name')
+th:has-text('Country')
+th:has-text('POC')
+th:has-text('Status')
+th:has-text('License')
+th:has-text('Submitted')
+```
+
+### Row Action
+```
+button:has-text('Review')
+```
+
+### Review Drawer — Action Buttons by Status
+```
+# Pending:
+button:has-text('Approve Agency')
+button:has-text('Put on Hold')
+button:has-text('Reject')
+
+# Approved:
+button:has-text('Revoke License')
+
+# Rejected:
+button:has-text('Revert to Pending')
+```
+
+### Approve Sub-form
+```
+text='Assign Commission Model'          # section heading
+label:has-text('Select commission model')
+# select dropdown for commission model
+button:has-text('Confirm Approve')
+button:has-text('Cancel')
+```
+
+### Hold Sub-form
+```
+textarea[placeholder='Explain what needs to be fixed...']
+label:has-text('Allow applicant to resubmit documents')
+input[type='checkbox']                  # resubmit toggle
+button:has-text('Put on Hold')
+button:has-text('Cancel')
+```
+
+### Reject Sub-form
+```
+textarea[placeholder='Reason for rejection...']
+button:has-text('Confirm Reject')
+button:has-text('Cancel')
+```
+
+### Document Links
+```
+button:has-text('Identity Document')
+button:has-text('Agency Document')
+```
+
+---
+
+## Ticker Config (`/orders-management/ticker-config`)
+
+### Page Header
+```
+h1:has-text('Global Ticker Configuration')
+p:has-text('This is where the Admin will manage the banner.')
+```
+
+### Loading State
+```
+text='Loading configuration...'
+```
+
+### Form Fields
+```
+label:has-text('Ticker Config')         # toggle switch label
+label:has-text('Ticker Message')
+label:has-text('Ticker Background Color')
+label:has-text('Ticker Text Color')
+input[type='color']                     # first: background color
+input[type='color']                     # second: text color
+```
+
+### Submit Button
+```
+button:has-text('Update Global Ticker')
+button:has-text('Saving...')            # loading state
+```
+
+---
+
+## Inventory Movements (`/orders-management/inventory-movements`)
+
+### Page Header
+```
+h1:has-text('Inventory Movements')
+```
+
+### Primary Button
+```
+button:has-text('+ Add Inventory Movement')
+```
+
+### Search Controls
+```
+button:has-text('Movement ID')          # default search-by type
+input[placeholder='Search Movement ID']
+button:has-text('Date')
+button:has-text('Filters')
+```
+
+### Table Column Headers
+```
+th:has-text('MOVEMENT ID')
+th:has-text('TYPE')
+th:has-text('WAREHOUSE')
+th:has-text('STATUS')
+th:has-text('MOVED BY')
+th:has-text('DATE')
+```
+
+### Movement Type Badges
+```
+span:has-text('Warehouse → Warehouse')   # purple
+span:has-text('SKU → SKU')               # blue
+span:has-text('To Damaged Bin')          # red
+```
+
+### Status Badges
+```
+span:has-text('In Transit')         # yellow
+span:has-text('Received')           # green
+```
+
+### Create Movement Form (inside Add modal)
+
+**Movement Type Buttons:**
+```
+button:has-text('SKU → SKU')
+button:has-text('Warehouse → Warehouse')
+button:has-text('To Damaged Bin')
+```
+
+**Reason options — To Damaged Bin:**
+```
+option:has-text('Physical Damage')
+option:has-text('Expired Product')
+option:has-text('Quality Failure')
+option:has-text('Packaging Damage')
+option:has-text('Customer Return - Unsellable')
+option:has-text('Purchase Order Correction')
+option:has-text('Lost / Missing in Audit')
+option:has-text('Outdated Stock')
+```
+
+**Reason options — SKU to SKU:**
+```
+option:has-text('SKU Merge')
+option:has-text('Wrong SKU Mapping')
+option:has-text('Repackaging')
+option:has-text('Services Deal')
+option:has-text('Variant Consolidation')
+option:has-text('Internal Adjustment')
+```
+
+**Reason options — Warehouse to Warehouse:**
+```
+option:has-text('Demand Fulfillment')
+option:has-text('Purchase Transfer')
+```
+
+---
+
+## Purchase Orders (`/orders-management/purchase-orders`)
+
+```
+# Status badge values:
+span:has-text('Draft')
+span:has-text('Received')
+span:has-text('Partially Received')
+span:has-text('Cancelled')
+span:has-text('Submitted')
+```
+
+---
+
+## Quick Selector Reference Table
+
+| Page | Key Selector | Notes |
+|------|-------------|-------|
+| Orders | `h1:has-text('Orders Management')` | Page title |
+| Orders | `input[placeholder='Search orders']` | Search box |
+| Orders | `button:has-text('Dispatching in Process')` | Tab 4 (lowercase 'i') |
+| Orders | `button:has-text('Shipped')` | Tab 5 — NOT 'In Delivery' |
+| Orders | `th:has-text('WATI')` | CP and Undelivered tabs only |
+| Orders | `th:has-text('EDIT')` | DIP tab only |
+| Orders | `th:has-text('SHIPPED DATE')` | Undelivered tab only |
+| Orders DIP | `button:has-text('Upload Courier + Vendor File')` | DIP tab standalone |
+| Orders DIP | `button:has-text('Generate Batches')` | DIP tab standalone |
+| Orders DIP | `button:has-text('Clear Courier Assignment')` | DIP tab standalone |
+| Orders Approved | `button:has-text('Update Substatus')` | NOT 'Update Sub-status' |
+| Orders Approved | `button:has-text('Move Processable Orders')` | NOT 'Assign Courier' |
+| Orders Cancel | `button:has-text('Back')` | NOT 'Cancel' — cancel popup back button |
+| Orders Filter | `button:has-text('Clear all filters')` | Reset all |
+| Orders Filter | `button:has-text('Apply filter')` | Submit — lowercase 'f' |
+| Orders Filter | `input[type='date']` | NOT `input[placeholder='dd/mm/yyyy']` |
+| Order Detail | `h3:has-text('Order Details')` | h3 NOT h2 |
+| Order Detail | `button:has-text('Edit Order')` | Opens edit mode |
+| Order Detail | `button:has-text('Process Order')` | Approved status (NOT 'Approve Order') |
+| Order Detail | `button:has-text('Approve Order')` | CP status only |
+| Order Detail | `button:has-text('Cancel Order')` | Cancel single order |
+| Agents | `button:has-text('+ Create Agent')` | With '+' prefix |
+| Ratings | `h1:has-text('Ratings Settings')` | NEW page |
+| Stores | `h1:has-text('Integrated Stores')` | NOT 'Stores Settings' |
+| Dispatch | `input[placeholder='Search orders...']` | With ellipsis '...' |
+| Ticketing | `h2:has-text('Ticketing Management')` | h2 NOT h1 |
+| Ticketing | `button:has-text('Create New Ticket')` | No '+' prefix |
+| Gold Sub | `h1:has-text('Gold Subscription Management')` | Page title |
+| Gold Sub | `input[placeholder='Enter user email']` | Default search |
+| Commission | `button:has-text('Edit')` | NOT '✏ Edit' — plain text |
+| Commission | `button:has-text('+ New Model')` | Create |
+| Commission | `input[placeholder='Enter model name']` | Model name field |
+| Commission | `button:has-text('Save Model')` | Drawer save |
+| Inventory | `button:has-text('+ Add Inventory Movement')` | Create button |
+| Inventory | `input[placeholder='Search Movement ID']` | Search input |
+| Ticker | `h1:has-text('Global Ticker Configuration')` | Page title |
+| Ticker | `button:has-text('Update Global Ticker')` | Save button |
+| Agency Reg | `button:has-text('Review')` | Per-row action |
+
+---
+
+## ⚠️ Corrections vs Previously Documented
+
+| Field | Old (incorrect) | Correct (verified from source) |
+|-------|----------------|-------------------------------|
+| Tab 4 label | 'Dispatching In Process' (capital I) | **'Dispatching in Process'** (lowercase i) |
+| Tab 5 label | 'In Delivery' | **'Shipped'** |
+| Country option | 'United States' | **'United States (USA)'** |
+| Filter dates | `input[placeholder='dd/mm/yyyy']` | **`input[type='date']`** |
+| All Orders dropdown | many items listed | **only 'Update Statuses' and 'Upload Orders'** |
+| Approved dropdown | 'Update Sub-status' | **'Update Substatus'** (one word) |
+| Approved dropdown | 'Assign Courier' | **'Move Processable Orders'** |
+| Commission card edit | '✏ Edit' (unicode emoji) | **'Edit'** (Pencil lucide icon + text) |
+| Order Details header | `h2:has-text('Order Details')` | **`h3:has-text('Order Details')`** |
+| Modal action (Approved) | 'Approve Order' | **'Process Order'** for Approved-status orders |
+| Cancel popup back btn | 'Cancel' | **'Back'** |
+| Ticketing heading | `h1:has-text(...)` | **`h2:has-text('Ticketing Management')`** |
+| Stores title | 'Stores Settings' | **'Integrated Stores'** |

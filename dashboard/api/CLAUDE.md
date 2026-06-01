@@ -15,19 +15,26 @@ AI-powered SQA agent for the Zambeel platform. Automates Jira ticket management,
 | production | https://portal.myzambeel.com     |
 
 ## Portal types
-Three portal types: `seller`, `admin`, `agency`. Each logs in via email/password stored in `.env`.
+Three portal types: `seller`, `admin`, `agency`. Each has its own Google account and saved auth session.
 
-## Auth credentials
-All portals authenticate with email/password from `.env`. No session JSON files are used.
+## Auth sessions
+Sessions are saved in `auth/` as JSON files named `portal_env.json` (e.g. `seller_local.json`).
 
-| Variable | Portal |
-|----------|--------|
-| `ADMIN_STAGING_EMAIL` / `ADMIN_STAGING_PASSWORD` | Admin, staging |
-| `SELLER_STAGING_EMAIL` / `SELLER_STAGING_PASSWORD` | Seller, staging |
-| `AGENCY_STAGING_EMAIL` / `AGENCY_STAGING_PASSWORD` | Agency, staging |
-| `ADMIN_PRODUCTION_EMAIL` / `ADMIN_PRODUCTION_PASSWORD` | Admin, production |
-| `SELLER_PRODUCTION_EMAIL` / `SELLER_PRODUCTION_PASSWORD` | Seller, production |
-| `AGENCY_PRODUCTION_EMAIL` / `AGENCY_PRODUCTION_PASSWORD` | Agency, production |
+**Currently saved sessions:**
+- seller_local, seller_staging
+- admin_local, admin_staging
+- agency_local, agency_staging
+
+**To create or refresh a session (requires manual Google login in a browser window):**
+```
+python tools/auth_setup.py <portal> <env>
+```
+Examples:
+```
+python tools/auth_setup.py admin local
+python tools/auth_setup.py seller staging
+```
+The script opens Chrome, lets you log in manually, then saves the session to `auth/`.
 
 ## Success URLs per portal
 These are the post-login landing paths the test checks for:
@@ -43,24 +50,14 @@ If a portal starts redirecting to a different path after login, update `success_
 ## Tools
 
 ### tools/playwright_tool.py
-Browser login-validation tests using Playwright with email/password login from `.env`.
+Browser login-validation tests using Playwright and saved auth sessions.
 
 Key functions:
 - `run_tests(portal, env)` — runs a headless login test; returns `("PASS"|"FAIL", message)`
-- `login_to_portal(page, portal, env)` — fills login form with credentials from `.env`
 - `start_local_server()` / `stop_local_server()` — spins the frontend dev server up/down for local tests
 - Convenience wrappers: `run_tests_seller_local()`, `run_tests_admin_staging()`, etc.
 
 Screenshots are saved to `screenshots/` as `portal_env_TIMESTAMP.png`.
-
-### tools/explore_oms.py
-Live UI exploration script — logs in as admin and visits every OMS page on staging.
-Extracts all interactive elements (buttons, inputs, selects, tabs, modals, dropdowns).
-Output saved to `tools/exploration_output/` as JSON + screenshots.
-
-```
-python tools/explore_oms.py
-```
 
 ### tools/github_tool.py
 Git branch operations on the frontend and backend repos.
@@ -72,6 +69,9 @@ Key functions:
 - `pull_latest(repo_path)` — pulls from the tracking remote
 
 Repo paths are read from `GITHUB_FRONTEND_REPO` and `GITHUB_BACKEND_REPO` in `.env`.
+
+### tools/auth_setup.py
+One-time interactive script for creating or refreshing auth sessions. Launches a visible Chrome window so you can complete Google OAuth manually, then saves the storage state to `auth/`.
 
 ### tools/jira_tool.py
 Jira integration. (See Jira section below.)
