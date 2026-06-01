@@ -2264,11 +2264,18 @@ async def ai_chat(request: Request):
         dirs = ["oms", "shared"]
 
     kb = ""
+    # Always load system_data first - most important factual data
+    system_data_path = KNOWLEDGE_DIR / "shared" / "system_data.md"
+    if system_data_path.exists():
+        kb += system_data_path.read_text()[:3000]
+
+    # Then load portal-specific files
     for d in dirs:
         path = KNOWLEDGE_DIR / d
         if path.exists():
-            for f in path.glob("*.md"):
-                kb += f.read_text()[:1500]
+            for f in sorted(path.glob("*.md")):
+                kb += f.read_text()[:800]
+
     kb = kb[:8000]  # hard cap to stay under Groq free tier token limit
 
     system = f"""You are a senior Zambeel platform expert and SQA engineer.
