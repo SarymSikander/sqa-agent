@@ -2298,8 +2298,6 @@ async def ai_chat(request: Request):
     body = await request.json()
     message = body.get("message", "")
 
-    groq_client = Groq(api_key=os.getenv("GROQ_API_KEY"))
-
     msg_lower = message.lower()
     if "seller" in msg_lower:
         dirs = ["seller", "shared"]
@@ -2341,15 +2339,27 @@ Portals:
 KNOWLEDGE BASE:
 {kb}"""
 
-    response = groq_client.chat.completions.create(
-        model="llama-3.3-70b-versatile",
-        messages=[
-            {"role": "system", "content": system},
-            {"role": "user", "content": message},
-        ],
-        max_tokens=2000,
-    )
-    return {"answer": response.choices[0].message.content}
+    try:
+        groq_client = Groq(api_key=os.getenv('GROQ_API_KEY'))
+        response = groq_client.chat.completions.create(
+            model='llama-3.3-70b-versatile',
+            messages=[{'role': 'system', 'content': system}, {'role': 'user', 'content': message}],
+            max_tokens=1000
+        )
+        answer = response.choices[0].message.content
+    except Exception as groq_err:
+        if '429' in str(groq_err) or 'rate' in str(groq_err).lower():
+            from openai import OpenAI
+            fallback = OpenAI(base_url='https://models.inference.ai.azure.com', api_key=os.getenv('GITHUB_TOKEN'))
+            response = fallback.chat.completions.create(
+                model='gpt-4o',
+                messages=[{'role': 'system', 'content': system[:3000]}, {'role': 'user', 'content': message}],
+                max_tokens=1000
+            )
+            answer = response.choices[0].message.content
+        else:
+            raise
+    return {"answer": answer}
 
 
 @app.post("/api-tests/create-jira-bugs")
