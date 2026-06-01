@@ -2265,51 +2265,50 @@ async def ai_chat(request: Request):
 
     try:
         import mysql.connector
-        print(f'[AI-CHAT-DB] Connecting to {os.getenv("PRODUCTION_DB_HOST")}:{os.getenv("PRODUCTION_DB_PORT")} db={os.getenv("PRODUCTION_DB_NAME")}')
         conn = mysql.connector.connect(
-            host=os.getenv("PRODUCTION_DB_HOST"),
-            port=int(os.getenv("PRODUCTION_DB_PORT", 3306)),
-            user=os.getenv("PRODUCTION_DB_USER"),
-            password=os.getenv("PRODUCTION_DB_PASSWORD"),
-            database=os.getenv("PRODUCTION_DB_NAME"),
+            host=os.getenv('PRODUCTION_DB_HOST'),
+            port=int(os.getenv('PRODUCTION_DB_PORT', 3306)),
+            user=os.getenv('PRODUCTION_DB_USER'),
+            password=os.getenv('PRODUCTION_DB_PASSWORD'),
+            database=os.getenv('PRODUCTION_DB_NAME')
         )
         cursor = conn.cursor()
 
-        cursor.execute("SHOW TABLES")
-        tables = [r[0] for r in cursor.fetchall()]
-
-        schema_info = []
-        for table in tables:
-            cursor.execute(f"DESCRIBE {table}")
-            cols = cursor.fetchall()
-            col_names = [c[0] for c in cols]
-            schema_info.append(f"{table}: {', '.join(col_names)}")
-
-        counts = []
-        for table in tables:
+        def q(sql, params=None):
             try:
-                cursor.execute(f"SELECT COUNT(*) FROM {table}")
-                count = cursor.fetchone()[0]
-                counts.append(f"{table}: {count} rows")
-            except Exception:
-                pass
+                cursor.execute(sql, params)
+                return cursor.fetchall()
+            except:
+                return []
+
+        orders_today = q('SELECT COUNT(*) FROM orders WHERE DATE(createdAt) = CURDATE()')[0][0]
+        total_orders = q('SELECT COUNT(*) FROM orders')[0][0]
+        top_courier = q('''SELECT cp.name, COUNT(*) as cnt FROM orders o
+            JOIN courier_partners cp ON o.fk_courier_id = cp.id
+            WHERE DATE(o.createdAt) = CURDATE() GROUP BY cp.name ORDER BY cnt DESC LIMIT 3''')
+        pending_orders = q("SELECT COUNT(*) FROM orders WHERE status_value = 'Confirmation Pending'")[0][0]
+        total_stores = q('SELECT COUNT(*) FROM stores')[0][0]
+        total_agencies = q('SELECT COUNT(*) FROM agencies WHERE status = "approved"')[0][0]
+        total_tickets = q('SELECT COUNT(*) FROM tickets')[0][0]
+        tickets_today = q('SELECT COUNT(*) FROM tickets WHERE DATE(createdAt) = CURDATE()')[0][0]
+
+        couriers_text = ', '.join([f'{r[0]}: {r[1]} orders' for r in top_courier]) if top_courier else 'none'
 
         conn.close()
-        print(f"[AI-CHAT-DB] Loaded {len(tables)} tables schema")
 
-        live_data = f"""LIVE PRODUCTION DATABASE - Complete Access:
-
-ALL TABLES AND COLUMNS:
-{chr(10).join(schema_info)}
-
-LIVE ROW COUNTS:
-{chr(10).join(counts)}
-
-You have read access to all these tables. When asked about specific data, reason from the schema and counts above. For specific queries the user asks about, explain what SQL would answer it and what the likely answer is based on the data patterns."""
+        live_data = f'''LIVE PRODUCTION DATA (updated this second):
+- Orders today: {orders_today}
+- Total orders ever: {total_orders}
+- Pending confirmation: {pending_orders}
+- Top couriers today: {couriers_text}
+- Active stores: {total_stores}
+- Approved agencies: {total_agencies}
+- Total tickets: {total_tickets}
+- Tickets today: {tickets_today}'''
 
     except Exception as e:
-        print(f"[AI-CHAT-DB] Failed: {e}")
-        live_data = ""
+        print(f'[AI-CHAT-DB] {e}')
+        live_data = ''
 
     system = f"""You are a senior Zambeel platform expert who knows everything about this system. Answer questions directly and confidently. Never say 'I don't have access' or 'I cannot determine' — you have the knowledge base and live DB data below. Give specific, direct answers. If the answer is in the data provided, state it as fact. Be concise and professional like a senior colleague answering a quick question.
 
