@@ -1280,11 +1280,9 @@ _TEST_CASE_JSON_SCHEMA = (
 
 def generate_test_cases(ticket_key, title, description, screenshots: list = None):
     import re
+    from groq import Groq
 
-    client = OpenAI(
-        base_url="https://models.inference.ai.azure.com",
-        api_key=os.getenv("GITHUB_TOKEN"),
-    )
+    groq_client = Groq(api_key=os.getenv("GROQ_API_KEY"))
 
     # Detect portal from screenshots, then ticket key prefix, then default to admin
     if screenshots and screenshots[0].get("portal"):
@@ -1298,22 +1296,20 @@ def generate_test_cases(ticket_key, title, description, screenshots: list = None
 
     knowledge_base = get_portal_knowledge(portal_hint)
 
-    # ── Vision path ────────────────────────────────────────────────────────────
     if not screenshots:
         raise RuntimeError("generate_test_cases: no screenshots provided — cannot generate test cases")
     valid_shots = [s for s in screenshots if s.get("base64")]
     if not valid_shots:
         errors = [s.get("error", "no base64") for s in screenshots]
         raise RuntimeError(f"generate_test_cases: all screenshots failed — {errors}")
-    print(f"[generate_test_cases] Vision path — {len(valid_shots)} screenshot(s), "
+    print(f"[generate_test_cases] {len(valid_shots)} screenshot(s), "
           f"portal={portal_hint}, kb={len(knowledge_base):,} chars")
 
     pages_summary = ", ".join(s.get("url_path", s.get("url", "")) for s in valid_shots)
-    vision_text = (
+    prompt = (
         f"{_MANDATORY_SELECTOR_INSTRUCTION}\n\n"
         f"{ZAMBEEL_OMS_ROUTES}\n\n"
-        "You are a senior QA engineer. I am showing you screenshot(s) of live web pages "
-        f"from the Zambeel platform.\n\n"
+        "You are a senior QA engineer generating Playwright test cases for the Zambeel platform.\n\n"
         f"Ticket: {ticket_key}\n"
         f"Title: {title}\n"
         f"Description: {description}\n\n"
@@ -1321,37 +1317,26 @@ def generate_test_cases(ticket_key, title, description, screenshots: list = None
         f"CRITICAL: Generate test cases ONLY for the feature described in the ticket. "
         f"Do NOT generate tests for login, navigation, or unrelated features. "
         f"Every test case must directly test: {title}\n\n"
-        "Look at the screenshot(s) carefully. Cross-reference what you SEE with the "
-        "KNOWLEDGE BASE below to confirm exact selector text:\n"
+        "Cross-reference the KNOWLEDGE BASE below to confirm exact selector text:\n"
         "1. Identify every relevant UI element — exact button labels, input placeholders, "
         "dropdown option text, heading text.\n"
         "2. Generate 5 Playwright test cases. For each selector, verify it exists in the "
         "KNOWLEDGE BASE. If it does not appear there, use text= with the exact visible text.\n"
-        "3. Never invent placeholder text or button labels not present in the screenshot "
-        "or the KNOWLEDGE BASE.\n\n"
+        "3. Never invent placeholder text or button labels not present in the KNOWLEDGE BASE.\n\n"
         f"KNOWLEDGE BASE ({portal_hint} portal):\n"
         f"{knowledge_base}\n\n"
         + _TEST_CASE_JSON_SCHEMA
     )
 
-    content: list = [{"type": "text", "text": vision_text}]
-    for shot in valid_shots:
-        content.append({
-            "type": "image_url",
-            "image_url": {"url": f"data:image/png;base64,{shot['base64']}"},
-        })
-    content.append({"type": "text", "text": 'Return ONLY valid JSON: {"test_cases": [...]}'})
+    print(f"[generate_test_cases] prompt (first 500 chars): {prompt[:500]}")
 
-    print(f"[VISION] prompt (first 500 chars): {vision_text[:500]}")
-    print(f"[VISION] sending {len(valid_shots)} image(s) to gpt-4o")
-
-    response = client.chat.completions.create(
-        model="gpt-4o",
-        messages=[{"role": "user", "content": content}],
-        max_tokens=4000,
+    response = groq_client.chat.completions.create(
+        model="llama-3.3-70b-versatile",
+        messages=[{"role": "user", "content": prompt}],
+        max_tokens=2000,
     )
     output = (response.choices[0].message.content or "").strip()
-    print(f"[VISION] raw response ({len(output)} chars): {output[:1000]}")
+    print(f"[generate_test_cases] raw response ({len(output)} chars): {output[:1000]}")
     return _parse_test_cases(output)
 
 
@@ -2278,6 +2263,27 @@ async def ai_chat(request: Request):
 
     kb = kb[:8000]  # hard cap to stay under Groq free tier token limit
 
+    try:
+        import mysql.connector
+        conn = mysql.connector.connect(
+            host=os.getenv("STAGING_DB_HOST"),
+            port=int(os.getenv("STAGING_DB_PORT", 3306)),
+            user=os.getenv("STAGING_DB_USER"),
+            password=os.getenv("STAGING_DB_PASSWORD"),
+            database=os.getenv("STAGING_DB_NAME"),
+        )
+        cursor = conn.cursor()
+        cursor.execute("SELECT COUNT(*) FROM orders")
+        total_orders = cursor.fetchone()[0]
+        cursor.execute("SELECT COUNT(*) FROM orders WHERE created_at >= DATE_SUB(NOW(), INTERVAL 24 HOUR)")
+        orders_today = cursor.fetchone()[0]
+        cursor.execute("SELECT COUNT(*) FROM stores")
+        total_stores = cursor.fetchone()[0]
+        conn.close()
+        live_data = f"LIVE DB DATA (right now): Total orders: {total_orders}, Orders today: {orders_today}, Total stores: {total_stores}"
+    except Exception:
+        live_data = ""
+
     system = f"""You are a senior Zambeel platform expert and SQA engineer.
 
 Zambeel repos:
@@ -2288,6 +2294,8 @@ Zambeel repos:
 Portals:
 - Admin/OMS staging: https://staging.myzambeel.com
 - Admin/OMS production: https://portal.myzambeel.com
+
+{live_data}
 
 KNOWLEDGE BASE:
 {kb}"""
