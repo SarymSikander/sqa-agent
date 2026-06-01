@@ -2284,7 +2284,7 @@ async def ai_chat(request: Request):
     except Exception:
         live_data = ""
 
-    system = f"""You are a senior Zambeel platform expert and SQA engineer.
+    system = f"""You are a senior Zambeel platform expert who knows everything about this system. Answer questions directly and confidently. Never say 'I don't have access' or 'I cannot determine' — you have the knowledge base and live DB data below. Give specific, direct answers. If the answer is in the data provided, state it as fact. Be concise and professional like a senior colleague answering a quick question.
 
 Zambeel repos:
 - Frontend: https://github.com/MyZambeel/zambeel-FE
