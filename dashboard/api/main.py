@@ -2277,10 +2277,7 @@ async def ai_chat(request: Request):
         cursor = conn.cursor()
         cursor.execute("SELECT COUNT(*) FROM orders")
         total_orders = cursor.fetchone()[0]
-        cursor.execute('SHOW COLUMNS FROM orders LIKE "%date%"')
-        date_cols = cursor.fetchall()
-        print(f"[AI-CHAT-DB] Date columns: {date_cols}")
-        cursor.execute("SELECT COUNT(*) FROM orders WHERE created_at >= DATE_SUB(NOW(), INTERVAL 24 HOUR)")
+        cursor.execute("SELECT COUNT(*) FROM orders WHERE DATE(createdAt) = CURDATE()")
         orders_today = cursor.fetchone()[0]
         cursor.execute("SELECT COUNT(*) FROM stores")
         total_stores = cursor.fetchone()[0]
