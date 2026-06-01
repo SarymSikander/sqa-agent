@@ -2246,6 +2246,44 @@ async def get_api_test_perf_metrics():
 
 # ── /ai/chat ──────────────────────────────────────────────────────────────────
 
+def _load_chat_knowledge(message: str) -> tuple[str, str]:
+    """Return (portal_label, knowledge_text) for /ai/chat based on message keywords."""
+    msg_lower = message.lower()
+    if "seller" in msg_lower:
+        portal_dir = "seller"
+    elif "agency" in msg_lower:
+        portal_dir = "agency"
+    else:
+        portal_dir = "oms"
+
+    ordered = [
+        f"{portal_dir}/overview.md",
+        f"{portal_dir}/pages.md",
+        f"{portal_dir}/selectors.md",
+        f"{portal_dir}/flows.md",
+        f"{portal_dir}/test_patterns.md",
+        "shared/auth.md",
+        "shared/test_rules.md",
+        "shared/api_endpoints.md",
+        "shared/jira_statuses.md",
+        "shared/business_rules.md",
+        "shared/database.md",
+        "shared/error_messages.md",
+        "shared/notifications.md",
+        "shared/state_machines.md",
+        "shared/validations.md",
+    ]
+    chunks = []
+    for rel in ordered:
+        fpath = KNOWLEDGE_DIR / rel
+        if fpath.exists():
+            try:
+                chunks.append(f"# {rel}\n{fpath.read_text()}")
+            except Exception:
+                pass
+    return portal_dir, "\n\n---\n\n".join(chunks)
+
+
 @app.post("/ai/chat")
 async def ai_chat(request: Request):
     body = await request.json()
@@ -2254,9 +2292,10 @@ async def ai_chat(request: Request):
         raise HTTPException(status_code=400, detail="message is required")
 
     def _answer():
-        import google.generativeai as genai
-        genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
-        model = genai.GenerativeModel("gemini-1.5-flash")
+        from groq import Groq
+
+        portal_label, knowledge = _load_chat_knowledge(message)
+        print(f"[ai/chat] portal={portal_label} knowledge={len(knowledge):,} chars")
 
         system = (
             "You are a senior Zambeel platform expert and SQA engineer.\n\n"
@@ -2267,11 +2306,18 @@ async def ai_chat(request: Request):
             "Portals:\n"
             "- Admin/OMS staging: https://staging.myzambeel.com\n"
             "- Admin/OMS production: https://portal.myzambeel.com\n\n"
-            f"FULL KNOWLEDGE BASE:\n{APP_CONTEXT}"
+            f"KNOWLEDGE BASE ({portal_label} portal + shared):\n{knowledge}"
         )
 
-        response = model.generate_content(f"{system}\n\nUser question: {message}")
-        return response.text
+        client = Groq(api_key=os.getenv("GROQ_API_KEY"))
+        response = client.chat.completions.create(
+            model="llama-3.1-70b-versatile",
+            messages=[
+                {"role": "system", "content": system},
+                {"role": "user", "content": message},
+            ],
+        )
+        return response.choices[0].message.content
 
     try:
         answer = await asyncio.to_thread(_answer)
