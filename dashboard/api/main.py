@@ -1338,35 +1338,45 @@ def generate_test_cases(ticket_key, title, description, screenshots: list = None
 
     print(f"[generate_test_cases] prompt (first 500 chars): {prompt[:500]}")
 
-    _groq_models = ["llama-3.3-70b-versatile", "llama-3.1-8b-instant", "gemma2-9b-it"]
-    output = ""
-    for _model in _groq_models:
-        try:
-            print(f"[generate_test_cases] trying model={_model}")
-            _resp = groq_client.chat.completions.create(
-                model=_model,
-                messages=[{"role": "user", "content": prompt}],
-                max_tokens=2000,
-            )
-            output = (_resp.choices[0].message.content or "").strip()
-            print(f"[generate_test_cases] model={_model} succeeded ({len(output)} chars): {output[:1000]}")
-            break
-        except Exception as _err:
-            err_str = str(_err)
-            is_rate_limit = (
-                "RateLimitError" in type(_err).__name__ or
-                "429" in err_str or
-                "rate_limit" in err_str.lower() or
-                "rate limit" in err_str.lower()
-            )
-            if is_rate_limit:
-                print(f"[generate_test_cases] model={_model} rate limited, trying next")
-                continue
-            raise
-    if not output:
-        return [{"name": "Error", "steps": [], "evidence_selector": "",
-                 "error": "Groq daily limit reached. Please try again in a few hours."}]
-    return _parse_test_cases(output)
+    try:
+        _groq_models = [
+            "llama-3.3-70b-versatile",
+            "llama-3.1-8b-instant",
+            "qwen/qwen-3-32b",
+            "openai/gpt-oss-20b",
+        ]
+        output = ""
+        for _model in _groq_models:
+            try:
+                print(f"[generate_test_cases] trying model={_model}")
+                _resp = groq_client.chat.completions.create(
+                    model=_model,
+                    messages=[{"role": "user", "content": prompt}],
+                    max_tokens=2000,
+                )
+                output = (_resp.choices[0].message.content or "").strip()
+                print(f"[generate_test_cases] model={_model} succeeded ({len(output)} chars): {output[:500]}")
+                break
+            except Exception as _err:
+                err_str = str(_err)
+                is_rate_limit = (
+                    "RateLimitError" in type(_err).__name__ or
+                    "429" in err_str or
+                    "rate_limit" in err_str.lower() or
+                    "rate limit" in err_str.lower()
+                )
+                if is_rate_limit:
+                    print(f"[generate_test_cases] model={_model} rate limited — trying next")
+                    continue
+                raise
+        if not output:
+            return [{"error": "Groq daily limit reached on all models. Please try again in a few hours.",
+                     "test_name": "Error", "steps": [], "evidence_selector": ""}]
+        return _parse_test_cases(output)
+    except Exception as _top_err:
+        print(f"[generate_test_cases] unexpected error: {_top_err}")
+        return [{"error": f"Test generation failed: {str(_top_err)[:200]}",
+                 "test_name": "Error", "steps": [], "evidence_selector": ""}]
 
 
 def _build_qa_report(*, issue_key, summary, env, frontend_branch, backend_branch,
