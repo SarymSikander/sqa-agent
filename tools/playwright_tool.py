@@ -313,7 +313,7 @@ def run_tests(portal, env):
 _STEP_KEYWORDS = [
     "NAVIGATE", "ASSERT_TEXT", "ASSERT_EXISTS", "ASSERT_NOT_EXISTS",
     "ASSERT_DISABLED", "ASSERT_URL", "CLICK_OPTION", "SELECT_OPTION",
-    "SCREENSHOT", "FILL", "CLICK", "WAIT",
+    "SCREENSHOT", "FILL", "CLICK", "WAIT", "SELECT_ROW",
 ]
 
 def _normalize_step(step: str) -> str:
@@ -445,9 +445,52 @@ def run_qa_test_cases(portal: str, env: str, test_cases: list) -> dict:
                     if not step_str:
                         continue
                     try:
-                        if step_str.startswith("CLICK:"):
+                        if step_str.startswith("SELECT_ROW:"):
+                            val = step_str[len("SELECT_ROW:"):].strip()
+                            n = 0
+                            if val.lstrip("-").isdigit():
+                                n = int(val)
+                            elif val.startswith("nth="):
+                                try:
+                                    n = int(val[4:])
+                                except ValueError:
+                                    n = 0
+                            try:
+                                page.locator("table tbody tr").nth(n).locator('input[type="checkbox"]').click(timeout=5000)
+                            except Exception:
+                                page.locator("tbody tr").nth(n).locator('[role="checkbox"]').click(timeout=5000)
+                            page.wait_for_timeout(500)
+                            _log(f"[SELECT_ROW] Clicked checkbox on row {n}", "pass")
+                            steps_executed += 1
+
+                        elif step_str.startswith("CLICK:"):
                             sel = step_str[6:].strip()
                             page.wait_for_selector(sel, timeout=8000)
+                            # Check if element is disabled before clicking
+                            el = page.query_selector(sel)
+                            is_disabled = False
+                            if el:
+                                try:
+                                    disabled_attr = el.get_attribute("disabled")
+                                    el_class = el.get_attribute("class") or ""
+                                    is_disabled = (
+                                        disabled_attr is not None or
+                                        any(c in el_class for c in ["disabled", "opacity-50", "cursor-not-allowed", "pointer-events-none"])
+                                    )
+                                except Exception:
+                                    pass
+                            if is_disabled:
+                                _log(f"[CLICK BLOCKED] {sel} is disabled — checkboxes must be selected first", "warn")
+                                # Auto-recovery: select first row and retry
+                                try:
+                                    page.locator("table tbody tr").nth(0).locator('input[type="checkbox"]').click(timeout=5000)
+                                except Exception:
+                                    try:
+                                        page.locator("tbody tr").nth(0).locator('[role="checkbox"]').click(timeout=5000)
+                                    except Exception:
+                                        pass
+                                page.wait_for_timeout(500)
+                                _log("[SELECT_ROW] Auto-recovery: clicked checkbox on row 0", "ok")
                             if sel.strip().startswith("select"):
                                 page.locator(sel).last.click(force=True)
                             else:

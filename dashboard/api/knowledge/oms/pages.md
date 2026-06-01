@@ -54,6 +54,18 @@ Shipped | Undelivered | Delivered | Return in Transit | Return | Cancelled
 
 **Buttons:** `Filter` | `Actions`
 
+> ⚠️ CRITICAL — Actions button pattern (applies to ALL tables with row checkboxes):
+> The Actions button/dropdown is DISABLED by default.
+> It only becomes ENABLED after at least one table row checkbox is selected.
+> ALWAYS follow this exact sequence for any test that uses Actions:
+> ```
+> SELECT_ROW: nth=0          ← click first row checkbox
+> WAIT: 500                  ← wait for Actions to enable
+> CLICK: button:has-text('Actions')   ← now clickable
+> CLICK_OPTION: Revert       ← click the option inside Actions dropdown
+> ```
+> Never skip SELECT_ROW and WAIT — Actions will be disabled and the test will fail.
+
 **Table columns (confirmed):**
 ORDER ID | TICKET | STORE INFO | ORDER DATE | CUSTOMER NAME | PHONE NUMBER | AMOUNT | TAG | TRUSTED | STATUS | SUB-STATUS | COURIER | BATCH ID | TRACKING ID
 

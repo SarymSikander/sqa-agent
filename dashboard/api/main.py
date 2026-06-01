@@ -267,6 +267,12 @@ ABSOLUTE RULES — VIOLATION MEANS THE TEST SUITE IS WORTHLESS:
 7. For ticketing search by ticket number, ALWAYS include CLICK_OPTION: Ticket Number as the VERY FIRST step before any FILL. Without this, the input targets the wrong field.
 8. Input placeholder for ticket number search is EXACTLY: 'Search by ticket number...' — three dots, nothing else. Any other spelling is wrong.
 9. ALWAYS REFER TO THE KNOWLEDGE BASE BEFORE GENERATING ANY SELECTOR OR EVIDENCE. If it is not in the knowledge base and not visible in the screenshot, do not use it.
+10. RULE — Actions button/dropdown: The Actions button is DISABLED by default. It only enables after a row checkbox is selected. When any test case involves an "Actions" button/dropdown, ALWAYS follow this exact sequence:
+    SELECT_ROW: nth=0          ← FIRST: click first row checkbox
+    WAIT: 500                  ← wait for Actions to enable
+    CLICK: button:has-text('Actions')   ← NOW clickable
+    CLICK_OPTION: <option>     ← click the option
+    NEVER click Actions without SELECT_ROW + WAIT first — it is disabled and the test will fail.
 
 MANDATORY: You MUST use ONLY selectors from the KNOWLEDGE BASE provided below.
 Do NOT invent selectors.
