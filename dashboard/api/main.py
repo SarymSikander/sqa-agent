@@ -2246,84 +2246,53 @@ async def get_api_test_perf_metrics():
 
 # ── /ai/chat ──────────────────────────────────────────────────────────────────
 
-def _load_chat_knowledge(message: str) -> tuple[str, str]:
-    """Return (portal_label, knowledge_text) for /ai/chat based on message keywords."""
-    msg_lower = message.lower()
-    if "seller" in msg_lower:
-        portal_dir = "seller"
-    elif "agency" in msg_lower:
-        portal_dir = "agency"
-    else:
-        portal_dir = "oms"
-
-    ordered = [
-        f"{portal_dir}/overview.md",
-        f"{portal_dir}/pages.md",
-        f"{portal_dir}/selectors.md",
-        f"{portal_dir}/flows.md",
-        f"{portal_dir}/test_patterns.md",
-        "shared/auth.md",
-        "shared/test_rules.md",
-        "shared/api_endpoints.md",
-        "shared/jira_statuses.md",
-        "shared/business_rules.md",
-        "shared/database.md",
-        "shared/error_messages.md",
-        "shared/notifications.md",
-        "shared/state_machines.md",
-        "shared/validations.md",
-    ]
-    chunks = []
-    for rel in ordered:
-        fpath = KNOWLEDGE_DIR / rel
-        if fpath.exists():
-            try:
-                chunks.append(f"# {rel}\n{fpath.read_text()}")
-            except Exception:
-                pass
-    return portal_dir, "\n\n---\n\n".join(chunks)
-
+from groq import Groq
 
 @app.post("/ai/chat")
 async def ai_chat(request: Request):
     body = await request.json()
-    message = body.get("message", "").strip()
-    if not message:
-        raise HTTPException(status_code=400, detail="message is required")
+    message = body.get("message", "")
 
-    def _answer():
-        from groq import Groq
+    groq_client = Groq(api_key=os.getenv("GROQ_API_KEY"))
 
-        portal_label, knowledge = _load_chat_knowledge(message)
-        print(f"[ai/chat] portal={portal_label} knowledge={len(knowledge):,} chars")
+    msg_lower = message.lower()
+    if "seller" in msg_lower:
+        dirs = ["seller", "shared"]
+    elif "agency" in msg_lower:
+        dirs = ["agency", "shared"]
+    else:
+        dirs = ["oms", "shared"]
 
-        system = (
-            "You are a senior Zambeel platform expert and SQA engineer.\n\n"
-            "Zambeel repos:\n"
-            "- Frontend: https://github.com/MyZambeel/zambeel-FE\n"
-            "- Backend: https://github.com/MyZambeel/zambeel-api\n"
-            "- SQA Agent: https://github.com/SarymSikander/sqa-agent\n\n"
-            "Portals:\n"
-            "- Admin/OMS staging: https://staging.myzambeel.com\n"
-            "- Admin/OMS production: https://portal.myzambeel.com\n\n"
-            f"KNOWLEDGE BASE ({portal_label} portal + shared):\n{knowledge}"
-        )
+    kb = ""
+    for d in dirs:
+        path = KNOWLEDGE_DIR / d
+        if path.exists():
+            for f in path.glob("*.md"):
+                kb += f.read_text()[:3000]
 
-        client = Groq(api_key=os.getenv("GROQ_API_KEY"))
-        response = client.chat.completions.create(
-            model="llama-3.1-70b-versatile",
-            messages=[
-                {"role": "system", "content": system},
-                {"role": "user", "content": message},
-            ],
-        )
-        return response.choices[0].message.content
+    system = f"""You are a senior Zambeel platform expert and SQA engineer.
 
-    try:
-        answer = await asyncio.to_thread(_answer)
-        return {"answer": answer}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+Zambeel repos:
+- Frontend: https://github.com/MyZambeel/zambeel-FE
+- Backend: https://github.com/MyZambeel/zambeel-api
+- SQA Agent: https://github.com/SarymSikander/sqa-agent
+
+Portals:
+- Admin/OMS staging: https://staging.myzambeel.com
+- Admin/OMS production: https://portal.myzambeel.com
+
+KNOWLEDGE BASE:
+{kb}"""
+
+    response = groq_client.chat.completions.create(
+        model="llama-3.1-70b-versatile",
+        messages=[
+            {"role": "system", "content": system},
+            {"role": "user", "content": message},
+        ],
+        max_tokens=2000,
+    )
+    return {"answer": response.choices[0].message.content}
 
 
 @app.post("/api-tests/create-jira-bugs")
