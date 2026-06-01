@@ -2265,6 +2265,7 @@ async def ai_chat(request: Request):
 
     try:
         import mysql.connector
+        print(f'[AI-CHAT-DB] Connecting to {os.getenv("PRODUCTION_DB_HOST")}:{os.getenv("PRODUCTION_DB_PORT")} db={os.getenv("PRODUCTION_DB_NAME")}')
         conn = mysql.connector.connect(
             host=os.getenv("PRODUCTION_DB_HOST"),
             port=int(os.getenv("PRODUCTION_DB_PORT", 3306)),
@@ -2272,6 +2273,7 @@ async def ai_chat(request: Request):
             password=os.getenv("PRODUCTION_DB_PASSWORD"),
             database=os.getenv("PRODUCTION_DB_NAME"),
         )
+        print("[AI-CHAT-DB] Connected successfully")
         cursor = conn.cursor()
         cursor.execute("SELECT COUNT(*) FROM orders")
         total_orders = cursor.fetchone()[0]
@@ -2280,8 +2282,10 @@ async def ai_chat(request: Request):
         cursor.execute("SELECT COUNT(*) FROM stores")
         total_stores = cursor.fetchone()[0]
         conn.close()
+        print(f"[AI-CHAT-DB] Live data: orders={total_orders}, today={orders_today}, stores={total_stores}")
         live_data = f"LIVE DB DATA (right now): Total orders: {total_orders}, Orders today: {orders_today}, Total stores: {total_stores}"
-    except Exception:
+    except Exception as e:
+        print(f"[AI-CHAT-DB] Connection failed: {e}")
         live_data = ""
 
     system = f"""You are a senior Zambeel platform expert who knows everything about this system. Answer questions directly and confidently. Never say 'I don't have access' or 'I cannot determine' — you have the knowledge base and live DB data below. Give specific, direct answers. If the answer is in the data provided, state it as fact. Be concise and professional like a senior colleague answering a quick question.
