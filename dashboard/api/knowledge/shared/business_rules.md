@@ -4,6 +4,26 @@ Business rules enforced in code, not just convention.
 
 ---
 
+## Supported Countries & Currencies
+_Source: production `countries` table + `agency_commission_model_rules.currency` — queried 2026-06-01_
+
+| ID | Country | Currency Code | Notes |
+|----|---------|---------------|-------|
+| 1 | UAE | AED | Active — commission models configured |
+| 2 | Qatar | QAR | Active — commission models configured |
+| 3 | Kuwait | KWD | Active — commission models configured |
+| 4 | Saudi Arabia | SAR | Active — commission models configured |
+| 5 | Pakistan | PKR | Active — commission models configured |
+| 6 | Oman | OMR | Active — commission models configured |
+| 7 | Bahrain | BHD | Active — commission models configured |
+| 8 | Iraq | IQD | In countries table — no commission model yet |
+| 9 | United States | USD | In countries table — no commission model yet |
+
+- Phone number digit lengths per country are validated on order approval via `countryData` constants
+- City validation uses `validCitiesByCountry` hardcoded list
+
+---
+
 ## Order Lifecycle Rules
 
 ### CSV Upload
