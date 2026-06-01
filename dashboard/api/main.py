@@ -267,12 +267,12 @@ ABSOLUTE RULES — VIOLATION MEANS THE TEST SUITE IS WORTHLESS:
 7. For ticketing search by ticket number, ALWAYS include CLICK_OPTION: Ticket Number as the VERY FIRST step before any FILL. Without this, the input targets the wrong field.
 8. Input placeholder for ticket number search is EXACTLY: 'Search by ticket number...' — three dots, nothing else. Any other spelling is wrong.
 9. ALWAYS REFER TO THE KNOWLEDGE BASE BEFORE GENERATING ANY SELECTOR OR EVIDENCE. If it is not in the knowledge base and not visible in the screenshot, do not use it.
-10. RULE — Actions button/dropdown: The Actions button is DISABLED by default. It only enables after a row checkbox is selected. When any test case involves an "Actions" button/dropdown, ALWAYS follow this exact sequence:
-    SELECT_ROW: nth=0          ← FIRST: click first row checkbox
-    WAIT: 500                  ← wait for Actions to enable
-    CLICK: button:has-text('Actions')   ← NOW clickable
-    CLICK_OPTION: <option>     ← click the option
-    NEVER click Actions without SELECT_ROW + WAIT first — it is disabled and the test will fail.
+10. RULE — Actions button is DISABLED by default on ALL table pages. It only enables after at least one row checkbox is selected. MANDATORY sequence whenever a test needs to use Actions:
+    Step N:   SELECT_ROW: nth=0
+    Step N+1: WAIT: 800
+    Step N+2: CLICK: button:has-text('Actions')
+    Step N+3: CLICK_OPTION: [action name e.g. Revert]
+    NEVER generate a CLICK on Actions without SELECT_ROW immediately before it.
 
 MANDATORY: You MUST use ONLY selectors from the KNOWLEDGE BASE provided below.
 Do NOT invent selectors.
@@ -1338,13 +1338,24 @@ def generate_test_cases(ticket_key, title, description, screenshots: list = None
 
     print(f"[generate_test_cases] prompt (first 500 chars): {prompt[:500]}")
 
-    response = groq_client.chat.completions.create(
-        model="llama-3.3-70b-versatile",
-        messages=[{"role": "user", "content": prompt}],
-        max_tokens=2000,
-    )
-    output = (response.choices[0].message.content or "").strip()
-    print(f"[generate_test_cases] raw response ({len(output)} chars): {output[:1000]}")
+    _groq_models = ["llama-3.3-70b-versatile", "llama3-8b-8192", "mixtral-8x7b-32768"]
+    output = ""
+    for _model in _groq_models:
+        try:
+            print(f"[generate_test_cases] trying model={_model}")
+            _resp = groq_client.chat.completions.create(
+                model=_model,
+                messages=[{"role": "user", "content": prompt}],
+                max_tokens=2000,
+            )
+            output = (_resp.choices[0].message.content or "").strip()
+            print(f"[generate_test_cases] model={_model} succeeded ({len(output)} chars): {output[:1000]}")
+            break
+        except Exception as _err:
+            if "429" in str(_err) or "rate" in str(_err).lower():
+                print(f"[generate_test_cases] model={_model} rate limited, trying next")
+                continue
+            raise
     return _parse_test_cases(output)
 
 

@@ -459,7 +459,7 @@ def run_qa_test_cases(portal: str, env: str, test_cases: list) -> dict:
                                 page.locator("table tbody tr").nth(n).locator('input[type="checkbox"]').click(timeout=5000)
                             except Exception:
                                 page.locator("tbody tr").nth(n).locator('[role="checkbox"]').click(timeout=5000)
-                            page.wait_for_timeout(500)
+                            page.wait_for_timeout(800)
                             _log(f"[SELECT_ROW] Clicked checkbox on row {n}", "pass")
                             steps_executed += 1
 
@@ -480,17 +480,11 @@ def run_qa_test_cases(portal: str, env: str, test_cases: list) -> dict:
                                 except Exception:
                                     pass
                             if is_disabled:
-                                _log(f"[CLICK BLOCKED] {sel} is disabled — checkboxes must be selected first", "warn")
-                                # Auto-recovery: select first row and retry
-                                try:
-                                    page.locator("table tbody tr").nth(0).locator('input[type="checkbox"]').click(timeout=5000)
-                                except Exception:
-                                    try:
-                                        page.locator("tbody tr").nth(0).locator('[role="checkbox"]').click(timeout=5000)
-                                    except Exception:
-                                        pass
-                                page.wait_for_timeout(500)
-                                _log("[SELECT_ROW] Auto-recovery: clicked checkbox on row 0", "ok")
+                                _log(f"[DISABLED BUTTON] {sel} is currently disabled — skipping", "fail")
+                                _log("Button is disabled — row checkbox must be selected first using SELECT_ROW step", "fail")
+                                tc_pass = False
+                                steps_executed += 1
+                                continue
                             if sel.strip().startswith("select"):
                                 page.locator(sel).last.click(force=True)
                             else:

@@ -66,6 +66,12 @@ Shipped | Undelivered | Delivered | Return in Transit | Return | Cancelled
 > ```
 > Never skip SELECT_ROW and WAIT — Actions will be disabled and the test will fail.
 
+> CRITICAL — Actions button pattern:
+> - Actions button is disabled by default
+> - Must select at least one row checkbox first (SELECT_ROW: nth=0)
+> - Only then does Actions become clickable
+> - Applies to ALL order table pages: Confirmation Pending, Dispatching in Process, etc.
+
 **Table columns (confirmed):**
 ORDER ID | TICKET | STORE INFO | ORDER DATE | CUSTOMER NAME | PHONE NUMBER | AMOUNT | TAG | TRUSTED | STATUS | SUB-STATUS | COURIER | BATCH ID | TRACKING ID
 
