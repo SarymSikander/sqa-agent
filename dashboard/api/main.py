@@ -2274,23 +2274,31 @@ async def ai_chat(request: Request):
         )
         cursor = conn.cursor()
 
-        def q(sql, params=None):
+        def q(sql):
             try:
-                cursor.execute(sql, params)
+                cursor.execute(sql)
+                result = cursor.fetchall()
+                return result[0][0] if result else 0
+            except Exception as e:
+                return 0
+
+        def rows(sql):
+            try:
+                cursor.execute(sql)
                 return cursor.fetchall()
-            except:
+            except Exception:
                 return []
 
-        orders_today = q('SELECT COUNT(*) FROM orders WHERE DATE(createdAt) = CURDATE()')[0][0]
-        total_orders = q('SELECT COUNT(*) FROM orders')[0][0]
-        top_courier = q('''SELECT cp.name, COUNT(*) as cnt FROM orders o
+        orders_today = q('SELECT COUNT(*) FROM orders WHERE DATE(createdAt) = CURDATE()')
+        total_orders = q('SELECT COUNT(*) FROM orders')
+        top_courier = rows('''SELECT cp.name, COUNT(*) as cnt FROM orders o
             JOIN courier_partners cp ON o.fk_courier_id = cp.id
             WHERE DATE(o.createdAt) = CURDATE() GROUP BY cp.name ORDER BY cnt DESC LIMIT 3''')
-        pending_orders = q("SELECT COUNT(*) FROM orders WHERE status_value = 'Confirmation Pending'")[0][0]
-        total_stores = q('SELECT COUNT(*) FROM stores')[0][0]
-        total_agencies = q('SELECT COUNT(*) FROM agencies WHERE status = "approved"')[0][0]
-        total_tickets = q('SELECT COUNT(*) FROM tickets')[0][0]
-        tickets_today = q('SELECT COUNT(*) FROM tickets WHERE DATE(createdAt) = CURDATE()')[0][0]
+        pending_orders = q("SELECT COUNT(*) FROM orders WHERE status_value = 'Confirmation Pending'")
+        total_stores = q('SELECT COUNT(*) FROM stores')
+        total_agencies = q('SELECT COUNT(*) FROM agencies WHERE status = "approved"')
+        total_tickets = q('SELECT COUNT(*) FROM tickets')
+        tickets_today = q('SELECT COUNT(*) FROM tickets WHERE DATE(createdAt) = CURDATE()')
 
         couriers_text = ', '.join([f'{r[0]}: {r[1]} orders' for r in top_courier]) if top_courier else 'none'
 
