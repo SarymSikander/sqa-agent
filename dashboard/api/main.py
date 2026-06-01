@@ -2246,10 +2246,10 @@ async def get_api_test_perf_metrics():
 
 # ── /ai/chat ──────────────────────────────────────────────────────────────────
 
-from groq import Groq
-
 @app.post("/ai/chat")
 async def ai_chat(request: Request):
+    from groq import Groq
+
     body = await request.json()
     message = body.get("message", "")
 

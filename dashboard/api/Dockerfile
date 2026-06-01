@@ -8,4 +8,3 @@ COPY . .
 RUN mkdir -p auth screenshots reports
 EXPOSE 7860
 CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "7860"]
-# cache bust Mon Jun  1 13:33:56 PKT 2026
