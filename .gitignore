@@ -5,3 +5,4 @@ screenshots/
 reports/
 logs/
 __pycache__/
+tools/exploration_output/
