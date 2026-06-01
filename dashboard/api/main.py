@@ -1338,7 +1338,7 @@ def generate_test_cases(ticket_key, title, description, screenshots: list = None
 
     print(f"[generate_test_cases] prompt (first 500 chars): {prompt[:500]}")
 
-    _groq_models = ["llama-3.3-70b-versatile", "llama3-8b-8192", "mixtral-8x7b-32768"]
+    _groq_models = ["llama-3.3-70b-versatile", "llama-3.1-8b-instant", "gemma2-9b-it"]
     output = ""
     for _model in _groq_models:
         try:
@@ -1352,10 +1352,20 @@ def generate_test_cases(ticket_key, title, description, screenshots: list = None
             print(f"[generate_test_cases] model={_model} succeeded ({len(output)} chars): {output[:1000]}")
             break
         except Exception as _err:
-            if "429" in str(_err) or "rate" in str(_err).lower():
+            err_str = str(_err)
+            is_rate_limit = (
+                "RateLimitError" in type(_err).__name__ or
+                "429" in err_str or
+                "rate_limit" in err_str.lower() or
+                "rate limit" in err_str.lower()
+            )
+            if is_rate_limit:
                 print(f"[generate_test_cases] model={_model} rate limited, trying next")
                 continue
             raise
+    if not output:
+        return [{"name": "Error", "steps": [], "evidence_selector": "",
+                 "error": "Groq daily limit reached. Please try again in a few hours."}]
     return _parse_test_cases(output)
 
 
