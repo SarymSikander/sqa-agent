@@ -28,6 +28,8 @@ from pydantic import BaseModel
 
 app = FastAPI(title="Zambeel SQA Dashboard API", version="1.0.0")
 
+_db_cache = {'data': '', 'ts': 0}
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*", "https://sqa-agent.vercel.app"],
@@ -2231,6 +2233,64 @@ async def get_api_test_perf_metrics():
 
 # ── /ai/chat ──────────────────────────────────────────────────────────────────
 
+def get_live_db_data():
+    if time.time() - _db_cache['ts'] < 300:
+        return _db_cache['data']
+    try:
+        import mysql.connector
+        conn = mysql.connector.connect(
+            host=os.getenv('PRODUCTION_DB_HOST'),
+            port=int(os.getenv('PRODUCTION_DB_PORT', 3306)),
+            user=os.getenv('PRODUCTION_DB_USER'),
+            password=os.getenv('PRODUCTION_DB_PASSWORD'),
+            database=os.getenv('PRODUCTION_DB_NAME')
+        )
+        cursor = conn.cursor()
+
+        def q(sql):
+            try:
+                cursor.execute(sql)
+                result = cursor.fetchall()
+                return result[0][0] if result else 0
+            except Exception:
+                return 0
+
+        orders_today = q('SELECT COUNT(*) FROM orders WHERE DATE(createdAt) = CURDATE()')
+        total_orders = q('SELECT COUNT(*) FROM orders')
+        pending_orders = q("SELECT COUNT(*) FROM orders WHERE status_value = 'Confirmation Pending'")
+        total_stores = q('SELECT COUNT(*) FROM stores')
+        total_agencies = q('SELECT COUNT(*) FROM agencies WHERE status = "approved"')
+        total_tickets = q('SELECT COUNT(*) FROM tickets')
+        tickets_today = q('SELECT COUNT(*) FROM tickets WHERE DATE(createdAt) = CURDATE()')
+
+        cursor.execute('''SELECT cp.name, COUNT(*) as cnt
+            FROM dispatch_batches db
+            JOIN courier_partners cp ON db.fk_courier_id = cp.id
+            WHERE DATE(db.createdAt) = CURDATE()
+            GROUP BY cp.name ORDER BY cnt DESC LIMIT 3''')
+        top_couriers = cursor.fetchall()
+        couriers_text = ', '.join([f'{r[0]}: {r[1]} batches' for r in top_couriers]) if top_couriers else 'none'
+
+        conn.close()
+
+        live_data = f'''LIVE PRODUCTION DATA (cached 5 min):
+- Orders today: {orders_today}
+- Total orders ever: {total_orders}
+- Pending confirmation: {pending_orders}
+- Top couriers today: {couriers_text}
+- Active stores: {total_stores}
+- Approved agencies: {total_agencies}
+- Total tickets: {total_tickets}
+- Tickets today: {tickets_today}'''
+
+        _db_cache['data'] = live_data
+        _db_cache['ts'] = time.time()
+        return live_data
+    except Exception as e:
+        print(f'[AI-CHAT-DB] {e}')
+        return _db_cache['data']
+
+
 @app.post("/ai/chat")
 async def ai_chat(request: Request):
     from groq import Groq
@@ -2263,60 +2323,7 @@ async def ai_chat(request: Request):
 
     kb = kb[:8000]  # hard cap to stay under Groq free tier token limit
 
-    try:
-        import mysql.connector
-        conn = mysql.connector.connect(
-            host=os.getenv('PRODUCTION_DB_HOST'),
-            port=int(os.getenv('PRODUCTION_DB_PORT', 3306)),
-            user=os.getenv('PRODUCTION_DB_USER'),
-            password=os.getenv('PRODUCTION_DB_PASSWORD'),
-            database=os.getenv('PRODUCTION_DB_NAME')
-        )
-        cursor = conn.cursor()
-
-        def q(sql):
-            try:
-                cursor.execute(sql)
-                result = cursor.fetchall()
-                return result[0][0] if result else 0
-            except Exception as e:
-                return 0
-
-        def rows(sql):
-            try:
-                cursor.execute(sql)
-                return cursor.fetchall()
-            except Exception:
-                return []
-
-        orders_today = q('SELECT COUNT(*) FROM orders WHERE DATE(createdAt) = CURDATE()')
-        total_orders = q('SELECT COUNT(*) FROM orders')
-        top_courier = rows('''SELECT cp.name, COUNT(*) as cnt FROM orders o
-            JOIN courier_partners cp ON o.fk_courier_id = cp.id
-            WHERE DATE(o.createdAt) = CURDATE() GROUP BY cp.name ORDER BY cnt DESC LIMIT 3''')
-        pending_orders = q("SELECT COUNT(*) FROM orders WHERE status_value = 'Confirmation Pending'")
-        total_stores = q('SELECT COUNT(*) FROM stores')
-        total_agencies = q('SELECT COUNT(*) FROM agencies WHERE status = "approved"')
-        total_tickets = q('SELECT COUNT(*) FROM tickets')
-        tickets_today = q('SELECT COUNT(*) FROM tickets WHERE DATE(createdAt) = CURDATE()')
-
-        couriers_text = ', '.join([f'{r[0]}: {r[1]} orders' for r in top_courier]) if top_courier else 'none'
-
-        conn.close()
-
-        live_data = f'''LIVE PRODUCTION DATA (updated this second):
-- Orders today: {orders_today}
-- Total orders ever: {total_orders}
-- Pending confirmation: {pending_orders}
-- Top couriers today: {couriers_text}
-- Active stores: {total_stores}
-- Approved agencies: {total_agencies}
-- Total tickets: {total_tickets}
-- Tickets today: {tickets_today}'''
-
-    except Exception as e:
-        print(f'[AI-CHAT-DB] {e}')
-        live_data = ''
+    live_data = get_live_db_data()
 
     system = f"""You are a senior Zambeel platform expert who knows everything about this system. Answer questions directly and confidently. Never say 'I don't have access' or 'I cannot determine' — you have the knowledge base and live DB data below. Give specific, direct answers. If the answer is in the data provided, state it as fact. Be concise and professional like a senior colleague answering a quick question.
 
