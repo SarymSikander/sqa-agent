@@ -2268,7 +2268,8 @@ async def ai_chat(request: Request):
         path = KNOWLEDGE_DIR / d
         if path.exists():
             for f in path.glob("*.md"):
-                kb += f.read_text()[:3000]
+                kb += f.read_text()[:1500]
+    kb = kb[:8000]  # hard cap to stay under Groq free tier token limit
 
     system = f"""You are a senior Zambeel platform expert and SQA engineer.
 
