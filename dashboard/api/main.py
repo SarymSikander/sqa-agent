@@ -2273,19 +2273,42 @@ async def ai_chat(request: Request):
             password=os.getenv("PRODUCTION_DB_PASSWORD"),
             database=os.getenv("PRODUCTION_DB_NAME"),
         )
-        print("[AI-CHAT-DB] Connected successfully")
         cursor = conn.cursor()
-        cursor.execute("SELECT COUNT(*) FROM orders")
-        total_orders = cursor.fetchone()[0]
-        cursor.execute("SELECT COUNT(*) FROM orders WHERE DATE(createdAt) = CURDATE()")
-        orders_today = cursor.fetchone()[0]
-        cursor.execute("SELECT COUNT(*) FROM stores")
-        total_stores = cursor.fetchone()[0]
+
+        cursor.execute("SHOW TABLES")
+        tables = [r[0] for r in cursor.fetchall()]
+
+        schema_info = []
+        for table in tables:
+            cursor.execute(f"DESCRIBE {table}")
+            cols = cursor.fetchall()
+            col_names = [c[0] for c in cols]
+            schema_info.append(f"{table}: {', '.join(col_names)}")
+
+        counts = []
+        for table in tables:
+            try:
+                cursor.execute(f"SELECT COUNT(*) FROM {table}")
+                count = cursor.fetchone()[0]
+                counts.append(f"{table}: {count} rows")
+            except Exception:
+                pass
+
         conn.close()
-        print(f"[AI-CHAT-DB] Live data: orders={total_orders}, today={orders_today}, stores={total_stores}")
-        live_data = f"LIVE DB DATA (right now): Total orders: {total_orders}, Orders today: {orders_today}, Total stores: {total_stores}"
+        print(f"[AI-CHAT-DB] Loaded {len(tables)} tables schema")
+
+        live_data = f"""LIVE PRODUCTION DATABASE - Complete Access:
+
+ALL TABLES AND COLUMNS:
+{chr(10).join(schema_info)}
+
+LIVE ROW COUNTS:
+{chr(10).join(counts)}
+
+You have read access to all these tables. When asked about specific data, reason from the schema and counts above. For specific queries the user asks about, explain what SQL would answer it and what the likely answer is based on the data patterns."""
+
     except Exception as e:
-        print(f"[AI-CHAT-DB] Connection failed: {e}")
+        print(f"[AI-CHAT-DB] Failed: {e}")
         live_data = ""
 
     system = f"""You are a senior Zambeel platform expert who knows everything about this system. Answer questions directly and confidently. Never say 'I don't have access' or 'I cannot determine' — you have the knowledge base and live DB data below. Give specific, direct answers. If the answer is in the data provided, state it as fact. Be concise and professional like a senior colleague answering a quick question.
