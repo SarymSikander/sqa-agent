@@ -2266,11 +2266,11 @@ async def ai_chat(request: Request):
     try:
         import mysql.connector
         conn = mysql.connector.connect(
-            host=os.getenv("STAGING_DB_HOST"),
-            port=int(os.getenv("STAGING_DB_PORT", 3306)),
-            user=os.getenv("STAGING_DB_USER"),
-            password=os.getenv("STAGING_DB_PASSWORD"),
-            database=os.getenv("STAGING_DB_NAME"),
+            host=os.getenv("PRODUCTION_DB_HOST"),
+            port=int(os.getenv("PRODUCTION_DB_PORT", 3306)),
+            user=os.getenv("PRODUCTION_DB_USER"),
+            password=os.getenv("PRODUCTION_DB_PASSWORD"),
+            database=os.getenv("PRODUCTION_DB_NAME"),
         )
         cursor = conn.cursor()
         cursor.execute("SELECT COUNT(*) FROM orders")
