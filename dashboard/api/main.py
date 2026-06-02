@@ -1217,14 +1217,16 @@ def _parse_test_cases(output: str) -> list:
         print('[_parse_test_cases] Empty output from AI')
         return []
     clean = output.strip()
-    if clean.startswith('```'):
-        clean = '\n'.join(clean.split('\n')[1:])
-    if clean.endswith('```'):
-        clean = '\n'.join(clean.split('\n')[:-1])
+    start = clean.find('{')
+    end = clean.rfind('}')
+    if start == -1 or end == -1:
+        print(f'[_parse_test_cases] No JSON found in: {clean[:200]}')
+        return []
+    clean = clean[start:end + 1]
     try:
         parsed = json.loads(clean)
     except json.JSONDecodeError as e:
-        print(f'[_parse_test_cases] JSON error: {e}, output: {clean[:200]}')
+        print(f'[_parse_test_cases] JSON error: {e}')
         return []
     if isinstance(parsed, list):
         raw_cases = parsed
