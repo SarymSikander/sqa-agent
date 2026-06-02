@@ -2105,6 +2105,26 @@
   </div>
 </div>
 
+<!-- ── QA Clarification Modal ────────────────────────────────────────────────── -->
+<div id="qa-clarify-modal" class="modal-overlay">
+  <div class="modal-box" style="max-width:480px">
+    <div class="modal-header">
+      <div class="modal-title">🤖 QA Clarification Needed</div>
+    </div>
+    <div class="modal-body" style="padding:16px 0 8px">
+      <p id="qa-clarify-question" style="font-size:13px;color:var(--text);margin-bottom:16px;line-height:1.6;white-space:pre-wrap"></p>
+      <label>Your answer</label>
+      <textarea id="qa-clarify-answer" placeholder="Type your answer here, or click Skip to proceed without it…" style="min-height:80px;margin-bottom:4px"></textarea>
+    </div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;padding-top:12px">
+      <button class="btn btn-secondary" onclick="submitClarification(true)">Skip</button>
+      <button class="btn btn-primary" onclick="submitClarification(false)">
+        <span class="label">Submit</span>
+      </button>
+    </div>
+  </div>
+</div>
+
 <!-- ── Jira Detail Panel ─────────────────────────────────────────────────────── -->
 <div id="jira-panel-overlay" class="panel-overlay" onclick="closeJiraPanel()"></div>
 <div id="jira-panel" class="slide-panel">
@@ -3447,9 +3467,45 @@ async function _runQAStream(key, env, fe, be, portal, apiBase) {
 
 
 const _qaPortalProgress = {};
+let _clarifyRunId = null;
+
+function openClarifyModal(runId, question) {
+  _clarifyRunId = runId;
+  document.getElementById('qa-clarify-question').textContent = question;
+  document.getElementById('qa-clarify-answer').value = '';
+  document.getElementById('qa-clarify-modal').classList.add('open');
+  setTimeout(() => document.getElementById('qa-clarify-answer').focus(), 80);
+}
+
+function closeClarifyModal() {
+  document.getElementById('qa-clarify-modal').classList.remove('open');
+}
+
+async function submitClarification(skip) {
+  const answer = skip ? '' : (document.getElementById('qa-clarify-answer').value.trim());
+  closeClarifyModal();
+  if (!_clarifyRunId) return;
+  const runId = _clarifyRunId;
+  _clarifyRunId = null;
+  const token = sessionStorage.getItem('sqa_token') || '';
+  try {
+    await fetch(API_BASE + '/qa/clarify', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+      body: JSON.stringify({ run_id: runId, answer }),
+    });
+  } catch(e) {
+    console.error('[clarify] submit failed:', e);
+  }
+}
 
 function _handleQAEvent(ev) {
   const { stage, status, message, portal, result, count, all_pass, new_status } = ev;
+
+  if (ev.type === 'clarification_needed') {
+    openClarifyModal(ev.run_id, ev.question);
+    return;
+  }
 
   if (stage === 'running_tests' && status === 'progress') {
     if (!_qaPortalProgress[portal]) {

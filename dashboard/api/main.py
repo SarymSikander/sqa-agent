@@ -30,6 +30,9 @@ app = FastAPI(title="Zambeel SQA Dashboard API", version="1.0.0")
 
 _db_cache = {'data': '', 'ts': 0}
 
+# Pending clarification queues keyed by run_id — set/awaited inside run_qa SSE generator
+_clarification_store: dict[str, asyncio.Queue] = {}
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*", "https://sqa-agent.vercel.app"],
@@ -387,6 +390,21 @@ class RunQABody(BaseModel):
     frontend_branch: str
     backend_branch: str
     portal: Optional[str] = None
+
+class ClarifyBody(BaseModel):
+    run_id: str
+    answer: str
+
+# ── /qa/clarify ───────────────────────────────────────────────────────────────
+
+@app.post("/qa/clarify")
+async def qa_clarify(body: ClarifyBody):
+    """Receive user's answer to a clarification question raised during a QA run."""
+    q = _clarification_store.get(body.run_id)
+    if q is None:
+        raise HTTPException(status_code=404, detail="No pending clarification for this run_id")
+    await q.put(body.answer)
+    return {"ok": True}
 
 # ── /debug/files ──────────────────────────────────────────────────────────────
 
@@ -1314,6 +1332,19 @@ def generate_test_cases(ticket_key, title, description, screenshots: list = None
           f"portal={portal_hint}, kb={len(knowledge_base):,} chars")
 
     pages_summary = ", ".join(s.get("url_path", s.get("url", "")) for s in valid_shots)
+
+    complexity_instruction = (
+        f"Analyze this ticket and decide how many test cases are needed:\n"
+        f"- Simple UI change (button rename, color, text): 1-2 test cases\n"
+        f"- Single feature (add search filter, add pagination): 2-3 test cases\n"
+        f"- Medium feature (new modal, new form): 3-4 test cases\n"
+        f"- Complex feature (multi-step flow, state machine): 4-6 test cases\n"
+        f"- Bug fix verification: 1-2 test cases\n\n"
+        f"Ticket: {title}\n"
+        f"Description: {description}\n\n"
+        f"Generate ONLY the number of test cases actually needed. Do not pad with irrelevant tests."
+    )
+
     prompt = (
         f"{_MANDATORY_SELECTOR_INSTRUCTION}\n\n"
         f"{ZAMBEEL_OMS_ROUTES}\n\n"
@@ -1328,8 +1359,9 @@ def generate_test_cases(ticket_key, title, description, screenshots: list = None
         "Cross-reference the KNOWLEDGE BASE below to confirm exact selector text:\n"
         "1. Identify every relevant UI element — exact button labels, input placeholders, "
         "dropdown option text, heading text.\n"
-        "2. Generate 5 Playwright test cases. For each selector, verify it exists in the "
-        "KNOWLEDGE BASE. If it does not appear there, use text= with the exact visible text.\n"
+        f"2. {complexity_instruction}\n"
+        "For each selector, verify it exists in the KNOWLEDGE BASE. If it does not appear "
+        "there, use text= with the exact visible text.\n"
         "3. Never invent placeholder text or button labels not present in the KNOWLEDGE BASE.\n\n"
         f"KNOWLEDGE BASE ({portal_hint} portal):\n"
         f"{knowledge_base}\n\n"
@@ -1377,6 +1409,97 @@ def generate_test_cases(ticket_key, title, description, screenshots: list = None
         print(f"[generate_test_cases] unexpected error: {_top_err}")
         return [{"error": f"Test generation failed: {str(_top_err)[:200]}",
                  "test_name": "Error", "steps": [], "evidence_selector": ""}]
+
+
+def _check_uncertain_steps(test_cases: list) -> list:
+    """Return uncertain steps that need user clarification before execution.
+
+    Detects: '?' in step text (AI uncertainty marker), or generic
+    input[type='text'] selectors without a placeholder attribute.
+    Returns a list of dicts: {tc_index, step_index, step, question}.
+    """
+    uncertain = []
+    for tc_i, tc in enumerate(test_cases):
+        for s_i, step in enumerate(tc.get("steps", [])):
+            question = ""
+            if "?" in step:
+                question = (
+                    f"Step has an uncertainty marker: `{step[:120]}`. "
+                    f"Can you clarify which element to interact with in the '{tc.get('test_name', '')}' test?"
+                )
+            elif re.search(r"input\[type=['\"]text['\"]\](?!\s*\[placeholder)", step):
+                question = (
+                    f"I need to fill a text input but the selector `input[type='text']` is too "
+                    f"generic (no placeholder). What is the exact placeholder text for this input "
+                    f"in the '{tc.get('test_name', '')}' test? (step: `{step[:80]}`)"
+                )
+            if question:
+                uncertain.append({"tc_index": tc_i, "step_index": s_i, "step": step, "question": question})
+    return uncertain
+
+
+def learn_from_run(test_cases: list, test_results: list):
+    """Append newly-discovered working selectors to the relevant knowledge/selectors.md files
+    and commit the changes to git."""
+    import subprocess
+
+    today = datetime.now().strftime("%Y-%m-%d")
+    changed_files = []
+
+    for result in test_results:
+        portal = result.get("portal", "admin")
+        portal_dir = {"admin": "oms", "seller": "seller", "agency": "agency"}.get(portal, "oms")
+        selectors_file = KNOWLEDGE_DIR / portal_dir / "selectors.md"
+        if not selectors_file.exists():
+            continue
+
+        existing = selectors_file.read_text()
+        new_lines = []
+
+        for entry in result.get("execution_log", []):
+            step = entry.get("step", "")
+            if entry.get("result", "").lower() != "pass":
+                continue
+            if not any(step.startswith(p) for p in ("CLICK:", "FILL:", "ASSERT_EXISTS:")):
+                continue
+
+            colon_idx = step.index(":")
+            selector = step[colon_idx + 1:].strip()
+            if "|" in selector:
+                selector = selector.split("|")[0].strip()
+            if not selector or len(selector) < 6:
+                continue
+
+            action = step[:colon_idx]
+            if selector not in existing:
+                new_lines.append(f"- `{selector}` — {action} (verified passing {today})")
+
+        if not new_lines:
+            continue
+
+        if "## Learned from QA runs" not in existing:
+            existing += "\n\n## Learned from QA runs\n"
+        existing += f"\n### {today}\n" + "\n".join(new_lines) + "\n"
+        selectors_file.write_text(existing)
+        changed_files.append(selectors_file)
+        print(f"[learn_from_run] {len(new_lines)} new selector(s) → {selectors_file.name}")
+
+    if not changed_files:
+        print("[learn_from_run] nothing new to commit")
+        return
+
+    cwd = str(KNOWLEDGE_DIR.parent)
+    try:
+        for f in changed_files:
+            subprocess.run(["git", "add", str(f)], check=True, capture_output=True, cwd=cwd)
+        subprocess.run(
+            ["git", "commit", "-m", f"chore(knowledge): auto-learn selectors from QA run {today}"],
+            check=True, capture_output=True, cwd=cwd,
+        )
+        print("[learn_from_run] committed to git")
+    except subprocess.CalledProcessError as e:
+        stderr = e.stderr.decode() if e.stderr else str(e)
+        print(f"[learn_from_run] git error: {stderr}")
 
 
 def _build_qa_report(*, issue_key, summary, env, frontend_branch, backend_branch,
@@ -1600,6 +1723,31 @@ async def run_qa_endpoint(issue_key: str, body: RunQABody):
                 pass
         yield evt({"stage": "generating_test_cases", "status": "done", "count": len(test_cases)})
 
+        # ── Stage: interactive clarification for uncertain selectors ───────────
+        if test_cases:
+            _run_id = f"{issue_key}_{int(time.time())}"
+            _uncertain = _check_uncertain_steps(test_cases)
+            for _u in _uncertain:
+                _q: asyncio.Queue = asyncio.Queue()
+                _clarification_store[_run_id] = _q
+                yield evt({
+                    "type": "clarification_needed",
+                    "run_id": _run_id,
+                    "question": _u["question"],
+                })
+                try:
+                    _answer = await asyncio.wait_for(_q.get(), timeout=300)
+                    if _answer:
+                        # Patch the uncertain step in-place with user's guidance as a comment
+                        _tc = test_cases[_u["tc_index"]]
+                        _old_step = _tc["steps"][_u["step_index"]]
+                        _tc["steps"][_u["step_index"]] = f"{_old_step}  # user: {_answer}"
+                        print(f"[clarify] step updated: {_tc['steps'][_u['step_index']][:120]}")
+                except asyncio.TimeoutError:
+                    print(f"[clarify] timeout waiting for answer to: {_u['question'][:80]}")
+                finally:
+                    _clarification_store.pop(_run_id, None)
+
         # ── Stage: run Playwright tests ────────────────────────────────────────
         yield evt({"stage": "running_tests", "status": "running"})
 
@@ -1694,6 +1842,12 @@ async def run_qa_endpoint(issue_key: str, body: RunQABody):
                        "portal": portal, "result": test_results[-1]["status"]})
         all_pass = bool(test_results) and all(r["status"] == "PASS" for r in test_results)
         yield evt({"stage": "running_tests", "status": "done", "all_pass": all_pass})
+
+        # ── Auto-learn: record working selectors to knowledge files ───────────
+        try:
+            await asyncio.to_thread(learn_from_run, test_cases, test_results)
+        except Exception as _le:
+            print(f"[learn_from_run] error (non-fatal): {_le}")
 
         # ── Stage: update Jira ────────────────────────────────────────────────
         yield evt({"stage": "updating_jira", "status": "running"})
