@@ -1,6 +1,7 @@
 import asyncio
 import json
 import os
+import queue as _stdlib_queue
 import re
 import secrets
 import shutil
@@ -1785,9 +1786,38 @@ async def run_qa_endpoint(issue_key: str, body: RunQABody):
             try:
                 if test_cases:
                     portal_tcs = [tc for tc in test_cases if tc.get("portal", "seller").lower() == portal]
-                    r = await asyncio.to_thread(
-                        _playwright.run_qa_test_cases, portal, run_env, portal_tcs
+                    _cq_req  = _stdlib_queue.Queue()
+                    _cq_resp = _stdlib_queue.Queue()
+                    _loop    = asyncio.get_running_loop()
+                    _future  = _loop.run_in_executor(
+                        None,
+                        lambda: _playwright.run_qa_test_cases(
+                            portal, run_env, portal_tcs, _cq_req, _cq_resp
+                        ),
                     )
+                    # Poll for mid-run clarification requests while the thread executes
+                    while not _future.done():
+                        try:
+                            _cq_item = _cq_req.get_nowait()
+                            _cq_run_id = f"{issue_key}_step_{int(time.time())}"
+                            _cq_q: asyncio.Queue = asyncio.Queue()
+                            _clarification_store[_cq_run_id] = _cq_q
+                            yield evt({
+                                "type":    "clarification_needed",
+                                "run_id":  _cq_run_id,
+                                "question": _cq_item["question"],
+                                "step":    _cq_item["step"],
+                            })
+                            try:
+                                _cq_answer = await asyncio.wait_for(_cq_q.get(), timeout=300)
+                            except asyncio.TimeoutError:
+                                _cq_answer = ""
+                            finally:
+                                _clarification_store.pop(_cq_run_id, None)
+                            _cq_resp.put(_cq_answer)
+                        except _stdlib_queue.Empty:
+                            await asyncio.sleep(0.1)
+                    r = _future.result()
                     status = r.get("status", "FAIL")
                     print(f"[run_tests] run_qa_test_cases: portal={portal} status={status} "
                           f"steps={r.get('steps_executed',0)} evidence={len(r.get('feature_evidence',[]))}")

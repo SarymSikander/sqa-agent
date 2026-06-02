@@ -990,3 +990,20 @@ span:has-text('Submitted')
 | Cancel popup back btn | 'Cancel' | **'Back'** |
 | Ticketing heading | `h1:has-text(...)` | **`h2:has-text('Ticketing Management')`** |
 | Stores title | 'Stores Settings' | **'Integrated Stores'** |
+
+---
+
+## Orders page — Actions dropdown
+
+- Actions button: `button:has-text('Actions')` — disabled by default, only enabled after at least one table row is selected
+- To enable: use **SELECT_ROW** step first (clicks a row checkbox); wait 1000ms for UI to re-render
+- After enabling: `CLICK: button:has-text('Actions')` opens the dropdown menu
+- Dropdown items render as `[role="menuitem"]` elements, **NOT** native `<select>` options
+- **Use `CLICK_DROPDOWN_ITEM: Revert`** — do **NOT** use `CLICK_OPTION: Revert` (that targets `<select>` elements)
+- Revert modal contains: "Count of orders being reverted", "SKU wise total quantity"
+- Tag dropdown inside Revert modal: native `<select>` with confirmation-pending tags — use `CLICK_OPTION:` for that
+- Correct step sequence for a Revert action:
+  1. `SELECT_ROW: nth=0`
+  2. `WAIT: 1000`
+  3. `CLICK: button:has-text('Actions')`
+  4. `CLICK_DROPDOWN_ITEM: Revert`

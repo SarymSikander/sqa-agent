@@ -312,8 +312,8 @@ def run_tests(portal, env):
 
 _STEP_KEYWORDS = [
     "NAVIGATE", "ASSERT_TEXT", "ASSERT_EXISTS", "ASSERT_NOT_EXISTS",
-    "ASSERT_DISABLED", "ASSERT_URL", "CLICK_OPTION", "SELECT_OPTION",
-    "SCREENSHOT", "FILL", "CLICK", "WAIT", "SELECT_ROW",
+    "ASSERT_DISABLED", "ASSERT_URL", "CLICK_DROPDOWN_ITEM", "CLICK_OPTION",
+    "SELECT_OPTION", "SCREENSHOT", "FILL", "CLICK", "WAIT", "SELECT_ROW",
 ]
 
 def _normalize_step(step: str) -> str:
@@ -325,7 +325,8 @@ def _normalize_step(step: str) -> str:
     return step
 
 
-def run_qa_test_cases(portal: str, env: str, test_cases: list) -> dict:
+def run_qa_test_cases(portal: str, env: str, test_cases: list,
+                      clarify_req_queue=None, clarify_resp_queue=None) -> dict:
     """
     Execute AI-generated structured test cases for a single portal/env.
 
@@ -444,149 +445,194 @@ def run_qa_test_cases(portal: str, env: str, test_cases: list) -> dict:
                     step_str = _normalize_step(step_str.strip())
                     if not step_str:
                         continue
-                    try:
-                        if step_str.startswith("SELECT_ROW:"):
-                            val = step_str[len("SELECT_ROW:"):].strip()
-                            n = 0
-                            if val.lstrip("-").isdigit():
-                                n = int(val)
-                            elif val.startswith("nth="):
+                    for _attempt in range(2):
+                        try:
+                            if step_str.startswith("SELECT_ROW:"):
+                                val = step_str[len("SELECT_ROW:"):].strip()
+                                n = 0
+                                if val.lstrip("-").isdigit():
+                                    n = int(val)
+                                elif val.startswith("nth="):
+                                    try:
+                                        n = int(val[4:])
+                                    except ValueError:
+                                        n = 0
                                 try:
-                                    n = int(val[4:])
-                                except ValueError:
-                                    n = 0
-                            try:
-                                page.locator("table tbody tr").nth(n).locator('input[type="checkbox"]').click(timeout=5000)
-                            except Exception:
-                                page.locator("tbody tr").nth(n).locator('[role="checkbox"]').click(timeout=5000)
-                            page.wait_for_timeout(800)
-                            _log(f"[SELECT_ROW] Clicked checkbox on row {n}", "pass")
-                            steps_executed += 1
+                                    page.locator("table tbody tr").nth(n).locator('input[type="checkbox"]').click(timeout=5000)
+                                except Exception:
+                                    page.locator("tbody tr").nth(n).locator('[role="checkbox"]').click(timeout=5000)
+                                # Wait for UI to update and Actions button to become enabled
+                                page.wait_for_timeout(1000)
+                                _log(f"[SELECT_ROW] Clicked checkbox on row {n}", "pass")
+                                steps_executed += 1
 
-                        elif step_str.startswith("CLICK:"):
-                            sel = step_str[6:].strip()
-                            page.wait_for_selector(sel, timeout=8000)
-                            # Check if element is disabled before clicking
-                            el = page.query_selector(sel)
-                            is_disabled = False
-                            if el:
+                            elif step_str.startswith("CLICK:"):
+                                sel = step_str[6:].strip()
+                                page.wait_for_selector(sel, timeout=8000)
+                                # Check if element is disabled before clicking
+                                el = page.query_selector(sel)
+                                is_disabled = False
+                                if el:
+                                    try:
+                                        disabled_attr = el.get_attribute("disabled")
+                                        el_class = el.get_attribute("class") or ""
+                                        is_disabled = (
+                                            disabled_attr is not None or
+                                            any(c in el_class for c in ["disabled", "opacity-50", "cursor-not-allowed", "pointer-events-none"])
+                                        )
+                                    except Exception:
+                                        pass
+                                if is_disabled:
+                                    _log(f"[DISABLED BUTTON] {sel} is currently disabled — skipping", "fail")
+                                    _log("Button is disabled — row checkbox must be selected first using SELECT_ROW step", "fail")
+                                    tc_pass = False
+                                    steps_executed += 1
+                                    break
+                                if sel.strip().startswith("select"):
+                                    page.locator(sel).last.click(force=True)
+                                else:
+                                    page.click(sel, timeout=8000)
+                                _log(f"CLICK: {sel}", "pass")
+                                steps_executed += 1
+                                if "save" in sel.lower():
+                                    page.wait_for_timeout(2000)
+                                    page.wait_for_load_state("networkidle")
+                                    _log("Post-save wait: networkidle", "ok")
+                                if "+ new model" in sel.lower() or "new model" in sel.lower():
+                                    page.wait_for_selector("input[placeholder='Enter model name']", timeout=8000)
+                                    _log("Post-modal wait: modal input visible", "ok")
+
+                            elif step_str.startswith("FILL:"):
+                                parts = step_str[5:].split("|", 1)
+                                sel   = parts[0].strip()
+                                val   = parts[1].strip().strip("'\"") if len(parts) > 1 else ""
+                                page.wait_for_selector(sel, timeout=8000)
+                                page.fill(sel, val)
+                                _log(f"FILL: {sel} → '{val}'", "pass")
+                                steps_executed += 1
+
+                            elif step_str.startswith("WAIT:"):
+                                val = step_str[5:].strip()
+                                if val.lstrip("-").isdigit():
+                                    # Numeric value → millisecond timeout
+                                    page.wait_for_timeout(int(val))
+                                    _log(f"WAIT: {val}ms", "pass")
+                                    steps_executed += 1
+                                elif '[role="option"]' in val or "[role='option']" in val:
+                                    _log(f"WAIT: {val} (skipped — role=option not applicable)", "skip")
+                                else:
+                                    page.wait_for_selector(val, timeout=10000)
+                                    _log(f"WAIT: {val}", "pass")
+                                    steps_executed += 1
+
+                            elif step_str.startswith("NAVIGATE:"):
+                                path = step_str[9:].strip()
+                                if path.count('/orders-management') > 1:
+                                    path = path.replace('/orders-management/orders-management', '/orders-management')
+                                page.goto(base_url + path, timeout=30000, wait_until="domcontentloaded")
+                                page.wait_for_timeout(1500)
+                                _log(f"NAVIGATE: {path}", "pass", page.url)
+                                steps_executed += 1
+
+                            elif step_str.startswith("ASSERT_EXISTS:"):
+                                sel   = step_str[14:].strip()
+                                found = bool(page.query_selector(sel))
+                                _log(f"ASSERT_EXISTS: {sel}", "pass" if found else "fail",
+                                     None if found else "Element not found")
+                                if not found:
+                                    tc_pass = False
+                                steps_executed += 1
+
+                            elif step_str.startswith("ASSERT_NOT_EXISTS:"):
+                                sel   = step_str[18:].strip()
+                                found = bool(page.query_selector(sel))
+                                _log(f"ASSERT_NOT_EXISTS: {sel}",
+                                     "pass" if not found else "fail",
+                                     None if not found else "Element unexpectedly present")
+                                if found:
+                                    tc_pass = False
+                                steps_executed += 1
+
+                            elif step_str.startswith("ASSERT_TEXT:"):
+                                payload = step_str[12:].strip()
+                                if "|" in payload:
+                                    parts    = payload.split("|", 1)
+                                    sel      = parts[0].strip()
+                                    expected = parts[1].strip().strip("'")
+                                else:
+                                    sel      = payload  # text embedded in selector e.g. h2:has-text('...')
+                                    expected = ""
+                                el = page.query_selector(sel)
+                                if el:
+                                    if expected:
+                                        actual = el.inner_text()
+                                        if expected.lower() in actual.lower():
+                                            _log(f"ASSERT_TEXT: {sel}", "pass", f"Found '{expected}'")
+                                        else:
+                                            _log(f"ASSERT_TEXT: {sel}", "fail",
+                                                 f"Expected '{expected}' in '{actual[:100]}'")
+                                            tc_pass = False
+                                    else:
+                                        _log(f"ASSERT_TEXT: {sel}", "pass", "Element exists")
+                                else:
+                                    _log(f"ASSERT_TEXT: {sel}", "fail", "Element not found")
+                                    tc_pass = False
+                                steps_executed += 1
+
+                            elif step_str.startswith("SCREENSHOT:"):
+                                _take_screenshot(page, step_str[11:].strip())
+                                steps_executed += 1
+
+                            elif step_str.startswith("CLICK_OPTION:"):
+                                val = step_str[len("CLICK_OPTION:"):].strip().strip("'\"")
+                                page.locator("select").filter(has=page.locator(f'option:has-text("{val}")')).first.select_option(label=val)
+                                _log(f"CLICK_OPTION: {val}", "pass")
+                                steps_executed += 1
+
+                            elif step_str.startswith("CLICK_DROPDOWN_ITEM:"):
+                                val = step_str[len("CLICK_DROPDOWN_ITEM:"):].strip().strip("'\"")
+                                # Wait for dropdown animation, then click menu item by text
+                                page.wait_for_timeout(500)
+                                item_loc = page.locator(
+                                    f'[role="menuitem"]:has-text("{val}"), '
+                                    f'li:has-text("{val}"), '
+                                    f'a:has-text("{val}")'
+                                ).first
+                                item_loc.wait_for(timeout=5000)
+                                item_loc.click(timeout=5000)
+                                _log(f"CLICK_DROPDOWN_ITEM: {val}", "pass")
+                                steps_executed += 1
+
+                            else:
+                                _log(f"UNKNOWN step (skipped): {step_str[:80]}", "skip")
+
+                        except Exception as e:
+                            if _attempt == 0:
+                                # First failure — wait and retry once
                                 try:
-                                    disabled_attr = el.get_attribute("disabled")
-                                    el_class = el.get_attribute("class") or ""
-                                    is_disabled = (
-                                        disabled_attr is not None or
-                                        any(c in el_class for c in ["disabled", "opacity-50", "cursor-not-allowed", "pointer-events-none"])
-                                    )
+                                    page.wait_for_timeout(1000)
                                 except Exception:
                                     pass
-                            if is_disabled:
-                                _log(f"[DISABLED BUTTON] {sel} is currently disabled — skipping", "fail")
-                                _log("Button is disabled — row checkbox must be selected first using SELECT_ROW step", "fail")
-                                tc_pass = False
-                                steps_executed += 1
                                 continue
-                            if sel.strip().startswith("select"):
-                                page.locator(sel).last.click(force=True)
-                            else:
-                                page.click(sel, timeout=8000)
-                            _log(f"CLICK: {sel}", "pass")
-                            steps_executed += 1
-                            if "save" in sel.lower():
-                                page.wait_for_timeout(2000)
-                                page.wait_for_load_state("networkidle")
-                                _log("Post-save wait: networkidle", "ok")
-                            if "+ new model" in sel.lower() or "new model" in sel.lower():
-                                page.wait_for_selector("input[placeholder='Enter model name']", timeout=8000)
-                                _log("Post-modal wait: modal input visible", "ok")
-
-                        elif step_str.startswith("FILL:"):
-                            parts = step_str[5:].split("|", 1)
-                            sel   = parts[0].strip()
-                            val   = parts[1].strip().strip("'\"") if len(parts) > 1 else ""
-                            page.wait_for_selector(sel, timeout=8000)
-                            page.fill(sel, val)
-                            _log(f"FILL: {sel} → '{val}'", "pass")
-                            steps_executed += 1
-
-                        elif step_str.startswith("WAIT:"):
-                            sel = step_str[5:].strip()
-                            if '[role="option"]' in sel or "[role='option']" in sel:
-                                _log(f"WAIT: {sel} (skipped — role=option not applicable)", "skip")
-                            else:
-                                page.wait_for_selector(sel, timeout=10000)
-                                _log(f"WAIT: {sel}", "pass")
-                                steps_executed += 1
-
-                        elif step_str.startswith("NAVIGATE:"):
-                            path = step_str[9:].strip()
-                            if path.count('/orders-management') > 1:
-                                path = path.replace('/orders-management/orders-management', '/orders-management')
-                            page.goto(base_url + path, timeout=30000, wait_until="domcontentloaded")
-                            page.wait_for_timeout(1500)
-                            _log(f"NAVIGATE: {path}", "pass", page.url)
-                            steps_executed += 1
-
-                        elif step_str.startswith("ASSERT_EXISTS:"):
-                            sel   = step_str[14:].strip()
-                            found = bool(page.query_selector(sel))
-                            _log(f"ASSERT_EXISTS: {sel}", "pass" if found else "fail",
-                                 None if found else "Element not found")
-                            if not found:
-                                tc_pass = False
-                            steps_executed += 1
-
-                        elif step_str.startswith("ASSERT_NOT_EXISTS:"):
-                            sel   = step_str[18:].strip()
-                            found = bool(page.query_selector(sel))
-                            _log(f"ASSERT_NOT_EXISTS: {sel}",
-                                 "pass" if not found else "fail",
-                                 None if not found else "Element unexpectedly present")
-                            if found:
-                                tc_pass = False
-                            steps_executed += 1
-
-                        elif step_str.startswith("ASSERT_TEXT:"):
-                            payload = step_str[12:].strip()
-                            if "|" in payload:
-                                parts    = payload.split("|", 1)
-                                sel      = parts[0].strip()
-                                expected = parts[1].strip().strip("'")
-                            else:
-                                sel      = payload  # text embedded in selector e.g. h2:has-text('...')
-                                expected = ""
-                            el = page.query_selector(sel)
-                            if el:
-                                if expected:
-                                    actual = el.inner_text()
-                                    if expected.lower() in actual.lower():
-                                        _log(f"ASSERT_TEXT: {sel}", "pass", f"Found '{expected}'")
-                                    else:
-                                        _log(f"ASSERT_TEXT: {sel}", "fail",
-                                             f"Expected '{expected}' in '{actual[:100]}'")
-                                        tc_pass = False
-                                else:
-                                    _log(f"ASSERT_TEXT: {sel}", "pass", "Element exists")
-                            else:
-                                _log(f"ASSERT_TEXT: {sel}", "fail", "Element not found")
-                                tc_pass = False
-                            steps_executed += 1
-
-                        elif step_str.startswith("SCREENSHOT:"):
-                            _take_screenshot(page, step_str[11:].strip())
-                            steps_executed += 1
-
-                        elif step_str.startswith("CLICK_OPTION:"):
-                            val = step_str[len("CLICK_OPTION:"):].strip().strip("'\"")
-                            page.locator("select").filter(has=page.locator(f'option:has-text("{val}")')).first.select_option(label=val)
-                            _log(f"CLICK_OPTION: {val}", "pass")
-                            steps_executed += 1
-
+                            # Second failure — request clarification if channel is wired up
+                            if clarify_req_queue is not None:
+                                clarify_req_queue.put({
+                                    "step": step_str,
+                                    "question": (
+                                        f"Step failed twice: `{step_str[:120]}`. "
+                                        f"Error: {str(e)[:200]}. "
+                                        f"What is the correct selector or approach?"
+                                    ),
+                                })
+                                try:
+                                    answer = clarify_resp_queue.get(timeout=300)
+                                    _log(f"Clarification received: {answer}", "ok")
+                                except Exception:
+                                    _log("Clarification timeout — proceeding without guidance", "warn")
+                            _log(f"ERROR — {step_str[:80]}", "fail", str(e))
+                            tc_pass = False
                         else:
-                            _log(f"UNKNOWN step (skipped): {step_str[:80]}", "skip")
-
-                    except Exception as e:
-                        _log(f"ERROR — {step_str[:80]}", "fail", str(e))
-                        tc_pass = False
+                            break  # step succeeded — exit retry loop
 
                 ev_sel = tc.get("evidence_selector", "").strip()
                 if ev_sel:
