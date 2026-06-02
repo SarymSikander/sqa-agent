@@ -1,8 +1,7 @@
 FROM python:3.11-slim
 WORKDIR /app
-RUN apt-get update && apt-get install -y --no-install-recommends git gcc && rm -rf /var/lib/apt/lists/*
-RUN apt-get update && apt-get install -y nodejs npm
-RUN pip install --no-cache-dir fastapi "uvicorn[standard]" python-multipart python-dotenv requests gitpython openai playwright mysql-connector-python bcrypt PyJWT
+RUN apt-get update && apt-get install -y --no-install-recommends git gcc nodejs npm && rm -rf /var/lib/apt/lists/*
+RUN pip install --no-cache-dir fastapi "uvicorn[standard]" python-multipart python-dotenv requests gitpython openai anthropic playwright mysql-connector-python bcrypt PyJWT groq
 RUN playwright install chromium --with-deps
 COPY dashboard/api/ .
 RUN mkdir -p auth screenshots reports
