@@ -310,6 +310,77 @@ def run_tests(portal, env):
 # AI test case executor
 # ---------------------------------------------------------------------------
 
+def _human_friendly_question(step_str: str) -> str:
+    """Return a plain-English clarification question a non-developer QA tester can answer.
+
+    Returns an empty string for steps that are pure timing/infrastructure failures
+    (SELECT_ROW, WAIT, NAVIGATE, ASSERT_*) — those aren't user-answerable.
+    """
+    import re as _re
+
+    # Infrastructure/timing steps — the tester can't help with these
+    _skip = (
+        "SELECT_ROW:", "WAIT:", "NAVIGATE:", "ASSERT_EXISTS:", "ASSERT_NOT_EXISTS:",
+        "ASSERT_TEXT:", "ASSERT_DISABLED:", "ASSERT_URL:", "SCREENSHOT:",
+        "CLICK_OPTION:", "SELECT_OPTION:",
+    )
+    if any(step_str.startswith(p) for p in _skip):
+        return ""
+
+    if step_str.startswith("CLICK:"):
+        sel = step_str[6:].strip()
+        m = _re.search(r"has-text\(['\"](.+?)['\"]\)", sel)
+        if m:
+            label = m.group(1)
+            return (
+                f"I couldn't find a button or link labeled \"{label}\" on the page.\n\n"
+                f"• Does this element exist on the current page?\n"
+                f"• If yes — what is its exact label or text?"
+            )
+        m = _re.search(r"text=['\"](.+?)['\"]", sel)
+        if m:
+            txt = m.group(1)
+            return (
+                f"I couldn't find the text \"{txt}\" on the page.\n\n"
+                f"• Is this text visible on the current page?\n"
+                f"• If yes — what is the exact wording?"
+            )
+        return (
+            "I couldn't find the element I needed to click on this page.\n\n"
+            "• Does a clickable button or link exist here?\n"
+            "• If yes — what does it say?"
+        )
+
+    if step_str.startswith("FILL:"):
+        parts = step_str[5:].split("|", 1)
+        sel = parts[0].strip()
+        val = parts[1].strip().strip("'\"") if len(parts) > 1 else ""
+        m = _re.search(r"placeholder=['\"](.+?)['\"]", sel)
+        if m:
+            ph = m.group(1)
+            return (
+                f"I couldn't find the input field that says \"{ph}\".\n\n"
+                f"• Does this input field exist on the current page?\n"
+                f"• If yes — what does the placeholder text say exactly?\n"
+                + (f"• I was going to type: \"{val}\"" if val else "")
+            )
+        return (
+            "I couldn't find an input field to type into on this page.\n\n"
+            "• Does a text input or form field exist here?\n"
+            "• If yes — describe where it is or what its label says."
+        )
+
+    if step_str.startswith("CLICK_DROPDOWN_ITEM:"):
+        val = step_str[len("CLICK_DROPDOWN_ITEM:"):].strip().strip("'\"")
+        return (
+            f"I opened the dropdown menu but couldn't find an option called \"{val}\".\n\n"
+            f"• Is \"{val}\" visible in the dropdown?\n"
+            f"• If not — what options are shown in the dropdown?"
+        )
+
+    return ""
+
+
 _STEP_KEYWORDS = [
     "NAVIGATE", "ASSERT_TEXT", "ASSERT_EXISTS", "ASSERT_NOT_EXISTS",
     "ASSERT_DISABLED", "ASSERT_URL", "CLICK_DROPDOWN_ITEM", "CLICK_OPTION",
@@ -614,16 +685,10 @@ def run_qa_test_cases(portal: str, env: str, test_cases: list,
                                 except Exception:
                                     pass
                                 continue
-                            # Second failure — request clarification if channel is wired up
-                            if clarify_req_queue is not None:
-                                clarify_req_queue.put({
-                                    "step": step_str,
-                                    "question": (
-                                        f"Step failed twice: `{step_str[:120]}`. "
-                                        f"Error: {str(e)[:200]}. "
-                                        f"What is the correct selector or approach?"
-                                    ),
-                                })
+                            # Second failure — only ask the user if it's a question they can answer
+                            _question = _human_friendly_question(step_str)
+                            if _question and clarify_req_queue is not None:
+                                clarify_req_queue.put({"step": step_str, "question": _question})
                                 try:
                                     answer = clarify_resp_queue.get(timeout=300)
                                     _log(f"Clarification received: {answer}", "ok")
