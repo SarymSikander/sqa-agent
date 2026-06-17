@@ -54,7 +54,13 @@
       "Bash(/Users/sarimsikandar/Desktop/sqa-agent/venv/bin/python3 *)",
       "Bash(GIT_ASKPASS=echo git *)",
       "Bash(GIT_TRACE_PACKET=1 git fetch hf main)",
-      "Bash(GIT_PROTOCOL=\"\" git *)"
+      "Bash(GIT_PROTOCOL=\"\" git *)",
+      "Bash(~/Desktop/sqa-agent/venv/bin/python3 -c \"import ast, sys; ast.parse\\(open\\('main.py'\\).read\\(\\)\\); print\\('syntax OK'\\)\")",
+      "Bash(~/Desktop/sqa-agent/venv/bin/python3 -c \"import ast; ast.parse\\(open\\('main.py'\\).read\\(\\)\\); print\\('main.py OK'\\)\")",
+      "Bash(~/Desktop/sqa-agent/venv/bin/python3 -c \"import ast; ast.parse\\(open\\('tools/playwright_tool.py'\\).read\\(\\)\\); print\\('playwright_tool.py OK'\\)\")",
+      "Bash(~/Desktop/sqa-agent/venv/bin/python3 -c \"import ast; ast.parse\\(open\\('tools/playwright_tool.py'\\).read\\(\\)\\); print\\('OK'\\)\")",
+      "Bash(~/Desktop/sqa-agent/venv/bin/python3 *)",
+      "Skill(run)"
     ]
   }
 }
