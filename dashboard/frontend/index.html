@@ -1,65 +1,3 @@
-To enhance the visual presentation of the Zambeel SQA Dashboard, several
-aesthetic and layout refinements have been applied directly to the CSS and
-component structures.
-
-These updates improve readability, layout breathing room, interface depth, and
-visual hierarchy—all while keeping the original JavaScript, DOM IDs, streaming
-loops, and event-handling systems intact.
-
-Key Visual Enhancements Made:
-
-1.  Refined Color Palette & Typography (Slate/Zinc Foundation)
-
-      - Changed the primary body background (--bg) to a cleaner, brighter Slate
-        (#F8FAFC) to elevate contrast against cards and reduce muddy gray tones.
-      - Standardized typography weights, using deep slate colors (#0F172A) for
-        high-contrast text and warm neutral colors for secondary and tertiary
-        labels.
-
-2.  Polished Sidebar & Branding
-
-      - Redesigned the sidebar background with a sophisticated, deep
-        Slate-to-Indigo gradient (#0B0F19 to #111827).
-      - Updated the SVG paths within the sidebar to utilize light silver/white
-        fills so that the Zambeel logo reads cleanly against the dark
-        background.
-      - Added a subtle left-accent bar on active navigation items for a clearer
-        sense of location.
-
-3.  Enhanced Cards with Micro-Interactions
-
-      - Softened the default shadows (--shadow and --shadow-md) to feel modern
-        and light rather than harsh.
-      - Implemented high-fidelity micro-interactions: on hover, cards lift
-        slightly (transform: translateY(-2px)) and transition smoothly.
-      - Added semantic top-border highlights on the metric blocks (e.g., custom
-        colors for total tests, pass rate, and Jira indicators) to create an
-        immediate hierarchy.
-
-4.  Sleek macOS-Style Terminal Block
-
-      - Refined the live API execution console terminal with clean margins, a
-        subtle border, and custom visual window controls (the classic red,
-        yellow, and green terminal window dots) to match a professional
-        developer environment.
-
-5.  Modernized AI Assistant Chat UI
-
-      - Redesigned chat bubbles to resemble contemporary chat clients (like
-        Slack or Claude). User bubbles feature an indigo-to-violet gradient, and
-        assistant bubbles sit on soft warm slate blocks.
-      - Code snippets (<code>) and block elements are styled with a dark,
-        high-contrast editor theme for readability.
-
-6.  Glassmorphism Modals & Sheets
-
-      - Modals and slide-out panels now utilize high-performance backdrop
-        filters (backdrop-filter: blur(8px)) for a sense of layered depth when
-        overlaying active dashboard screens.
-
-Here is the complete, updated file with the integrated design enhancements:
-
-<!-- START OF FILE Paste June 17, 2026 - 8:37PM (Modified for Enhanced UI) -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -68,40 +6,40 @@ Here is the complete, updated file with the integrated design enhancements:
   <title>Zambeel SQA — Dashboard</title>
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 84 61'%3E%3Cpath d='M61.1145 50.8117H84V51.85C84 56.9117 79.904 61 74.8328 61H52.1424L49.4118 57.4309C48.1765 55.8085 47.5263 53.8617 47.5263 51.85C47.5263 49.9681 48.1114 48.0862 49.2817 46.4638L67.8762 21.0904C58.1238 17.067 46.291 13.3032 27.1765 13.3032C3.51084 13.3032 3.44582 23.7511 3.44582 25.6979C3.44582 32.1872 7.34675 38.1575 7.34675 39.0011C7.34675 39.066 7.34675 39.1309 7.28173 39.1309C6.50155 39.1309 0 31.2138 0 22.583C0 5.77554 15.9938 0 27.1765 0C44.4056 0 62.935 6.29468 73.3375 10.383C78.2786 12.3298 81.5294 17.1319 81.5294 22.4532L61.1145 50.8117Z' fill='%235B3DF5'/%3E%3C/svg%3E" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
   <style>
     /* ── Tokens ─────────────────────────────────────────────────────────────── */
     :root {
-      --bg:           #F8FAFC; /* Slate 50 - cleaner background contrast */
+      --bg:           #F2F4F8;
       --bg2:          #FFFFFF;
       --card:         #FFFFFF;
-      --card2:        #F8FAFC;
-      --border:       #E2E8F0; /* Slate 200 - softer dividers */
-      --border-hover: #CBD5E1; /* Slate 300 */
-      --text:         #0F172A; /* Slate 900 - high readability */
-      --text2:        #475569; /* Slate 600 - muted details */
-      --text3:        #94A3B8; /* Slate 400 - secondary labels */
-      --g1:           #4F46E5; /* Indigo 600 */
-      --g2:           #7C3AED; /* Violet 600 */
-      --g3:           #A78BFA;
-      --gradient:     linear-gradient(135deg, #4F46E5 0%, #7C3AED 100%);
-      --gradient-h:   linear-gradient(135deg, #4338CA 0%, #6D28D9 100%);
-      --accent:       #6366F1; /* Indigo 500 */
-      --accent-light: rgba(99, 102, 241, 0.06);
-      --success:      #10B981; /* Emerald 500 */
-      --success-bg:   rgba(16, 185, 129, 0.08);
-      --error:        #EF4444; /* Red 500 */
-      --error-bg:     rgba(239, 68, 68, 0.08);
-      --warn:         #F59E0B; /* Amber 500 */
-      --warn-bg:      rgba(245, 158, 11, 0.08);
-      --info-bg:      #EEF2FF;
-      --sidebar-w:    240px; /* Enhanced sidebar width for label breathing room */
+      --card2:        #F7F8FC;
+      --border:       #DDE1EC;
+      --border-hover: #C2C8D8;
+      --text:         #0D1226;
+      --text2:        #52596D;
+      --text3:        #9BA3B8;
+      --g1:           #4F35D9;
+      --g2:           #7B52EF;
+      --g3:           #9B7EFF;
+      --gradient:     linear-gradient(135deg, #4F35D9 0%, #7B52EF 100%);
+      --gradient-h:   linear-gradient(135deg, #5B3DF5 0%, #8B6BFF 100%);
+      --accent:       #5B3DF5;
+      --accent-light: rgba(91,61,245,0.07);
+      --success:      #059669;
+      --success-bg:   rgba(5,150,105,0.08);
+      --error:        #DC2626;
+      --error-bg:     rgba(220,38,38,0.08);
+      --warn:         #D97706;
+      --warn-bg:      rgba(217,119,6,0.08);
+      --info-bg:      #EEEEFF;
+      --sidebar-w:    224px;
       --r:            12px;
       --r-sm:         8px;
       --r-xs:         6px;
-      --shadow:       0 1px 3px rgba(15, 23, 42, 0.03), 0 4px 12px rgba(15, 23, 42, 0.04);
-      --shadow-md:    0 8px 24px rgba(15, 23, 42, 0.08), 0 2px 6px rgba(15, 23, 42, 0.04);
-      --shadow-glow:  0 0 0 3px rgba(99, 102, 241, 0.15), 0 12px 30px rgba(99, 102, 241, 0.2);
+      --shadow:       0 1px 3px rgba(13,18,38,0.06), 0 2px 8px rgba(13,18,38,0.03);
+      --shadow-md:    0 4px 20px rgba(13,18,38,0.08), 0 1px 4px rgba(13,18,38,0.04);
+      --shadow-glow:  0 0 0 3px rgba(91,61,245,0.18), 0 8px 28px rgba(91,61,245,0.22);
     }
 
     /* ── Reset ──────────────────────────────────────────────────────────────── */
@@ -109,7 +47,7 @@ Here is the complete, updated file with the integrated design enhancements:
     html, body { height: 100%; overflow: hidden; }
     body {
       font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-      font-size: 13.5px;
+      font-size: 14px;
       line-height: 1.6;
       background: var(--bg);
       color: var(--text);
@@ -117,9 +55,8 @@ Here is the complete, updated file with the integrated design enhancements:
       -webkit-font-smoothing: antialiased;
       -moz-osx-font-smoothing: grayscale;
     }
-    a { color: var(--accent); text-decoration: none; transition: color 0.15s ease; }
-    a:hover { color: var(--g2); text-decoration: underline; }
-    
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { text-decoration: underline; }
     input, select, textarea {
       font-family: inherit;
       font-size: 13.5px;
@@ -127,112 +64,97 @@ Here is the complete, updated file with the integrated design enhancements:
       color: var(--text);
       border: 1.5px solid var(--border);
       border-radius: var(--r-sm);
-      padding: 10px 14px;
+      padding: 9px 13px;
       outline: none;
       transition: border-color .18s, box-shadow .18s, background .18s;
       width: 100%;
     }
     input:focus, select:focus, textarea:focus {
-      border-color: var(--accent);
-      background: #FFFFFF;
-      box-shadow: 0 0 0 3.5px rgba(99, 102, 241, 0.12);
+      border-color: var(--g2);
+      background: #FAFBFF;
+      box-shadow: 0 0 0 3px rgba(91,61,245,0.12);
     }
     input:hover:not(:focus), select:hover:not(:focus), textarea:hover:not(:focus) {
       border-color: var(--border-hover);
     }
     select option { background: var(--bg2); color: var(--text); }
-    textarea { resize: vertical; min-height: 95px; }
-    label { display: block; font-size: 11px; font-weight: 700; color: var(--text2); margin-bottom: 7px; letter-spacing: 0.05em; text-transform: uppercase; }
+    textarea { resize: vertical; min-height: 90px; }
+    label { display: block; font-size: 11.5px; font-weight: 600; color: var(--text2); margin-bottom: 6px; letter-spacing: 0.03em; text-transform: uppercase; }
 
     /* ── Scrollbar ───────────────────────────────────────────────────────────── */
-    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar { width: 5px; height: 5px; }
     ::-webkit-scrollbar-track { background: transparent; }
-    ::-webkit-scrollbar-thumb { background: rgba(148, 163, 184, 0.3); border-radius: 99px; }
-    ::-webkit-scrollbar-thumb:hover { background: rgba(148, 163, 184, 0.5); }
+    ::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.12); border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: rgba(0,0,0,0.2); }
 
     /* ── Sidebar ─────────────────────────────────────────────────────────────── */
     #sidebar {
       width: var(--sidebar-w);
       min-width: var(--sidebar-w);
       height: 100vh;
-      background: linear-gradient(180deg, #0B0F19 0%, #111827 100%);
+      background: linear-gradient(170deg, #12123a 0%, #1e0a52 40%, #2d0f6e 70%, #400d7a 100%);
       border-right: none;
       display: flex;
       flex-direction: column;
-      padding: 0 0 24px;
+      padding: 0 0 20px;
       overflow: hidden;
     }
     .sidebar-logo {
-      padding: 24px 22px 20px;
-      border-bottom: 1px solid rgba(255,255,255,0.06);
-      margin-bottom: 12px;
+      padding: 22px 18px 18px;
+      border-bottom: 1px solid rgba(255,255,255,0.08);
+      margin-bottom: 8px;
     }
     .logo-svg-wrap svg {
-      width: 142px;
+      width: 136px;
       height: auto;
       display: block;
     }
-    .logo-svg-wrap svg path {
-      fill: #FFFFFF !important; /* Forces the text to render crisp white on deep dark background */
-    }
     .logo-sub {
       font-size: 10px;
-      font-weight: 700;
-      color: rgba(255,255,255,0.4);
-      margin-top: 8px;
-      letter-spacing: 0.12em;
+      font-weight: 600;
+      color: rgba(255,255,255,0.35);
+      margin-top: 7px;
+      letter-spacing: 0.10em;
       text-transform: uppercase;
     }
     .nav-item {
       display: flex;
       align-items: center;
-      gap: 12px;
-      padding: 10px 16px;
-      margin: 2px 14px;
-      border-radius: var(--r-sm);
+      gap: 10px;
+      padding: 9px 14px;
+      margin: 1px 10px;
+      border-radius: 10px;
       cursor: pointer;
-      color: rgba(148, 163, 184, 0.85);
+      color: rgba(255,255,255,0.58);
       font-size: 13px;
       font-weight: 500;
-      transition: background .16s, color .16s, box-shadow 0.16s;
+      transition: background .16s, color .16s;
       user-select: none;
       letter-spacing: 0.01em;
-      position: relative;
     }
-    .nav-item:hover { background: rgba(255,255,255,0.05); color: #FFFFFF; }
+    .nav-item:hover { background: rgba(255,255,255,0.09); color: rgba(255,255,255,0.92); }
     .nav-item.active {
-      background: linear-gradient(135deg, rgba(79, 70, 229, 0.9) 0%, rgba(124, 58, 237, 0.8) 100%);
-      color: #FFFFFF;
+      background: linear-gradient(135deg, rgba(107,53,212,0.85) 0%, rgba(91,61,245,0.75) 100%);
+      color: #ffffff;
       font-weight: 600;
-      box-shadow: 0 4px 12px rgba(79, 70, 229, 0.25);
+      box-shadow: 0 2px 12px rgba(91,61,245,0.4), inset 0 1px 0 rgba(255,255,255,0.1);
     }
-    .nav-item.active::before {
-      content: '';
-      position: absolute;
-      left: 0;
-      top: 25%;
-      bottom: 25%;
-      width: 3.5px;
-      background: #FFFFFF;
-      border-radius: 0 4px 4px 0;
-    }
-    .nav-item .nav-icon { width: 18px; height: 18px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; opacity: 0.8; }
+    .nav-item .nav-icon { width: 18px; height: 18px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; opacity: 0.9; }
     .nav-item.active .nav-icon { opacity: 1; }
     .sidebar-footer {
       margin-top: auto;
-      padding: 16px 20px 0;
-      border-top: 1px solid rgba(255,255,255,0.06);
+      padding: 14px 14px 0;
+      border-top: 1px solid rgba(255,255,255,0.08);
     }
     .api-status {
       display: flex;
       align-items: center;
-      gap: 9px;
+      gap: 7px;
       font-size: 11px;
-      color: rgba(148, 163, 184, 0.6);
-      font-weight: 500;
+      color: rgba(255,255,255,0.38);
     }
     .api-dot {
-      width: 7.5px; height: 7.5px;
+      width: 7px; height: 7px;
       border-radius: 50%;
       background: var(--success);
       box-shadow: 0 0 8px var(--success);
@@ -241,55 +163,55 @@ Here is the complete, updated file with the integrated design enhancements:
     }
     .api-dot.offline { background: var(--error); box-shadow: 0 0 8px var(--error); animation: none; }
     @keyframes pulse-dot {
-      0%, 100% { opacity: 1; box-shadow: 0 0 6px rgba(16, 185, 129, 0.6); }
-      50% { opacity: 0.6; box-shadow: 0 0 14px rgba(16, 185, 129, 0.9); }
+      0%, 100% { opacity: 1; box-shadow: 0 0 6px var(--success); }
+      50% { opacity: 0.7; box-shadow: 0 0 14px var(--success); }
     }
 
     /* ── Header ──────────────────────────────────────────────────────────────── */
     #topbar {
-      height: 64px;
+      height: 56px;
       background: var(--bg2);
       border-bottom: 1.5px solid var(--border);
       display: flex;
       align-items: center;
-      padding: 0 32px;
-      gap: 16px;
+      padding: 0 28px;
+      gap: 14px;
       flex-shrink: 0;
-      box-shadow: 0 1px 2px rgba(15, 23, 42, 0.02);
+      box-shadow: 0 1px 0 rgba(0,0,0,0.03);
     }
     .breadcrumb {
       display: flex;
       align-items: center;
-      gap: 8px;
-      font-size: 13.5px;
+      gap: 7px;
+      font-size: 13px;
       color: var(--text2);
       flex: 1;
     }
-    .breadcrumb .bc-root { color: var(--text3); font-weight: 500; }
-    .breadcrumb .bc-sep { color: var(--border-hover); font-size: 14px; }
-    .breadcrumb .bc-page { color: var(--text); font-weight: 700; letter-spacing: -0.01em; }
+    .breadcrumb .bc-root { color: var(--text3); font-weight: 400; }
+    .breadcrumb .bc-sep { color: var(--border-hover); font-size: 16px; line-height: 1; }
+    .breadcrumb .bc-page { color: var(--text); font-weight: 600; letter-spacing: -0.01em; }
     .agent-badge {
       display: flex;
       align-items: center;
       gap: 7px;
       background: var(--accent-light);
-      border: 1px solid rgba(99, 102, 241, 0.18);
+      border: 1px solid rgba(91,61,245,0.22);
       border-radius: 99px;
-      padding: 6px 14px;
+      padding: 5px 13px 5px 9px;
       font-size: 11px;
       font-weight: 700;
       color: var(--accent);
-      letter-spacing: 0.03em;
+      letter-spacing: 0.02em;
       text-transform: uppercase;
     }
     .live-dot {
       display: flex;
       align-items: center;
-      gap: 8px;
+      gap: 6px;
       font-size: 11px;
       font-weight: 700;
       color: var(--success);
-      letter-spacing: 0.05em;
+      letter-spacing: 0.04em;
       text-transform: uppercase;
     }
     .live-dot::before {
@@ -297,13 +219,13 @@ Here is the complete, updated file with the integrated design enhancements:
       width: 7px; height: 7px;
       border-radius: 50%;
       background: var(--success);
-      box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.4);
+      box-shadow: 0 0 0 0 rgba(34,197,94,0.5);
       animation: live-pulse 1.8s ease-in-out infinite;
     }
     @keyframes live-pulse {
-      0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.5); }
-      70% { box-shadow: 0 0 0 6px rgba(16, 185, 129, 0); }
-      100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+      0% { box-shadow: 0 0 0 0 rgba(34,197,94,0.5); }
+      70% { box-shadow: 0 0 0 6px rgba(34,197,94,0); }
+      100% { box-shadow: 0 0 0 0 rgba(34,197,94,0); }
     }
 
     /* ── Main ────────────────────────────────────────────────────────────────── */
@@ -313,96 +235,96 @@ Here is the complete, updated file with the integrated design enhancements:
     /* ── Pages ───────────────────────────────────────────────────────────────── */
     .page { display: none; }
     .page.active { display: block; }
-    .page-inner { padding: 32px 32px 48px; max-width: 1400px; margin: 0 auto; width: 100%; }
+    .page-inner { padding: 28px 32px 40px; max-width: 1300px; }
 
     /* ── Cards ───────────────────────────────────────────────────────────────── */
     .card {
       background: var(--card);
       border: 1.5px solid var(--border);
       border-radius: var(--r);
-      padding: 26px;
+      padding: 24px;
       box-shadow: var(--shadow);
-      transition: border-color .2s, box-shadow .2s, transform .2s ease-in-out;
+      transition: border-color .18s, box-shadow .18s;
     }
-    .card:hover { border-color: var(--border-hover); box-shadow: var(--shadow-md); transform: translateY(-1px); }
+    .card:hover { border-color: var(--border-hover); box-shadow: var(--shadow-md); }
     .card-title {
-      font-size: 11px;
-      font-weight: 800;
+      font-size: 10.5px;
+      font-weight: 700;
       text-transform: uppercase;
-      letter-spacing: 0.12em;
+      letter-spacing: 0.10em;
       color: var(--text3);
-      margin-bottom: 20px;
+      margin-bottom: 18px;
     }
-    .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
-    .grid-2 { display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; }
+    .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+    .grid-2 { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; }
 
     /* ── Buttons ─────────────────────────────────────────────────────────────── */
     .btn {
       display: inline-flex;
       align-items: center;
-      gap: 8px;
-      padding: 10px 18px;
+      gap: 7px;
+      padding: 9px 18px;
       border: none;
       border-radius: var(--r-sm);
       font-family: inherit;
-      font-size: 13.5px;
+      font-size: 13px;
       font-weight: 600;
       cursor: pointer;
-      transition: background .2s, box-shadow .2s, transform .14s, border-color .2s, opacity .2s;
+      transition: background .18s, box-shadow .18s, transform .14s, border-color .18s, opacity .18s;
       white-space: nowrap;
       letter-spacing: 0.01em;
       position: relative;
     }
     .btn-primary {
       background: var(--gradient);
-      color: #FFFFFF;
-      box-shadow: 0 4px 14px rgba(79, 70, 229, 0.25);
+      color: #fff;
+      box-shadow: 0 2px 10px rgba(79,53,217,0.35);
     }
     .btn-primary:hover {
       background: var(--gradient-h);
-      box-shadow: 0 6px 20px rgba(79, 70, 229, 0.35);
-      transform: translateY(-1.5px);
+      box-shadow: 0 6px 24px rgba(79,53,217,0.45);
+      transform: translateY(-1px);
     }
-    .btn-primary:active { transform: translateY(0); box-shadow: 0 2px 8px rgba(79, 70, 229, 0.2); }
+    .btn-primary:active { transform: translateY(0); box-shadow: 0 2px 8px rgba(79,53,217,0.3); }
     .btn-secondary {
       background: var(--bg2);
       color: var(--text);
       border: 1.5px solid var(--border);
-      box-shadow: 0 1px 2px rgba(15, 23, 42, 0.02);
+      box-shadow: 0 1px 2px rgba(0,0,0,0.04);
     }
-    .btn-secondary:hover { background: var(--card2); border-color: var(--border-hover); box-shadow: 0 4px 10px rgba(15, 23, 42, 0.04); }
+    .btn-secondary:hover { background: var(--card2); border-color: var(--border-hover); box-shadow: 0 2px 6px rgba(0,0,0,0.06); }
     .btn-secondary:active { background: var(--bg); }
     .btn-danger {
       background: var(--error-bg);
       color: var(--error);
-      border: 1.5px solid rgba(239, 68, 68, 0.18);
+      border: 1.5px solid rgba(220,38,38,0.22);
     }
-    .btn-danger:hover { background: rgba(239, 68, 68, 0.12); border-color: rgba(239, 68, 68, 0.3); }
+    .btn-danger:hover { background: rgba(220,38,38,0.14); border-color: rgba(220,38,38,0.35); }
     .btn-success {
       background: var(--success-bg);
       color: var(--success);
-      border: 1.5px solid rgba(16, 185, 129, 0.18);
+      border: 1.5px solid rgba(5,150,105,0.22);
     }
-    .btn-success:hover { background: rgba(16, 185, 129, 0.12); }
-    .btn-lg { padding: 13px 28px; font-size: 14px; border-radius: 10px; letter-spacing: 0.02em; }
-    .btn-sm { padding: 6px 12px; font-size: 11.5px; border-radius: var(--r-xs); }
-    .btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none !important; box-shadow: none !important; }
+    .btn-success:hover { background: rgba(5,150,105,0.14); }
+    .btn-lg { padding: 12px 28px; font-size: 14px; border-radius: 10px; letter-spacing: 0.02em; }
+    .btn-sm { padding: 5px 11px; font-size: 11.5px; border-radius: var(--r-xs); }
+    .btn:disabled { opacity: 0.42; cursor: not-allowed; transform: none !important; box-shadow: none !important; }
     .btn .spin {
       display: none;
-      width: 14px; height: 14px;
+      width: 13px; height: 13px;
       border: 2px solid rgba(255,255,255,0.3);
-      border-top-color: #FFFFFF;
+      border-top-color: #fff;
       border-radius: 50%;
       animation: spin .65s linear infinite;
       flex-shrink: 0;
     }
     .btn.loading .spin  { display: block; }
-    .btn.loading .label { opacity: 0.75; }
+    .btn.loading .label { opacity: 0.7; }
 
     /* ── Pill selector ───────────────────────────────────────────────────────── */
-    .pill-group { display: flex; gap: 8px; flex-wrap: wrap; }
+    .pill-group { display: flex; gap: 6px; flex-wrap: wrap; }
     .pill {
-      padding: 6px 16px;
+      padding: 5px 15px;
       border-radius: 99px;
       font-size: 12.5px;
       font-weight: 500;
@@ -411,15 +333,15 @@ Here is the complete, updated file with the integrated design enhancements:
       color: var(--text2);
       background: var(--bg2);
       font-family: inherit;
-      transition: all .18s ease-in-out;
+      transition: all .16s;
       letter-spacing: 0.01em;
     }
     .pill:hover { border-color: var(--border-hover); color: var(--text); background: var(--card2); }
     .pill.active {
       background: var(--gradient);
       border-color: transparent;
-      color: #FFFFFF;
-      box-shadow: 0 4px 12px rgba(79, 70, 229, 0.25);
+      color: #fff;
+      box-shadow: 0 2px 12px rgba(79,53,217,0.3);
       font-weight: 600;
     }
 
@@ -431,7 +353,7 @@ Here is the complete, updated file with the integrated design enhancements:
       margin-bottom: 24px;
     }
     .tab {
-      padding: 11px 22px;
+      padding: 10px 20px;
       font-size: 13.5px;
       font-weight: 500;
       cursor: pointer;
@@ -441,29 +363,29 @@ Here is the complete, updated file with the integrated design enhancements:
       transition: color .18s, border-color .18s;
     }
     .tab:hover { color: var(--text); }
-    .tab.active { color: var(--accent); border-bottom-color: var(--accent); font-weight: 600; }
+    .tab.active { color: #5B3DF5; border-bottom-color: #5B3DF5; }
 
     /* ── Badges ──────────────────────────────────────────────────────────────── */
     .badge {
       display: inline-flex;
       align-items: center;
-      gap: 6px;
-      padding: 4px 11px;
+      gap: 5px;
+      padding: 3px 10px;
       border-radius: 99px;
-      font-size: 10.5px;
+      font-size: 11px;
       font-weight: 700;
-      letter-spacing: 0.05em;
+      letter-spacing: 0.04em;
       text-transform: uppercase;
     }
-    .badge-pass    { background: rgba(16, 185, 129, 0.07);   color: #059669; border: 1.5px solid rgba(16, 185, 129, 0.15); }
-    .badge-fail    { background: rgba(239, 68, 68, 0.07);   color: #DC2626; border: 1.5px solid rgba(239, 68, 68, 0.15); }
-    .badge-warn    { background: rgba(245, 158, 11, 0.07);   color: #D97706; border: 1.5px solid rgba(245, 158, 11, 0.15); }
-    .badge-info    { background: rgba(79, 70, 229, 0.07);   color: #4F46E5; border: 1.5px solid rgba(79, 70, 229, 0.15); }
-    .badge-neutral { background: rgba(148, 163, 184, 0.06);       color: var(--text2); border: 1.5px solid var(--border); }
-    .dot { width: 5.5px; height: 5.5px; border-radius: 50%; background: currentColor; display: inline-block; flex-shrink: 0; }
+    .badge-pass    { background: rgba(5,150,105,0.09);   color: #059669; border: 1px solid rgba(5,150,105,0.22); }
+    .badge-fail    { background: rgba(220,38,38,0.08);   color: #DC2626; border: 1px solid rgba(220,38,38,0.2); }
+    .badge-warn    { background: rgba(217,119,6,0.08);   color: #B45309; border: 1px solid rgba(217,119,6,0.2); }
+    .badge-info    { background: rgba(91,61,245,0.08);   color: #4F35D9; border: 1px solid rgba(91,61,245,0.2); }
+    .badge-neutral { background: rgba(0,0,0,0.04);       color: var(--text2); border: 1px solid var(--border); }
+    .dot { width: 5px; height: 5px; border-radius: 50%; background: currentColor; display: inline-block; flex-shrink: 0; }
 
     /* ── Tables ──────────────────────────────────────────────────────────────── */
-    .tbl-wrap { border: 1.5px solid var(--border); border-radius: var(--r); overflow: hidden; box-shadow: var(--shadow); background: var(--bg2); }
+    .tbl-wrap { border: 1.5px solid var(--border); border-radius: var(--r); overflow: hidden; box-shadow: var(--shadow); }
     table { width: 100%; border-collapse: collapse; font-size: 13px; }
     thead th {
       background: var(--card2);
@@ -473,22 +395,22 @@ Here is the complete, updated file with the integrated design enhancements:
       text-transform: uppercase;
       letter-spacing: 0.10em;
       color: var(--text3);
-      padding: 12px 18px;
+      padding: 10px 16px;
       border-bottom: 1.5px solid var(--border);
       white-space: nowrap;
     }
-    tbody tr { border-bottom: 1px solid var(--border); transition: background .12s; }
+    tbody tr { border-bottom: 1px solid rgba(0,0,0,0.04); transition: background .12s; }
     tbody tr:last-child { border-bottom: none; }
-    tbody tr:nth-child(even) { background: rgba(248, 250, 252, 0.4); }
-    tbody tr:hover { background: rgba(99, 102, 241, 0.03); }
-    tbody td { padding: 14px 18px; color: var(--text); vertical-align: middle; }
-    .td-mono { font-family: 'JetBrains Mono', monospace; font-size: 11.5px; color: var(--accent); font-weight: 600; }
+    tbody tr:nth-child(even) { background: rgba(0,0,0,0.015); }
+    tbody tr:hover { background: rgba(91,61,245,0.04); }
+    tbody td { padding: 12px 16px; color: var(--text); vertical-align: middle; }
+    .td-mono { font-family: 'JetBrains Mono', monospace; font-size: 11.5px; color: var(--accent); font-weight: 500; }
     .td-muted { color: var(--text2); }
-    .empty-row td { text-align: center; color: var(--text3); padding: 48px; font-size: 13.5px; }
+    .empty-row td { text-align: center; color: var(--text3); padding: 44px; font-size: 13px; letter-spacing: 0.01em; }
 
     /* ── Skeleton ────────────────────────────────────────────────────────────── */
     .skeleton {
-      background: linear-gradient(90deg, rgba(148, 163, 184, 0.08) 25%, rgba(148, 163, 184, 0.15) 50%, rgba(148, 163, 184, 0.08) 75%);
+      background: linear-gradient(90deg, rgba(0,0,0,0.05) 25%, rgba(0,0,0,0.09) 50%, rgba(0,0,0,0.05) 75%);
       background-size: 200% 100%;
       animation: shimmer 1.6s infinite;
       border-radius: 6px;
@@ -498,124 +420,110 @@ Here is the complete, updated file with the integrated design enhancements:
     .skel-line:last-child { margin-bottom: 0; width: 70%; }
 
     /* ── Stats row ───────────────────────────────────────────────────────────── */
-    .stats-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; margin-bottom: 24px; }
+    .stats-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 24px; }
     .stat-card {
       background: var(--card);
       border: 1.5px solid var(--border);
       border-radius: var(--r);
-      padding: 22px 24px;
-      transition: border-color .18s, box-shadow .18s, transform .18s;
+      padding: 20px 22px;
+      transition: border-color .18s, box-shadow .18s;
       box-shadow: var(--shadow);
-      position: relative;
-      overflow: hidden;
     }
-    .stat-card::after {
-      content: '';
-      position: absolute;
-      top: 0; left: 0; right: 0;
-      height: 3px;
-      background: var(--border);
-    }
-    /* Semantic border highlights for stats cards */
-    .stat-card:nth-child(1)::after { background: var(--accent); }
-    .stat-card:nth-child(2)::after { background: var(--success); }
-    .stat-card:nth-child(3)::after { background: var(--error); }
-    .stat-card:nth-child(4)::after { background: var(--warn); }
-
-    .stat-card:hover { border-color: var(--border-hover); box-shadow: var(--shadow-md); transform: translateY(-2px); }
-    .stat-card:hover::after { height: 4.5px; }
-    .stat-label { font-size: 10px; font-weight: 700; color: var(--text3); text-transform: uppercase; letter-spacing: 0.10em; margin-bottom: 10px; }
-    .stat-value { font-size: 30px; font-weight: 800; color: var(--text); letter-spacing: -0.8px; line-height: 1.1; }
-    .stat-sub { font-size: 11px; color: var(--text3); margin-top: 5px; font-weight: 500; }
+    .stat-card:hover { border-color: var(--border-hover); box-shadow: var(--shadow-md); }
+    .stat-label { font-size: 10.5px; font-weight: 700; color: var(--text3); text-transform: uppercase; letter-spacing: 0.10em; margin-bottom: 10px; }
+    .stat-value { font-size: 28px; font-weight: 800; color: var(--text); letter-spacing: -0.8px; line-height: 1.1; }
+    .stat-sub { font-size: 11px; color: var(--text3); margin-top: 5px; }
 
     /* ── Env cards (Overview) ────────────────────────────────────────────────── */
-    .env-card { display: flex; flex-direction: column; gap: 20px; transition: border-color 0.25s, box-shadow 0.25s; }
+    .env-card { display: flex; flex-direction: column; gap: 16px; }
     .env-card-top { display: flex; justify-content: space-between; align-items: flex-start; }
-    .env-name { font-size: 17px; font-weight: 800; letter-spacing: -0.3px; color: var(--text); }
-    .env-url { font-size: 11px; color: var(--text3); font-family: 'JetBrains Mono', monospace; margin-top: 4px; }
+    .env-name { font-size: 16px; font-weight: 700; letter-spacing: -0.3px; color: var(--text); }
+    .env-url { font-size: 10.5px; color: var(--text3); font-family: 'JetBrains Mono', monospace; margin-top: 4px; }
     .env-card .btn { width: 100%; justify-content: center; }
+    .env-card-pass { border-color: rgba(5,150,105,0.35) !important; }
+    .env-card-pass:hover { border-color: rgba(5,150,105,0.55) !important; }
+    .env-card-fail { border-color: rgba(220,38,38,0.3) !important; }
+    .env-card-fail:hover { border-color: rgba(220,38,38,0.5) !important; }
 
     /* ── Activity feed ───────────────────────────────────────────────────────── */
-    .activity-list { display: flex; flex-direction: column; gap: 4px; }
+    .activity-list { display: flex; flex-direction: column; }
     .activity-item {
       display: flex;
       align-items: center;
-      gap: 16px;
-      padding: 14px;
+      gap: 12px;
+      padding: 12px 10px;
       border-radius: var(--r-sm);
-      border-bottom: 1px solid rgba(148, 163, 184, 0.08);
-      transition: background 0.18s, transform 0.18s;
+      border-bottom: 1px solid rgba(0,0,0,0.04);
+      transition: background .14s;
       cursor: pointer;
     }
     .activity-item:last-child { border-bottom: none; }
-    .activity-item:hover { background: var(--accent-light); transform: translateX(2px); }
+    .activity-item:hover { background: var(--accent-light); }
     .activity-thumb {
-      width: 64px; height: 44px;
+      width: 56px; height: 40px;
       object-fit: cover;
       border-radius: var(--r-xs);
       border: 1.5px solid var(--border);
       flex-shrink: 0;
-      transition: transform 0.2s;
     }
-    .activity-thumb:hover { transform: scale(1.05); }
     .activity-info { flex: 1; min-width: 0; }
-    .activity-label { font-size: 13.5px; font-weight: 600; color: var(--text); }
-    .activity-time  { font-size: 11px; color: var(--text3); display: block; margin-top: 3px; }
+    .activity-label { font-size: 13px; font-weight: 600; color: var(--text); }
+    .activity-time  { font-size: 11px; color: var(--text3); display: block; margin-top: 2px; }
 
     /* ── Hero (Overview) ─────────────────────────────────────────────────────── */
     .hero {
-      margin-bottom: 32px;
-      padding-bottom: 28px;
+      margin-bottom: 28px;
+      padding-bottom: 24px;
       border-bottom: 1.5px solid var(--border);
     }
     .hero-title {
-      font-size: 30px;
+      font-size: 28px;
       font-weight: 800;
-      letter-spacing: -1px;
-      line-height: 1.15;
+      letter-spacing: -0.8px;
+      line-height: 1.18;
       color: var(--text);
-      background: linear-gradient(135deg, var(--text) 0%, #312E81 100%);
+      background: linear-gradient(135deg, var(--text) 0%, #3d3d6b 100%);
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
       background-clip: text;
     }
-    .hero-sub { font-size: 15px; color: var(--text2); margin-top: 8px; line-height: 1.6; }
+    .hero-sub { font-size: 14.5px; color: var(--text2); margin-top: 8px; line-height: 1.6; }
 
     /* ── Two-col layout ──────────────────────────────────────────────────────── */
-    .split { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+    .split { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
 
     /* ── Forms ───────────────────────────────────────────────────────────────── */
-    .form-row { display: grid; gap: 14px; margin-bottom: 16px; }
+    .form-row { display: grid; gap: 12px; margin-bottom: 14px; }
     .form-row-2 { grid-template-columns: 1fr 1fr; }
     .form-row-3 { grid-template-columns: 1fr 1fr 1fr; }
-    .form-actions { display: flex; gap: 8px; margin-top: 8px; }
+    .form-actions { display: flex; gap: 8px; margin-top: 6px; }
 
     /* ── Control bar ─────────────────────────────────────────────────────────── */
     .ctrl-bar {
       display: flex;
       align-items: flex-end;
-      gap: 12px;
+      gap: 10px;
       flex-wrap: wrap;
-      margin-bottom: 24px;
+      margin-bottom: 20px;
     }
-    .ctrl-group { display: flex; flex-direction: column; gap: 6px; min-width: 140px; }
+    .ctrl-group { display: flex; flex-direction: column; gap: 5px; min-width: 140px; }
 
     /* ── Section title ───────────────────────────────────────────────────────── */
     .section-title {
-      font-size: 14px;
-      font-weight: 700;
+      font-size: 13px;
+      font-weight: 600;
       color: var(--text);
-      margin-bottom: 14px;
+      margin-bottom: 12px;
       display: flex;
       align-items: center;
-      gap: 10px;
+      gap: 8px;
     }
     .section-title .count {
       font-size: 11px;
-      font-weight: 700;
-      color: var(--text);
-      background: #E2E8F0;
-      padding: 2px 9px;
+      font-weight: 600;
+      color: var(--text3);
+      background: rgba(0,0,0,0.06);
+      padding: 2px 8px;
       border-radius: 99px;
     }
 
@@ -625,10 +533,8 @@ Here is the complete, updated file with the integrated design enhancements:
       align-items: center;
       justify-content: space-between;
       cursor: pointer;
-      margin-bottom: 10px;
+      margin-bottom: 8px;
       user-select: none;
-      padding: 8px 4px;
-      border-bottom: 1px dashed var(--border);
     }
     .at-sec-hdr:hover .at-sec-toggle { color: var(--text); }
     .at-sec-toggle {
@@ -637,13 +543,13 @@ Here is the complete, updated file with the integrated design enhancements:
       cursor: pointer;
       color: var(--text3);
       font-size: 11px;
-      padding: 0 4px;
+      padding: 0 3px;
       line-height: 1;
       flex-shrink: 0;
     }
     .at-sec-title {
-      font-size: 14px;
-      font-weight: 700;
+      font-size: 13px;
+      font-weight: 600;
       color: var(--text);
     }
     .at-sec-body.collapsed { display: none; }
@@ -651,59 +557,56 @@ Here is the complete, updated file with the integrated design enhancements:
     /* ── Screenshots grid ────────────────────────────────────────────────────── */
     .screenshots-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-      gap: 16px;
+      grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+      gap: 12px;
     }
     .screenshot-card {
-      border: 1.5px solid var(--border);
+      border: 1px solid var(--border);
       border-radius: var(--r-sm);
       overflow: hidden;
       cursor: pointer;
       transition: border-color .18s, transform .18s, box-shadow .18s;
-      background: var(--bg2);
     }
     .screenshot-card:hover {
-      border-color: var(--accent);
-      transform: translateY(-2.5px);
-      box-shadow: 0 8px 24px rgba(99, 102, 241, 0.12);
+      border-color: var(--g2);
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(91,61,245,0.18);
     }
-    .screenshot-card img { width: 100%; height: 125px; object-fit: cover; display: block; }
-    .screenshot-card .sc-label { padding: 10px 14px; background: var(--card2); }
-    .screenshot-card .sc-meta { font-size: 12.5px; color: var(--text); font-weight: 600; }
-    .screenshot-card .sc-name { font-family: 'JetBrains Mono', monospace; font-size: 10px; color: var(--text3); margin-top: 4px; }
+    .screenshot-card img { width: 100%; height: 110px; object-fit: cover; display: block; }
+    .screenshot-card .sc-label { padding: 7px 10px; background: var(--card2); }
+    .screenshot-card .sc-meta { font-size: 12px; color: var(--text2); font-weight: 500; }
+    .screenshot-card .sc-name { font-family: 'JetBrains Mono', monospace; font-size: 10px; color: var(--text3); margin-top: 2px; }
 
     /* ── PR cards ────────────────────────────────────────────────────────────── */
     .pr-card {
       display: flex;
       align-items: center;
-      gap: 14px;
-      padding: 16px 12px;
+      gap: 12px;
+      padding: 14px 0;
       border-bottom: 1px solid var(--border);
-      transition: background 0.18s, border-radius 0.18s;
     }
     .pr-card:last-child { border-bottom: none; }
     .pr-avatar {
-      width: 36px; height: 36px;
+      width: 32px; height: 32px;
       border-radius: 50%;
       background: var(--gradient);
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 13.5px;
+      font-size: 13px;
       font-weight: 700;
-      color: #FFFFFF;
+      color: #fff;
       flex-shrink: 0;
-      box-shadow: 0 2px 8px rgba(79, 70, 229, 0.2);
     }
     .pr-info { flex: 1; min-width: 0; }
-    .pr-title { font-size: 13.5px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--text); }
-    .pr-meta { font-size: 11.5px; color: var(--text3); margin-top: 3px; }
+    .pr-title { font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .pr-meta { font-size: 11px; color: var(--text3); margin-top: 2px; }
     .pr-branch {
       font-family: 'JetBrains Mono', monospace;
       font-size: 10.5px;
-      background: #F1F5F9;
+      background: rgba(0,0,0,0.06);
       border: 1px solid var(--border);
-      padding: 3px 10px;
+      padding: 2px 8px;
       border-radius: 99px;
       color: var(--text2);
       white-space: nowrap;
@@ -712,84 +615,85 @@ Here is the complete, updated file with the integrated design enhancements:
     /* ── Report cards ────────────────────────────────────────────────────────── */
     .report-card {
       background: var(--card);
-      border: 1.5px solid var(--border);
+      border: 1px solid var(--border);
       border-radius: var(--r);
-      padding: 20px;
-      transition: border-color .2s, box-shadow .2s;
+      padding: 18px;
+      transition: border-color .2s;
       display: flex;
       align-items: center;
-      gap: 16px;
+      gap: 14px;
     }
-    .report-card:hover { border-color: var(--border-hover); box-shadow: var(--shadow-md); }
+    .report-card:hover { border-color: var(--border-hover); }
     .report-icon {
-      width: 44px; height: 44px;
+      width: 40px; height: 40px;
       border-radius: var(--r-sm);
       background: var(--info-bg);
-      border: 1.5px solid rgba(99, 102, 241, 0.15);
+      border: 1px solid rgba(91,61,245,0.2);
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 20px;
+      font-size: 18px;
       flex-shrink: 0;
     }
     .report-info { flex: 1; min-width: 0; }
-    .report-name { font-size: 13.5px; font-weight: 600; font-family: 'JetBrains Mono', monospace; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .report-meta { font-size: 11.5px; color: var(--text3); margin-top: 4px; }
-    .reports-grid { display: flex; flex-direction: column; gap: 12px; }
+    .report-name { font-size: 13px; font-weight: 600; font-family: 'JetBrains Mono', monospace; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .report-meta { font-size: 11px; color: var(--text3); margin-top: 3px; }
+    .reports-grid { display: flex; flex-direction: column; gap: 10px; }
 
     /* ── Report viewer modal ──────────────────────────────────────────────────── */
     .report-viewer {
-      background: #0F172A; /* Slate 900 for dark developer styled viewer */
-      border: 1.5px solid #1E293B;
+      background: var(--card);
+      border: 1px solid var(--border);
       border-radius: var(--r);
       padding: 24px;
       font-family: 'JetBrains Mono', monospace;
       font-size: 12px;
-      line-height: 1.8;
+      line-height: 1.75;
       white-space: pre-wrap;
-      color: #E2E8F0;
-      max-height: 540px;
+      color: var(--text2);
+      max-height: 520px;
       overflow-y: auto;
     }
 
     /* ── PR review output ────────────────────────────────────────────────────── */
     .review-output {
       background: var(--card);
-      border: 1.5px solid var(--border);
+      border: 1px solid var(--border);
       border-radius: var(--r);
-      padding: 26px;
-      line-height: 1.75;
+      padding: 24px;
+      line-height: 1.7;
       max-height: 600px;
       overflow-y: auto;
     }
-    .review-output h1 { font-size: 18px; margin-bottom: 16px; color: var(--text); font-weight: 800; }
+    .review-output h1 { font-size: 17px; margin-bottom: 14px; color: var(--text); font-weight: 700; }
     .review-output h2 {
-      font-size: 14.5px; margin: 24px 0 12px; color: var(--text); font-weight: 700;
-      padding: 10px 16px; border-radius: var(--r-xs);
-      background: #F1F5F9; border-left: 4px solid var(--accent);
+      font-size: 14px; margin: 20px 0 10px; color: var(--text); font-weight: 700;
+      padding: 8px 14px; border-radius: var(--r-xs);
+      background: rgba(0,0,0,0.04); border-left: 3px solid var(--g2);
     }
-    .review-output h3 { font-size: 13.5px; margin: 16px 0 8px; color: var(--accent); font-weight: 600; }
-    .review-output p  { color: var(--text2); margin: 8px 0; }
-    .review-output li { color: var(--text2); margin: 6px 0 6px 24px; }
-    .review-output hr { border: none; border-top: 1.5px solid var(--border); margin: 20px 0; }
-    .review-output code { font-family: 'JetBrains Mono', monospace; font-size: 12px; background: #0F172A; padding: 3px 7px; border-radius: 4px; color: #F87171; }
-    .review-output strong { color: var(--text); font-weight: 700; }
+    .review-output h3 { font-size: 13px; margin: 14px 0 6px; color: #5B3DF5; }
+    .review-output p  { color: var(--text2); margin: 7px 0; }
+    .review-output li { color: var(--text2); margin: 5px 0 5px 22px; }
+    .review-output hr { border: none; border-top: 1px solid var(--border); margin: 18px 0; }
+    .review-output code { font-family: 'JetBrains Mono', monospace; font-size: 12px; background: rgba(0,0,0,0.06); padding: 2px 6px; border-radius: 4px; color: #5B3DF5; }
+    .review-output strong { color: var(--text); font-weight: 600; }
 
     /* ── Branch badges ───────────────────────────────────────────────────────── */
-    .branch-list { display: flex; flex-wrap: wrap; gap: 8px; }
+    .branch-list { display: flex; flex-wrap: wrap; gap: 6px; }
     .branch-badge {
       font-family: 'JetBrains Mono', monospace;
       font-size: 11.5px;
-      background: #F1F5F9;
-      border: 1.5px solid var(--border);
-      padding: 5px 12px;
+      background: rgba(0,0,0,0.04);
+      border: 1px solid var(--border);
+      padding: 4px 10px;
       border-radius: 99px;
       cursor: pointer;
       transition: all .18s;
       color: var(--text2);
     }
-    .branch-badge:hover  { border-color: var(--accent); background: #EEF2FF; color: var(--accent); }
-    .branch-badge.active { border-color: var(--accent); background: #EEF2FF; color: var(--accent); font-weight: 600; }
+    .branch-badge:hover  { border-color: var(--g1); background: #EEF2FF; color: #5B3DF5; }
+    .branch-badge.active { border-color: var(--g1); background: #EEF2FF; color: #5B3DF5; font-weight: 600; }
+
 
     /* ── Collapsible ─────────────────────────────────────────────────────────── */
     .collapsible-header {
@@ -801,60 +705,59 @@ Here is the complete, updated file with the integrated design enhancements:
     }
     .collapsible-header .chevron { transition: transform .2s; color: var(--text3); font-size: 14px; }
     .collapsible-header.open .chevron { transform: rotate(180deg); }
-    .collapsible-body { display: none; margin-top: 20px; }
+    .collapsible-body { display: none; margin-top: 18px; }
     .collapsible-body.open { display: block; }
 
     /* ── Notice ──────────────────────────────────────────────────────────────── */
     .notice {
       display: flex;
       align-items: flex-start;
-      gap: 11px;
+      gap: 10px;
       background: var(--info-bg);
-      border: 1.5px solid rgba(99, 102, 241, 0.22);
+      border: 1px solid rgba(91,61,245,0.25);
       border-radius: var(--r-sm);
-      padding: 12px 18px;
-      font-size: 13px;
-      color: #4F46E5;
-      margin-bottom: 20px;
-      font-weight: 500;
+      padding: 11px 15px;
+      font-size: 12.5px;
+      color: #5B3DF5;
+      margin-bottom: 18px;
     }
-    .notice.warn { background: var(--warn-bg); border-color: rgba(245, 158, 11, 0.22); color: #B45309; }
+    .notice.warn { background: var(--warn-bg); border-color: rgba(217,119,6,0.25); color: #D97706; }
 
     /* ── Toast ───────────────────────────────────────────────────────────────── */
     #toast-container {
       position: fixed;
-      top: 24px;
-      right: 24px;
+      top: 20px;
+      right: 20px;
       display: flex;
       flex-direction: column;
-      gap: 10px;
+      gap: 8px;
       z-index: 9999;
       pointer-events: none;
     }
     .toast {
       display: flex;
       align-items: center;
-      gap: 12px;
-      padding: 14px 18px;
+      gap: 10px;
+      padding: 13px 16px;
       background: var(--bg2);
       border: 1.5px solid var(--border);
-      border-radius: var(--r);
-      min-width: 320px;
-      max-width: 440px;
-      box-shadow: 0 10px 30px rgba(15, 23, 42, 0.12), 0 2px 8px rgba(15, 23, 42, 0.04);
-      animation: toastIn .28s cubic-bezier(0.16, 1, 0.3, 1);
-      font-size: 13.5px;
+      border-radius: 10px;
+      min-width: 300px;
+      max-width: 420px;
+      box-shadow: 0 8px 32px rgba(13,18,38,0.12), 0 1px 4px rgba(13,18,38,0.06);
+      animation: toastIn .25s cubic-bezier(0.16, 1, 0.3, 1);
+      font-size: 13px;
       pointer-events: all;
     }
-    .toast.success { border-color: rgba(16, 185, 129, 0.35); background: #ECFDF5; color: #065F46; }
-    .toast.error   { border-color: rgba(239, 68, 68, 0.35); background: #FEF2F2; color: #991B1B; }
-    .toast.warn    { border-color: rgba(245, 158, 11, 0.35); background: #FFFBEB; color: #92400E; }
-    .toast-icon    { font-size: 16px; flex-shrink: 0; }
-    .toast-msg     { flex: 1; font-weight: 500; line-height: 1.45; }
-    .toast-close   { cursor: pointer; color: var(--text3); font-size: 16px; line-height: 1; flex-shrink: 0; padding-left: 6px; }
+    .toast.success { border-color: rgba(5,150,105,0.3); background: rgba(5,150,105,0.03); }
+    .toast.error   { border-color: rgba(220,38,38,0.3); background: rgba(220,38,38,0.03); }
+    .toast.warn    { border-color: rgba(217,119,6,0.3); background: rgba(217,119,6,0.03); }
+    .toast-icon    { font-size: 15px; flex-shrink: 0; }
+    .toast-msg     { flex: 1; color: var(--text); line-height: 1.4; }
+    .toast-close   { cursor: pointer; color: var(--text3); font-size: 16px; line-height: 1; flex-shrink: 0; }
     .toast-close:hover { color: var(--text); }
     @keyframes toastIn {
-      from { transform: translateX(30px); opacity: 0; }
+      from { transform: translateX(20px); opacity: 0; }
       to   { transform: translateX(0);    opacity: 1; }
     }
 
@@ -862,8 +765,8 @@ Here is the complete, updated file with the integrated design enhancements:
     .modal-overlay {
       display: none;
       position: fixed; inset: 0;
-      background: rgba(15, 23, 42, 0.6);
-      backdrop-filter: blur(8px);
+      background: rgba(5,8,25,0.65);
+      backdrop-filter: blur(6px);
       z-index: 1000;
       align-items: center;
       justify-content: center;
@@ -873,57 +776,56 @@ Here is the complete, updated file with the integrated design enhancements:
       background: var(--bg2);
       border: 1.5px solid var(--border);
       border-radius: 14px;
-      padding: 32px;
-      width: min(840px, 94vw);
-      max-height: 86vh;
+      padding: 28px;
+      width: min(820px, 92vw);
+      max-height: 88vh;
       display: flex;
       flex-direction: column;
-      gap: 20px;
-      box-shadow: 0 24px 70px rgba(15, 23, 42, 0.18), 0 4px 16px rgba(15, 23, 42, 0.08);
+      gap: 18px;
+      box-shadow: 0 24px 80px rgba(5,8,25,0.18), 0 4px 16px rgba(5,8,25,0.08);
       animation: modalIn .22s cubic-bezier(0.16, 1, 0.3, 1);
     }
     @keyframes modalIn { from { transform: scale(0.96); opacity: 0; } to { transform: scale(1); opacity: 1; } }
-    @keyframes modalUp  { from { transform: translateY(32px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
-    .modal-header { display: flex; justify-content: space-between; align-items: center; padding-bottom: 18px; border-bottom: 1.5px solid var(--border); margin-bottom: -4px; }
-    .modal-title  { font-size: 16px; font-weight: 800; letter-spacing: -0.2px; }
-    .modal-close  { cursor: pointer; color: var(--text3); font-size: 18px; line-height: 1; transition: color .15s, background .15s; width: 30px; height: 30px; display: flex; align-items: center; justify-content: center; border-radius: 6px; }
+    @keyframes modalUp  { from { transform: translateY(24px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+    .modal-header { display: flex; justify-content: space-between; align-items: center; padding-bottom: 16px; border-bottom: 1.5px solid var(--border); margin-bottom: -4px; }
+    .modal-title  { font-size: 15px; font-weight: 700; letter-spacing: -0.2px; }
+    .modal-close  { cursor: pointer; color: var(--text3); font-size: 18px; line-height: 1; transition: color .15s; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; border-radius: 6px; }
     .modal-close:hover { color: var(--text); background: var(--card2); }
     .modal-body   { overflow-y: auto; }
 
     /* ── Inventory modal filter buttons ──────────────────────────────────────── */
     .inv-filter-btn {
-      padding: 5px 12px; border-radius: 99px; font-size: 11px; font-weight: 700;
-      border: 1.5px solid var(--border); background: transparent; color: var(--text2);
-      cursor: pointer; transition: all .14s ease-in-out;
+      padding: 4px 10px; border-radius: 99px; font-size: 11px; font-weight: 600;
+      border: 1px solid var(--border); background: transparent; color: var(--text2);
+      cursor: pointer; transition: all .12s;
     }
     .inv-filter-btn:hover { border-color: var(--border-hover); color: var(--text); }
-    .inv-filter-btn.active { background: var(--accent); border-color: var(--accent); color: #FFFFFF; box-shadow: 0 2px 8px rgba(99, 102, 241, 0.2); }
+    .inv-filter-btn.active { background: var(--accent); border-color: var(--accent); color: #fff; }
     /* method badge colours in inventory modal */
-    .mb-GET    { background: #16A34A; color:#FFFFFF; }
-    .mb-POST   { background: #2563EB; color:#FFFFFF; }
-    .mb-PATCH  { background: #D97706; color:#FFFFFF; }
-    .mb-DELETE { background: #DC2626; color:#FFFFFF; }
-    .mb-PUT    { background: #9333EA; color:#FFFFFF; }
+    .mb-GET    { background: #1a7f37; color:#fff; }
+    .mb-POST   { background: #0969da; color:#fff; }
+    .mb-PATCH  { background: #bc4c00; color:#fff; }
+    .mb-DELETE { background: #cf222e; color:#fff; }
+    .mb-PUT    { background: #8250df; color:#fff; }
 
     /* ── Current branch display ──────────────────────────────────────────────── */
     .branch-current {
       font-family: 'JetBrains Mono', monospace;
       font-size: 12px;
       background: var(--info-bg);
-      border: 1.5px solid rgba(99, 102, 241, 0.2);
-      padding: 6px 14px;
+      border: 1px solid rgba(91,61,245,0.2);
+      padding: 5px 12px;
       border-radius: 99px;
-      color: #4F46E5;
+      color: #5B3DF5;
       display: inline-flex;
       align-items: center;
-      gap: 8px;
-      font-weight: 500;
+      gap: 6px;
     }
 
     /* ── Repo header ─────────────────────────────────────────────────────────── */
-    .repo-header { margin-bottom: 20px; }
-    .repo-name { font-size: 17px; font-weight: 800; letter-spacing: -0.2px; }
-    .repo-sub  { font-size: 12.5px; color: var(--text3); margin-top: 4px; }
+    .repo-header { margin-bottom: 18px; }
+    .repo-name { font-size: 16px; font-weight: 700; letter-spacing: -0.2px; }
+    .repo-sub  { font-size: 12px; color: var(--text3); margin-top: 4px; }
 
     /* ── Util ────────────────────────────────────────────────────────────────── */
     .mt8  { margin-top: 8px; }
@@ -944,45 +846,44 @@ Here is the complete, updated file with the integrated design enhancements:
 
     /* ── Animations ──────────────────────────────────────────────────────────── */
     @keyframes spin    { to { transform: rotate(360deg); } }
-    @keyframes fadeIn  { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
-    .fade-in { animation: fadeIn .25s ease-out; }
+    @keyframes fadeIn  { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+    .fade-in { animation: fadeIn .25s ease; }
 
     /* ── Divider ─────────────────────────────────────────────────────────────── */
-    .divider { height: 1.5px; background: var(--border); margin: 24px 0; }
+    .divider { height: 1px; background: var(--border); margin: 20px 0; }
 
     /* ── AI Chat ─────────────────────────────────────────────────────────────── */
-    .ai-msg { display: flex; gap: 12px; align-items: flex-start; animation: fadeIn .22s ease-out; }
+    .ai-msg { display: flex; gap: 10px; align-items: flex-start; animation: fadeIn .2s ease; }
     .ai-msg-user { flex-direction: row-reverse; }
     .ai-avatar {
-      width: 32px; height: 32px; border-radius: 50%;
+      width: 30px; height: 30px; border-radius: 50%;
       display: flex; align-items: center; justify-content: center;
-      flex-shrink: 0; font-size: 15px;
+      flex-shrink: 0; font-size: 14px;
     }
-    .ai-avatar-bot { background: var(--gradient); color: #FFFFFF; box-shadow: 0 4px 10px rgba(79, 70, 229, 0.25); }
-    .ai-avatar-user { background: #E2E8F0; color: var(--text2); border: 1.5px solid var(--border); }
+    .ai-avatar-bot { background: var(--gradient); color: #fff; box-shadow: 0 2px 8px rgba(91,61,245,0.35); }
+    .ai-avatar-user { background: rgba(0,0,0,0.06); color: var(--text2); border: 1px solid var(--border); }
     .ai-bubble {
-      max-width: 80%;
-      padding: 12px 18px;
-      border-radius: 14px;
+      max-width: 78%;
+      padding: 11px 14px;
+      border-radius: 12px;
       font-size: 13.5px;
-      line-height: 1.65;
+      line-height: 1.6;
       white-space: pre-wrap;
     }
     .ai-msg-assistant .ai-bubble {
       background: var(--card2);
-      border: 1.5px solid var(--border);
+      border: 1px solid var(--border);
       color: var(--text);
       border-top-left-radius: 4px;
     }
     .ai-msg-user .ai-bubble {
       background: var(--gradient);
-      color: #FFFFFF;
+      color: #fff;
       border-top-right-radius: 4px;
-      box-shadow: 0 4px 12px rgba(79, 70, 229, 0.15);
     }
-    .ai-typing { display: flex; gap: 5px; align-items: center; padding: 16px; }
+    .ai-typing { display: flex; gap: 4px; align-items: center; padding: 14px; }
     .ai-typing span {
-      width: 8px; height: 8px; border-radius: 50%;
+      width: 7px; height: 7px; border-radius: 50%;
       background: var(--text3);
       animation: ai-bounce 1.2s ease-in-out infinite;
     }
@@ -990,30 +891,29 @@ Here is the complete, updated file with the integrated design enhancements:
     .ai-typing span:nth-child(3) { animation-delay: .4s; }
     @keyframes ai-bounce {
       0%, 80%, 100% { transform: translateY(0); }
-      40% { transform: translateY(-7px); }
+      40% { transform: translateY(-6px); }
     }
     .code-pill {
       font-family: 'JetBrains Mono', monospace;
       font-size: 11px;
-      background: #F1F5F9;
-      border: 1.5px solid var(--border);
-      padding: 4px 8px;
+      background: rgba(0,0,0,0.06);
+      border: 1px solid var(--border);
+      padding: 3px 8px;
       border-radius: var(--r-xs);
       color: var(--text2);
-      font-weight: 500;
     }
 
     /* ── Generate report buttons row ─────────────────────────────────────────── */
-    .gen-row { display: flex; gap: 12px; margin-bottom: 24px; flex-wrap: wrap; }
-    .gen-btn-wrap { display: flex; flex-direction: column; gap: 8px; }
-    .gen-env-label { font-size: 11px; font-weight: 700; color: var(--text3); text-align: center; text-transform: uppercase; letter-spacing: 0.08em; }
+    .gen-row { display: flex; gap: 10px; margin-bottom: 24px; flex-wrap: wrap; }
+    .gen-btn-wrap { display: flex; flex-direction: column; gap: 6px; }
+    .gen-env-label { font-size: 11px; font-weight: 600; color: var(--text3); text-align: center; text-transform: uppercase; letter-spacing: 0.06em; }
 
     /* ── Top gradient bar ────────────────────────────────────────────────────── */
     #top-gradient-bar {
       position: fixed;
       top: 0; left: 0; right: 0;
-      height: 3.5px;
-      background: linear-gradient(90deg, #4F46E5, #7C3AED, #4F46E5, #7C3AED, #4F46E5);
+      height: 3px;
+      background: linear-gradient(90deg, #5B3DF5, #8B5CF6, #5B3DF5, #8B5CF6, #5B3DF5);
       background-size: 300% 100%;
       z-index: 99999;
       animation: bar-shift 5s ease infinite;
@@ -1024,22 +924,25 @@ Here is the complete, updated file with the integrated design enhancements:
       100% { background-position: 0% 50%; }
     }
 
+    /* ── Hero ────────────────────────────────────────────────────────────────── */
+    .hero { }
+
     /* ── Env card pass/fail borders ──────────────────────────────────────────── */
     .env-card-pass {
-      border-color: rgba(16, 185, 129, 0.45) !important;
-      box-shadow: 0 0 0 1px rgba(16, 185, 129, 0.08), 0 8px 30px rgba(16, 185, 129, 0.08) !important;
+      border-color: rgba(34,197,94,0.45) !important;
+      box-shadow: 0 0 0 1px rgba(34,197,94,0.12), 0 4px 24px rgba(34,197,94,0.12) !important;
     }
     .env-card-fail {
-      border-color: rgba(239, 68, 68, 0.45) !important;
-      box-shadow: 0 0 0 1px rgba(239, 68, 68, 0.08), 0 8px 30px rgba(239, 68, 68, 0.08) !important;
+      border-color: rgba(239,68,68,0.45) !important;
+      box-shadow: 0 0 0 1px rgba(239,68,68,0.12), 0 4px 24px rgba(239,68,68,0.12) !important;
     }
 
     /* ── Lightbox ────────────────────────────────────────────────────────────── */
     #lightbox {
       display: none;
       position: fixed; inset: 0;
-      background: rgba(15, 23, 42, 0.94);
-      backdrop-filter: blur(12px);
+      background: rgba(0,0,0,0.92);
+      backdrop-filter: blur(10px);
       z-index: 10000;
       align-items: center;
       justify-content: center;
@@ -1048,30 +951,30 @@ Here is the complete, updated file with the integrated design enhancements:
     }
     #lightbox.open { display: flex; }
     #lightbox img {
-      max-width: 92vw;
+      max-width: 90vw;
       max-height: 88vh;
       border-radius: var(--r);
-      box-shadow: 0 32px 96px rgba(0, 0, 0, 0.8);
+      box-shadow: 0 32px 96px rgba(0,0,0,0.9);
       animation: modalIn .22s cubic-bezier(0.16,1,0.3,1);
       cursor: default;
     }
     #lightbox-close {
       position: absolute;
-      top: 24px; right: 30px;
-      font-size: 28px;
-      color: rgba(255,255,255,0.7);
+      top: 20px; right: 26px;
+      font-size: 26px;
+      color: rgba(255,255,255,0.65);
       cursor: pointer;
       line-height: 1;
       transition: color .15s;
     }
-    #lightbox-close:hover { color: #FFFFFF; }
+    #lightbox-close:hover { color: #fff; }
     #lightbox-label {
       position: absolute;
-      bottom: 24px; left: 50%;
+      bottom: 20px; left: 50%;
       transform: translateX(-50%);
-      font-size: 11.5px;
+      font-size: 11px;
       font-family: 'JetBrains Mono', monospace;
-      color: rgba(255,255,255,0.5);
+      color: rgba(255,255,255,0.45);
       white-space: nowrap;
     }
 
@@ -1094,33 +997,37 @@ Here is the complete, updated file with the integrated design enhancements:
       color: var(--text3);
       display: flex;
       align-items: center;
-      gap: 6px;
+      gap: 5px;
       white-space: nowrap;
-      font-weight: 500;
     }
     .last-updated-badge .lu-dot {
-      width: 5.5px; height: 5.5px;
+      width: 5px; height: 5px;
       border-radius: 50%;
       background: var(--text3);
       flex-shrink: 0;
     }
 
+    /* ── Activity item clickable ─────────────────────────────────────────────── */
+    .activity-item { cursor: pointer; border-radius: var(--r-xs); transition: background .14s; }
+    .activity-item:hover { background: rgba(91,61,245,0.06); }
+    .activity-thumb { cursor: zoom-in; }
+
     /* ── Slide Panel ─────────────────────────────────────────────────────────── */
     .panel-overlay {
       display: none;
       position: fixed; inset: 0;
-      background: rgba(15, 23, 42, 0.5);
-      backdrop-filter: blur(4px);
+      background: rgba(0,0,0,0.5);
+      backdrop-filter: blur(3px);
       z-index: 1100;
     }
     .panel-overlay.open { display: block; }
     .slide-panel {
       position: fixed;
       top: 0; right: 0; bottom: 0;
-      width: min(580px, 94vw);
+      width: min(560px, 94vw);
       background: var(--bg2);
-      border-left: 1.5px solid var(--border-hover);
-      box-shadow: -16px 0 64px rgba(15, 23, 42, 0.16);
+      border-left: 1px solid var(--border-hover);
+      box-shadow: -12px 0 56px rgba(0,0,0,0.16);
       z-index: 1200;
       display: flex;
       flex-direction: column;
@@ -1132,27 +1039,27 @@ Here is the complete, updated file with the integrated design enhancements:
     .panel-header {
       display: flex;
       align-items: center;
-      gap: 16px;
-      padding: 24px 28px;
-      border-bottom: 1.5px solid var(--border);
+      gap: 14px;
+      padding: 20px 24px;
+      border-bottom: 1px solid var(--border);
       flex-shrink: 0;
       background: var(--card);
     }
     .panel-key-badge {
       font-family: 'JetBrains Mono', monospace;
       font-size: 12px;
-      font-weight: 700;
-      color: #4F46E5;
+      font-weight: 600;
+      color: #5B3DF5;
       background: var(--info-bg);
-      border: 1.5px solid rgba(79, 70, 229, 0.2);
-      padding: 5px 12px;
+      border: 1px solid rgba(91,61,245,0.25);
+      padding: 4px 10px;
       border-radius: 99px;
       white-space: nowrap;
       flex-shrink: 0;
     }
     .panel-title {
-      font-size: 15px;
-      font-weight: 800;
+      font-size: 14px;
+      font-weight: 700;
       flex: 1;
       min-width: 0;
       overflow: hidden;
@@ -1165,167 +1072,164 @@ Here is the complete, updated file with the integrated design enhancements:
       color: var(--text3);
       font-size: 20px;
       line-height: 1;
-      transition: color .15s, background 0.15s;
+      transition: color .15s;
       flex-shrink: 0;
-      width: 30px; height: 30px;
+      width: 28px; height: 28px;
       display: flex; align-items: center; justify-content: center;
       border-radius: var(--r-xs);
     }
-    .panel-close:hover { color: var(--text); background: rgba(148, 163, 184, 0.12); }
+    .panel-close:hover { color: var(--text); background: rgba(0,0,0,0.06); }
     .panel-body {
       flex: 1;
       overflow-y: auto;
-      padding: 28px;
+      padding: 24px;
     }
-    .panel-section { margin-bottom: 24px; }
+    .panel-section { margin-bottom: 20px; }
     .panel-label {
-      font-size: 11px;
-      font-weight: 800;
+      font-size: 10.5px;
+      font-weight: 700;
       text-transform: uppercase;
       letter-spacing: 0.08em;
       color: var(--text3);
-      margin-bottom: 8px;
+      margin-bottom: 6px;
     }
     .panel-value {
-      font-size: 13.5px;
+      font-size: 13px;
       color: var(--text);
-      line-height: 1.65;
+      line-height: 1.6;
     }
     .panel-footer {
-      padding: 20px 28px;
-      border-top: 1.5px solid var(--border);
+      padding: 18px 24px;
+      border-top: 1px solid var(--border);
       flex-shrink: 0;
       background: var(--card);
     }
     .panel-meta-row {
       display: flex;
-      gap: 10px;
+      gap: 8px;
       flex-wrap: wrap;
-      margin-bottom: 24px;
+      margin-bottom: 20px;
       align-items: center;
     }
     .comment-item {
-      padding: 14px 18px;
+      padding: 13px 15px;
       background: var(--card);
-      border: 1.5px solid var(--border);
+      border: 1px solid var(--border);
       border-radius: var(--r-sm);
-      margin-bottom: 12px;
-      box-shadow: var(--shadow);
+      margin-bottom: 10px;
     }
     .comment-header {
       display: flex;
       align-items: center;
-      gap: 10px;
-      margin-bottom: 8px;
+      gap: 8px;
+      margin-bottom: 6px;
     }
     .comment-author {
-      font-size: 12.5px;
-      font-weight: 700;
-      color: #4F46E5;
+      font-size: 12px;
+      font-weight: 600;
+      color: #5B3DF5;
     }
     .comment-date {
-      font-size: 11px;
+      font-size: 10.5px;
       color: var(--text3);
     }
     .comment-body {
-      font-size: 13px;
+      font-size: 12.5px;
       color: var(--text2);
-      line-height: 1.65;
+      line-height: 1.6;
       white-space: pre-wrap;
       word-break: break-word;
     }
     .pr-branch-flow {
       display: flex;
       align-items: center;
-      gap: 10px;
+      gap: 8px;
       flex-wrap: wrap;
     }
     .pr-branch-tag {
       font-family: 'JetBrains Mono', monospace;
       font-size: 11.5px;
       background: var(--info-bg);
-      border: 1.5px solid rgba(79, 70, 229, 0.15);
-      padding: 4px 12px;
+      border: 1px solid rgba(91,61,245,0.2);
+      padding: 3px 10px;
       border-radius: 99px;
-      color: #4F46E5;
-      font-weight: 500;
+      color: #5B3DF5;
     }
-    .pr-arrow { color: var(--text3); font-size: 14px; }
+    .pr-arrow { color: var(--text3); font-size: 13px; }
     .pr-body-text {
-      font-size: 13px;
+      font-size: 12.5px;
       color: var(--text2);
-      line-height: 1.7;
+      line-height: 1.65;
       white-space: pre-wrap;
       word-break: break-word;
-      background: var(--card2);
-      border: 1.5px solid var(--border);
+      background: var(--card);
+      border: 1px solid var(--border);
       border-radius: var(--r-sm);
-      padding: 16px;
-      max-height: 240px;
+      padding: 14px;
+      max-height: 220px;
       overflow-y: auto;
     }
     .pr-review-panel-output {
       background: var(--card);
-      border: 1.5px solid var(--border);
+      border: 1px solid var(--border);
       border-radius: var(--r);
-      padding: 20px;
-      line-height: 1.75;
-      margin-top: 18px;
+      padding: 18px;
+      line-height: 1.7;
+      margin-top: 16px;
       font-size: 13px;
     }
-    .pr-review-panel-output h1 { font-size: 16px; margin-bottom: 14px; font-weight: 800; }
-    .pr-review-panel-output h2 { font-size: 13.5px; margin: 18px 0 10px; font-weight: 700; padding: 8px 14px; background: rgba(15, 23, 42, 0.04); border-left: 4px solid var(--g2); border-radius: var(--r-xs); }
-    .pr-review-panel-output h3 { font-size: 13px; margin: 14px 0 6px; color: #4F46E5; }
+    .pr-review-panel-output h1 { font-size: 15px; margin-bottom: 12px; font-weight: 700; }
+    .pr-review-panel-output h2 { font-size: 13px; margin: 16px 0 8px; font-weight: 700; padding: 6px 12px; background: rgba(0,0,0,0.04); border-left: 3px solid var(--g2); border-radius: var(--r-xs); }
+    .pr-review-panel-output h3 { font-size: 12.5px; margin: 12px 0 5px; color: #5B3DF5; }
     .pr-review-panel-output p  { color: var(--text2); margin: 6px 0; }
-    .pr-review-panel-output li { color: var(--text2); margin: 4px 0 4px 22px; }
-    .pr-review-panel-output code { font-family: 'JetBrains Mono', monospace; font-size: 12px; background: rgba(15, 23, 42, 0.06); padding: 2px 6px; border-radius: 3.5px; color: #4F46E5; }
-    .pr-review-panel-output strong { color: var(--text); font-weight: 700; }
+    .pr-review-panel-output li { color: var(--text2); margin: 4px 0 4px 20px; }
+    .pr-review-panel-output code { font-family: 'JetBrains Mono', monospace; font-size: 11.5px; background: rgba(0,0,0,0.06); padding: 2px 5px; border-radius: 3px; color: #5B3DF5; }
+    .pr-review-panel-output strong { color: var(--text); font-weight: 600; }
     /* Jira rows clickable */
     #jira-tbody tr { cursor: pointer; }
     /* PR cards clickable */
     .pr-card { cursor: pointer; }
-    .pr-card:hover { background: #EEF2FF; border-radius: var(--r-sm); }
+    .pr-card:hover { background: #EEF2FF; border-radius: var(--r-xs); }
 
     /* ── Run QA Modal ────────────────────────────────────────────────────────── */
-    #run-qa-modal .modal-box { max-width: 490px; }
-    .rqa-field { margin-bottom: 18px; }
-    .rqa-field label { margin-bottom: 8px; }
-    .rqa-radio-group { display: flex; gap: 24px; margin-top: 6px; }
+    #run-qa-modal .modal-box { max-width: 480px; }
+    .rqa-field { margin-bottom: 16px; }
+    .rqa-field label { margin-bottom: 6px; }
+    .rqa-radio-group { display: flex; gap: 20px; margin-top: 4px; }
     .rqa-radio-label {
-      display: flex; align-items: center; gap: 8px;
-      font-size: 13.5px; font-weight: 600; cursor: pointer;
+      display: flex; align-items: center; gap: 7px;
+      font-size: 13.5px; font-weight: 500; cursor: pointer;
       color: var(--text2);
     }
-    .rqa-radio-label input[type="radio"] { accent-color: #4F46E5; width: 16px; height: 16px; cursor: pointer; }
+    .rqa-radio-label input[type="radio"] { accent-color: #5B3DF5; width: 15px; height: 15px; cursor: pointer; }
     .rqa-checkbox-row {
-      display: flex; align-items: center; gap: 8px;
-      margin-top: 8px; font-size: 12px; color: var(--text2); cursor: pointer;
+      display: flex; align-items: center; gap: 7px;
+      margin-top: 7px; font-size: 12px; color: var(--text2); cursor: pointer;
     }
-    .rqa-checkbox-row input[type="checkbox"] { accent-color: #4F46E5; cursor: pointer; }
-    .rqa-actions { display: flex; gap: 10px; margin-top: 24px; }
+    .rqa-checkbox-row input[type="checkbox"] { accent-color: #5B3DF5; cursor: pointer; }
+    .rqa-actions { display: flex; gap: 8px; margin-top: 20px; }
     .rqa-actions .btn { flex: 1; justify-content: center; }
 
     /* ── QA Progress Stages ──────────────────────────────────────────────────── */
     .qa-progress-header {
-      font-size: 15px; font-weight: 800; color: var(--text);
-      margin-bottom: 24px;
-      padding-bottom: 16px;
-      border-bottom: 1.5px solid var(--border);
+      font-size: 14px; font-weight: 700; color: var(--text);
+      margin-bottom: 22px;
+      padding-bottom: 14px;
+      border-bottom: 1px solid var(--border);
     }
     .qa-progress-key {
       font-family: 'JetBrains Mono', monospace;
-      font-size: 12.5px; color: #4F46E5;
+      font-size: 12px; color: #5B3DF5;
       background: #EEF2FF;
-      border: 1.5px solid rgba(79, 70, 229, 0.18);
-      padding: 3px 10px; border-radius: 99px;
-      margin-left: 10px;
-      font-weight: 600;
+      border: 1px solid rgba(91,61,245,0.2);
+      padding: 2px 8px; border-radius: 99px;
+      margin-left: 8px;
     }
     .qa-stage {
-      display: flex; align-items: center; gap: 14px;
-      padding: 11px 0;
+      display: flex; align-items: center; gap: 12px;
+      padding: 9px 0;
       border-bottom: 1px solid var(--border);
-      font-size: 13.5px; font-weight: 600; color: var(--text2);
+      font-size: 13px; font-weight: 500; color: var(--text2);
       transition: color .2s;
     }
     .qa-stage:last-of-type { border-bottom: none; }
@@ -1333,143 +1237,137 @@ Here is the complete, updated file with the integrated design enhancements:
     .qa-stage.done    { color: var(--text); }
     .qa-stage.error   { color: var(--error); }
     .qa-stage-icon {
-      width: 26px; height: 26px; flex-shrink: 0;
+      width: 24px; height: 24px; flex-shrink: 0;
       display: flex; align-items: center; justify-content: center;
-      font-size: 15px;
+      font-size: 14px;
     }
     .qa-spin {
-      width: 17px; height: 17px;
-      border: 2px solid rgba(79, 70, 229, 0.2);
-      border-top-color: #4F46E5;
+      width: 16px; height: 16px;
+      border: 2px solid rgba(91,61,245,0.2);
+      border-top-color: #5B3DF5;
       border-radius: 50%;
       animation: spin .65s linear infinite;
     }
     .qa-stage-sub {
-      font-size: 11.5px; font-weight: 500;
-      color: var(--text3); margin-top: 3px;
+      font-size: 11px; font-weight: 400;
+      color: var(--text3); margin-top: 2px;
     }
     .qa-results-block {
-      margin-top: 24px;
-      border: 1.5px solid var(--border);
+      margin-top: 20px;
+      border: 1px solid var(--border);
       border-radius: var(--r-sm);
       overflow: hidden;
-      box-shadow: var(--shadow);
     }
     .qa-results-header {
-      font-size: 10.5px; font-weight: 800;
-      text-transform: uppercase; letter-spacing: 0.10em;
+      font-size: 11px; font-weight: 700;
+      text-transform: uppercase; letter-spacing: 0.07em;
       color: var(--text3);
-      padding: 11px 16px;
-      background: rgba(15, 23, 42, 0.03);
-      border-bottom: 1.5px solid var(--border);
+      padding: 9px 14px;
+      background: rgba(0,0,0,0.03);
+      border-bottom: 1px solid var(--border);
     }
     .qa-result-row {
-      display: flex; align-items: center; gap: 12px;
-      padding: 12px 16px; font-size: 13px;
+      display: flex; align-items: center; gap: 10px;
+      padding: 10px 14px; font-size: 12.5px;
       border-bottom: 1px solid var(--border);
     }
     .qa-result-row:last-child { border-bottom: none; }
     .qa-tc-list {
-      margin-top: 16px;
-      font-size: 12.5px; color: var(--text2);
-      display: flex; flex-direction: column; gap: 8px;
+      margin-top: 14px;
+      font-size: 12px; color: var(--text2);
+      display: flex; flex-direction: column; gap: 6px;
     }
     .qa-tc-item {
       background: var(--card);
-      border: 1.5px solid var(--border);
+      border: 1px solid var(--border);
       border-radius: var(--r-xs);
-      padding: 11px 14px;
-      box-shadow: var(--shadow);
+      padding: 9px 12px;
     }
-    .qa-tc-name { font-weight: 700; color: var(--text); margin-bottom: 4px; }
-    .qa-tc-desc { color: var(--text2); font-size: 12px; }
+    .qa-tc-name { font-weight: 600; color: var(--text); margin-bottom: 3px; }
+    .qa-tc-desc { color: var(--text2); font-size: 11.5px; }
 
     /* ── QA Evidence / Metrics ──────────────────────────────────────────────── */
     .qa-metrics-row {
       display: flex; gap: 0;
-      border: 1.5px solid var(--border); border-radius: var(--r-sm);
-      overflow: hidden; margin-bottom: 16px;
-      box-shadow: var(--shadow);
+      border: 1px solid var(--border); border-radius: var(--r-sm);
+      overflow: hidden; margin-bottom: 14px;
     }
     .qa-metric {
       flex: 1; display: flex; flex-direction: column; align-items: center;
-      padding: 10px 6px;
-      border-right: 1.5px solid var(--border);
+      padding: 8px 4px;
+      border-right: 1px solid var(--border);
       background: var(--card);
     }
     .qa-metric:last-child { border-right: none; }
-    .qa-metric-val { font-size: 16px; font-weight: 800; color: var(--text); line-height: 1.25; }
-    .qa-metric-lbl { font-size: 10px; color: var(--text3); margin-top: 3px; text-align: center; text-transform: uppercase; font-weight: 700; letter-spacing: 0.05em; }
+    .qa-metric-val { font-size: 15px; font-weight: 700; color: var(--text); line-height: 1.2; }
+    .qa-metric-lbl { font-size: 10px; color: var(--text3); margin-top: 2px; text-align: center; }
 
     /* Step screenshots strip */
     .qa-shot-strip {
-      display: flex; gap: 10px; overflow-x: auto; padding: 8px 0;
+      display: flex; gap: 8px; overflow-x: auto; padding: 6px 0;
       scrollbar-width: thin;
     }
     .qa-shot-item { flex-shrink: 0; text-align: center; }
     .qa-shot-thumb {
-      width: 110px; height: 72px; object-fit: cover;
-      border-radius: var(--r-xs); border: 1.5px solid var(--border);
+      width: 100px; height: 64px; object-fit: cover;
+      border-radius: var(--r-xs); border: 1px solid var(--border);
       display: block; background: var(--bg2);
-      transition: transform .18s, border-color .18s;
+      transition: transform .15s;
     }
-    .qa-shot-thumb:hover { transform: scale(1.05); border-color: var(--accent); }
+    .qa-shot-thumb:hover { transform: scale(1.05); }
     .qa-shot-label {
-      font-size: 10px; color: var(--text3); margin-top: 5px;
-      max-width: 110px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-      font-weight: 500;
+      font-size: 10px; color: var(--text3); margin-top: 4px;
+      max-width: 100px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
     }
 
     /* Feature evidence */
-    .qa-ev-list { display: flex; flex-direction: column; gap: 4px; margin-bottom: 8px; }
+    .qa-ev-list { display: flex; flex-direction: column; gap: 3px; margin-bottom: 6px; }
     .qa-ev-row {
-      display: grid; grid-template-columns: 18px 1fr auto;
-      gap: 8px; align-items: baseline;
-      font-size: 12px;
+      display: grid; grid-template-columns: 16px 1fr auto;
+      gap: 6px; align-items: baseline;
+      font-size: 11.5px;
     }
     .qa-ev-desc { color: var(--text2); font-weight: 500; }
     .qa-ev-detail {
-      font-family: 'JetBrains Mono', monospace; font-size: 10.5px;
-      color: var(--text3); max-width: 180px; overflow: hidden;
+      font-family: 'JetBrains Mono', monospace; font-size: 10px;
+      color: var(--text3); max-width: 160px; overflow: hidden;
       text-overflow: ellipsis; white-space: nowrap;
     }
 
     /* Execution log (collapsible) */
-    .qa-log-details { margin-top: 6px; }
+    .qa-log-details { margin-top: 4px; }
     .qa-log-summary {
-      font-size: 12px; color: var(--text3); cursor: pointer;
-      padding: 6px 0; list-style: none; user-select: none;
-      font-weight: 600;
+      font-size: 11.5px; color: var(--text3); cursor: pointer;
+      padding: 4px 0; list-style: none; user-select: none;
     }
     .qa-log-summary:hover { color: var(--text2); }
     .qa-log-table {
-      margin-top: 8px;
-      border: 1.5px solid var(--border); border-radius: var(--r-xs);
-      overflow: hidden; font-size: 11.5px;
+      margin-top: 6px;
+      border: 1px solid var(--border); border-radius: var(--r-xs);
+      overflow: hidden; font-size: 11px;
     }
     .qa-log-row {
-      display: grid; grid-template-columns: 64px 1fr auto;
-      gap: 10px; padding: 7px 10px; border-bottom: 1px solid var(--border);
+      display: grid; grid-template-columns: 60px 1fr auto;
+      gap: 8px; padding: 5px 8px; border-bottom: 1px solid var(--border);
       align-items: baseline;
     }
     .qa-log-row:last-child { border-bottom: none; }
-    .qa-log-row.qa-log-pass   { background: rgba(16, 185, 129, 0.03); }
-    .qa-log-row.qa-log-found  { background: rgba(16, 185, 129, 0.03); }
-    .qa-log-row.qa-log-fail   { background: rgba(239, 68, 68, 0.03); }
-    .qa-log-row.qa-log-warn   { background: rgba(245, 158, 11, 0.03); }
+    .qa-log-row.qa-log-pass   { background: rgba(16,185,129,.04); }
+    .qa-log-row.qa-log-found  { background: rgba(16,185,129,.04); }
+    .qa-log-row.qa-log-fail   { background: rgba(239,68,68,.04); }
+    .qa-log-row.qa-log-warn   { background: rgba(245,158,11,.04); }
     .qa-log-status {
-      font-weight: 800; font-size: 9.5px; text-transform: uppercase;
+      font-weight: 700; font-size: 10px; text-transform: uppercase;
       color: var(--text3);
-      letter-spacing: 0.04em;
     }
     .qa-log-row.qa-log-pass   .qa-log-status,
-    .qa-log-row.qa-log-found  .qa-log-status { color: #059669; }
-    .qa-log-row.qa-log-fail   .qa-log-status { color: #DC2626; }
-    .qa-log-row.qa-log-warn   .qa-log-status { color: #D97706; }
-    .qa-log-step  { color: var(--text2); font-weight: 500; }
+    .qa-log-row.qa-log-found  .qa-log-status { color: var(--success); }
+    .qa-log-row.qa-log-fail   .qa-log-status { color: var(--error); }
+    .qa-log-row.qa-log-warn   .qa-log-status { color: #d97706; }
+    .qa-log-step  { color: var(--text2); }
     .qa-log-detail {
       font-family: 'JetBrains Mono', monospace; font-size: 10px;
-      color: var(--text3); max-width: 180px; overflow: hidden;
+      color: var(--text3); max-width: 160px; overflow: hidden;
       text-overflow: ellipsis; white-space: nowrap;
     }
   </style>
@@ -1477,14 +1375,16 @@ Here is the complete, updated file with the integrated design enhancements:
 <body>
 
 <!-- ── Login overlay ─────────────────────────────────────────────────────────── -->
+<!-- ── Login overlay ─────────────────────────────────────────────────────────── -->
 <style>
   #login-overlay {
     position: fixed; inset: 0; z-index: 9999;
     display: flex; align-items: center; justify-content: center;
     padding: 16px;
-    background: linear-gradient(145deg, #070B13 0%, #0F172A 50%, #1E1B4B 100%);
+    background: linear-gradient(145deg, #0a0f2e 0%, #12083a 50%, #1a0a3e 100%);
     overflow: hidden;
   }
+  /* Geometric background shapes */
   #login-overlay::before, #login-overlay::after {
     content: '';
     position: absolute;
@@ -1493,14 +1393,14 @@ Here is the complete, updated file with the integrated design enhancements:
   #login-overlay::before {
     top: -10%; left: -8%;
     width: 55%; height: 70%;
-    background: rgba(255,255,255,0.015);
+    background: rgba(255,255,255,0.025);
     clip-path: polygon(0 0, 100% 15%, 80% 100%, 0% 85%);
     transform: rotate(-4deg);
   }
   #login-overlay::after {
     bottom: -12%; right: -6%;
     width: 50%; height: 65%;
-    background: rgba(255,255,255,0.01);
+    background: rgba(255,255,255,0.02);
     clip-path: polygon(20% 0, 100% 10%, 100% 100%, 0% 90%);
     transform: rotate(3deg);
   }
@@ -1509,56 +1409,57 @@ Here is the complete, updated file with the integrated design enhancements:
   }
   .lc-geo-1 {
     top: 8%; right: 5%; width: 28%; height: 40%;
-    background: rgba(99, 102, 241, 0.05);
+    background: rgba(108,71,255,0.07);
     clip-path: polygon(30% 0%, 100% 0%, 70% 100%, 0% 100%);
   }
   .lc-geo-2 {
     bottom: 5%; left: 2%; width: 22%; height: 30%;
-    background: rgba(255,255,255,0.015);
+    background: rgba(255,255,255,0.03);
     clip-path: polygon(0 20%, 100% 0%, 100% 80%, 0% 100%);
   }
   .lc-geo-3 {
     top: 40%; right: 15%; width: 18%; height: 25%;
-    background: rgba(99, 102, 241, 0.03);
+    background: rgba(108,71,255,0.04);
     clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%);
   }
+  /* Card */
   #login-card {
     position: relative; z-index: 1;
-    background: #FFFFFF;
+    background: #ffffff;
     border-radius: 12px;
     padding: 40px;
     width: 100%; max-width: 420px;
-    box-shadow: 0 25px 70px rgba(0,0,0,0.4), 0 4px 20px rgba(0,0,0,0.25);
+    box-shadow: 0 20px 60px rgba(0,0,0,0.45), 0 4px 16px rgba(0,0,0,0.3);
   }
   .lc-field-label {
-    display: block; font-size: 12px; font-weight: 700;
-    color: #475569; margin-bottom: 7px; text-transform: uppercase; letter-spacing: 0.03em;
+    display: block; font-size: 13px; font-weight: 600;
+    color: #374151; margin-bottom: 7px;
   }
   .lc-input {
     width: 100%; box-sizing: border-box;
-    border: 1px solid #E2E8F0; border-radius: 6px;
-    padding: 11px 14px; font-size: 14px; color: #0F172A;
-    background: #FFFFFF; outline: none;
+    border: 1px solid #e0e0e0; border-radius: 6px;
+    padding: 10px 14px; font-size: 14px; color: #1a1a2e;
+    background: #fff; outline: none;
     transition: border-color .15s, box-shadow .15s;
     font-family: inherit;
   }
-  .lc-input:focus { border-color: #6366F1; box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15); }
-  .lc-input::placeholder { color: #94A3B8; }
+  .lc-input:focus { border-color: #6c47ff; box-shadow: 0 0 0 3px rgba(108,71,255,0.12); }
+  .lc-input::placeholder { color: #b0b8c8; }
   #login-btn {
     width: 100%; border: none; border-radius: 6px;
-    padding: 13px; font-size: 14.5px; font-weight: 700;
-    color: #FFFFFF; cursor: pointer; letter-spacing: .02em;
-    background: linear-gradient(135deg, #4F46E5 0%, #7C3AED 100%);
+    padding: 12px; font-size: 15px; font-weight: 700;
+    color: #fff; cursor: pointer; letter-spacing: .02em;
+    background: linear-gradient(135deg, #1a1a4e 0%, #3d1a6e 100%);
     transition: opacity .15s, box-shadow .15s;
-    box-shadow: 0 4px 14px rgba(79, 70, 229, 0.35);
+    box-shadow: 0 4px 14px rgba(61,26,110,0.4);
     font-family: inherit;
   }
-  #login-btn:hover { opacity: .92; box-shadow: 0 6px 20px rgba(79, 70, 229, 0.45); }
+  #login-btn:hover { opacity: .88; box-shadow: 0 6px 20px rgba(61,26,110,0.5); }
   #login-btn:disabled { opacity: .65; cursor: default; }
   #login-error {
-    display: none; border-radius: 6px; padding: 10px 14px;
-    font-size: 13px; color: #EF4444; margin-bottom: 16px;
-    background: #FEF2F2; border: 1px solid #FCA5A5;
+    display: none; border-radius: 6px; padding: 9px 13px;
+    font-size: 13px; color: #ef4444; margin-bottom: 16px;
+    background: #fff5f5; border: 1px solid #fecaca;
   }
 </style>
 <div id="login-overlay">
@@ -1573,7 +1474,7 @@ Here is the complete, updated file with the integrated design enhancements:
       </div>
     </div>
     <!-- Heading -->
-    <h1 style="margin:0 0 24px;font-size:20px;font-weight:800;color:#0F172A;letter-spacing:-.3px">Sign in to SQA Agent</h1>
+    <h1 style="margin:0 0 24px;font-size:20px;font-weight:700;color:#1a1a2e;letter-spacing:-.3px">Sign in to SQA Agent</h1>
     <!-- Email -->
     <div style="margin-bottom:16px">
       <label class="lc-field-label" for="login-email">Email Address</label>
@@ -1600,7 +1501,7 @@ Here is the complete, updated file with the integrated design enhancements:
     <!-- Button -->
     <button id="login-btn" onclick="doLogin()">Sign In</button>
     <!-- Footer note -->
-    <p style="margin:20px 0 0;text-align:center;font-size:12px;color:#64748B;line-height:1.5">
+    <p style="margin:20px 0 0;text-align:center;font-size:12px;color:#888888;line-height:1.5">
       Access restricted to authorized team members only
     </p>
   </div>
@@ -1782,7 +1683,7 @@ Here is the complete, updated file with the integrated design enhancements:
           </div>
           <!-- progress bar (hidden until running) -->
           <div id="test-progress-wrap" class="hidden" style="margin-top:18px">
-            <div style="height:5px;background:rgba(15, 23, 42, 0.08);border-radius:99px;overflow:hidden">
+            <div style="height:4px;background:rgba(255,255,255,0.07);border-radius:99px;overflow:hidden">
               <div id="test-progress-bar" style="height:100%;width:0;background:var(--gradient);transition:width .4s;border-radius:99px"></div>
             </div>
             <div style="font-size:12px;color:var(--text3);margin-top:6px" id="test-progress-label">Running…</div>
@@ -1997,7 +1898,7 @@ Here is the complete, updated file with the integrated design enhancements:
         <!-- 1. Header bar -->
         <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:20px">
           <div>
-            <div style="font-size:18px;font-weight:700;color:var(--text)">API Test Suite</div>
+            <div style="font-size:18px;font-weight:600;color:var(--text)">API Test Suite</div>
             <div id="at-last-run" style="font-size:12px;color:var(--text3);margin-top:2px">Last run: —</div>
           </div>
           <div style="display:flex;gap:8px;flex-wrap:wrap">
@@ -2022,16 +1923,8 @@ Here is the complete, updated file with the integrated design enhancements:
 
         <!-- 2b. Live terminal (visible during/after run) -->
         <div id="at-terminal-wrap" style="display:none;margin-bottom:20px">
-          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
-            <div style="font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.06em">Live Terminal Output</div>
-            <!-- Interactive window control nodes -->
-            <div style="display: flex; gap: 5px;">
-              <span style="width:10px; height:10px; border-radius:50%; background:#FF5F56; display:inline-block;"></span>
-              <span style="width:10px; height:10px; border-radius:50%; background:#FFBD2E; display:inline-block;"></span>
-              <span style="width:10px; height:10px; border-radius:50%; background:#27C93F; display:inline-block;"></span>
-            </div>
-          </div>
-          <div id="at-terminal" style="background:#0F172A;color:#E2E8F0;font-family:'JetBrains Mono',monospace;font-size:12.5px;line-height:1.7;padding:18px 20px;border-radius:8px;height:290px;overflow-y:auto;white-space:pre-wrap;border:1.5px solid #1E293B;box-shadow: var(--shadow-md);"></div>
+          <div style="font-size:12px;font-weight:600;color:var(--text2);margin-bottom:6px;text-transform:uppercase;letter-spacing:.06em">Live Output</div>
+          <div id="at-terminal" style="background:#0d1117;color:#c9d1d9;font-family:'JetBrains Mono',monospace;font-size:12px;line-height:1.6;padding:14px 16px;border-radius:8px;height:280px;overflow-y:auto;white-space:pre-wrap;border:1px solid var(--border)"></div>
         </div>
 
         <!-- 3. Dimension stat cards -->
@@ -2144,30 +2037,29 @@ Here is the complete, updated file with the integrated design enhancements:
 
     <!-- ── AI Assistant ─────────────────────────────────────────────────────── -->
     <section id="page-ai-assistant" class="page">
-      <div class="page-inner" style="max-width:880px;height:calc(100vh - 64px);display:flex;flex-direction:column;padding-bottom:0">
+      <div class="page-inner" style="max-width:860px;height:calc(100vh - 54px);display:flex;flex-direction:column;padding-bottom:0">
 
         <div style="margin-bottom:20px;flex-shrink:0">
-          <h2 style="font-size:22px;font-weight:800;color:var(--text);margin-bottom:4px;letter-spacing:-0.5px">AI Assistant</h2>
-          <p style="font-size:13.5px;color:var(--text2)">Ask anything about the Zambeel project — portals, Jira flows, test patterns, selectors, and more.</p>
+          <h2 style="font-size:20px;font-weight:700;color:var(--text);margin-bottom:4px">AI Assistant</h2>
+          <p style="font-size:13px;color:var(--text2)">Ask anything about the Zambeel project — portals, Jira flows, test patterns, selectors, and more.</p>
         </div>
 
         <!-- Chat messages area -->
         <div id="ai-chat-messages" style="
           flex:1;
           overflow-y:auto;
-          border:1.5px solid var(--border);
+          border:1px solid var(--border);
           border-radius:var(--r);
           background:var(--card);
-          padding:24px;
+          padding:20px;
           display:flex;
           flex-direction:column;
-          gap:20px;
-          margin-bottom:18px;
-          box-shadow: var(--shadow);
+          gap:16px;
+          margin-bottom:16px;
         ">
           <div class="ai-msg ai-msg-assistant" id="ai-welcome-msg">
             <div class="ai-avatar ai-avatar-bot">
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
             </div>
             <div class="ai-bubble">
               Hi! I'm your Zambeel project assistant. Ask me about portals, test flows, Jira tickets, selectors, API endpoints, or anything else about the platform.
@@ -2176,20 +2068,20 @@ Here is the complete, updated file with the integrated design enhancements:
         </div>
 
         <!-- Input area -->
-        <div style="flex-shrink:0;padding-bottom:32px">
-          <div style="display:flex;gap:12px;align-items:flex-end">
+        <div style="flex-shrink:0;padding-bottom:28px">
+          <div style="display:flex;gap:10px;align-items:flex-end">
             <textarea id="ai-chat-input"
               placeholder="Ask about the Zambeel project…"
               rows="2"
-              style="flex:1;resize:none;min-height:50px;max-height:120px;border-radius:12px;padding:12px 16px;font-size:13.5px;line-height:1.55"
+              style="flex:1;resize:none;min-height:48px;max-height:120px;border-radius:var(--r);padding:12px 14px;font-size:13.5px;line-height:1.5"
               onkeydown="aiChatKeydown(event)"
             ></textarea>
-            <button class="btn btn-primary" id="ai-send-btn" onclick="aiSendMessage()" style="height:50px;align-self:flex-end;flex-shrink:0; width:50px; display:flex; align-items:center; justify-content:center;">
+            <button class="btn btn-primary" id="ai-send-btn" onclick="aiSendMessage()" style="height:48px;align-self:flex-end;flex-shrink:0">
               <div class="spin"></div>
-              <svg class="label" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+              <svg class="label" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
             </button>
           </div>
-          <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">
+          <div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap">
             <button class="pill" onclick="aiQuickQuestion('What portals does Zambeel have and what are their login URLs?')">Portals & login URLs</button>
             <button class="pill" onclick="aiQuickQuestion('What Jira projects exist and what are the ticket statuses?')">Jira projects</button>
             <button class="pill" onclick="aiQuickQuestion('How do I run Playwright tests for the seller portal on staging?')">Run tests</button>
@@ -2215,9 +2107,9 @@ Here is the complete, updated file with the integrated design enhancements:
 
 <!-- ── Run QA Modal ──────────────────────────────────────────────────────────── -->
 <div id="run-qa-modal" class="modal-overlay" onclick="if(event.target===this)closeRunQAModal()">
-  <div class="modal-box" style="max-width:490px">
+  <div class="modal-box" style="max-width:480px">
     <div class="modal-header">
-      <div class="modal-title">Configure QA Run — <span id="rqa-modal-key" style="font-family:'JetBrains Mono',monospace;color:#4F46E5;font-size:13px">—</span></div>
+      <div class="modal-title">Configure QA Run — <span id="rqa-modal-key" style="font-family:'JetBrains Mono',monospace;color:#5B3DF5;font-size:13px">—</span></div>
       <div class="modal-close" onclick="closeRunQAModal()">✕</div>
     </div>
     <div class="modal-body" style="display:flex;flex-direction:column;gap:0">
@@ -2252,14 +2144,14 @@ Here is the complete, updated file with the integrated design enhancements:
 
 <!-- ── QA Clarification Modal ────────────────────────────────────────────────── -->
 <div id="qa-clarify-modal" class="modal-overlay" style="z-index:9999">
-  <div class="modal-box" style="max-width:490px">
+  <div class="modal-box" style="max-width:480px">
     <div class="modal-header">
       <div class="modal-title">🤖 QA Clarification Needed</div>
     </div>
     <div class="modal-body" style="padding:16px 0 8px">
-      <p id="qa-clarify-question" style="font-size:13.5px;color:var(--text);margin-bottom:16px;line-height:1.6;white-space:pre-wrap"></p>
+      <p id="qa-clarify-question" style="font-size:13px;color:var(--text);margin-bottom:16px;line-height:1.6;white-space:pre-wrap"></p>
       <label>Your answer</label>
-      <textarea id="qa-clarify-answer" placeholder="Type your answer here, or click Skip to proceed without it…" style="min-height:85px;margin-bottom:4px"></textarea>
+      <textarea id="qa-clarify-answer" placeholder="Type your answer here, or click Skip to proceed without it…" style="min-height:80px;margin-bottom:4px"></textarea>
     </div>
     <div style="display:flex;gap:8px;justify-content:flex-end;padding-top:12px">
       <button class="btn btn-secondary" onclick="submitClarification(true)">Skip</button>
@@ -2287,9 +2179,9 @@ Here is the complete, updated file with the integrated design enhancements:
     <button class="btn btn-primary w100" id="jira-run-qa-btn" onclick="openRunQAModal()" style="justify-content:center;margin-bottom:8px">
       <div class="spin"></div><span class="label">▶ Run QA</span>
     </button>
-    <div style="height:1.5px;background:var(--border);margin-bottom:12px"></div>
+    <div style="height:1px;background:var(--border);margin-bottom:12px"></div>
     <label>Add Comment</label>
-    <textarea id="jira-panel-comment" placeholder="Write a comment…" style="margin-bottom:10px;min-height:75px"></textarea>
+    <textarea id="jira-panel-comment" placeholder="Write a comment…" style="margin-bottom:10px;min-height:72px"></textarea>
     <button class="btn btn-secondary w100" id="jira-panel-submit-btn" onclick="submitJiraPanelComment()" style="justify-content:center">
       <div class="spin"></div><span class="label">Submit Comment</span>
     </button>
@@ -2298,7 +2190,7 @@ Here is the complete, updated file with the integrated design enhancements:
 
 <!-- ── Sprint Modal ──────────────────────────────────────────────────────────── -->
 <div id="sprint-modal" class="modal-overlay" onclick="if(event.target===this)closeSprintModal()" style="display:none">
-  <div class="modal-box" style="max-width:430px">
+  <div class="modal-box" style="max-width:420px">
     <div class="modal-header">
       <div class="modal-title">Manage Sprint</div>
       <button class="modal-close" onclick="closeSprintModal()">✕</button>
@@ -2306,7 +2198,7 @@ Here is the complete, updated file with the integrated design enhancements:
     <div id="sprint-modal-body" style="padding:0 0 16px">
       <div style="color:var(--text3);font-size:13px;padding:8px 0">Loading sprint info…</div>
     </div>
-    <div style="display:flex;gap:8px;padding-top:12px;border-top:1.5px solid var(--border)">
+    <div style="display:flex;gap:8px;padding-top:12px;border-top:1px solid var(--border)">
       <button class="btn btn-primary btn-sm" id="sprint-start-btn" onclick="doStartSprint()" style="flex:1;justify-content:center">
         <div class="spin"></div><span class="label">▶ Start Sprint</span>
       </button>
@@ -2340,7 +2232,7 @@ Here is the complete, updated file with the integrated design enhancements:
 
 <!-- ── Generate Ticket Modal ─────────────────────────────────────────────────── -->
 <div id="gen-ticket-modal" class="modal-overlay" onclick="if(event.target===this)closeGenTicketModal()">
-  <div class="modal-box" style="max-width:530px">
+  <div class="modal-box" style="max-width:520px">
     <div class="modal-header">
       <div class="modal-title">✨ Generate Ticket with AI</div>
       <div class="modal-close" onclick="closeGenTicketModal()">✕</div>
@@ -2369,7 +2261,7 @@ Here is the complete, updated file with the integrated design enhancements:
           </select>
         </div>
       </div>
-      <div id="gen-ticket-status" style="display:none;align-items:center;gap:10px;padding:12px 14px;background:#EEF2FF;border:1.5px solid rgba(79, 70, 229, 0.2);border-radius:8px;margin-bottom:14px;font-size:13.5px;color:#4F46E5">
+      <div id="gen-ticket-status" style="display:none;align-items:center;gap:10px;padding:12px 14px;background:#EEF2FF;border:1px solid rgba(91,61,245,0.2);border-radius:8px;margin-bottom:14px;font-size:13px;color:#5B3DF5">
         <div class="qa-spin"></div>
         <span>AI is writing your ticket…</span>
       </div>
@@ -2387,7 +2279,7 @@ Here is the complete, updated file with the integrated design enhancements:
 
 <!-- ── API Inventory Modal ────────────────────────────────────────────────────── -->
 <div id="at-inventory-modal" class="modal-overlay" onclick="if(event.target===this)atCloseInventoryModal()" style="align-items:flex-end">
-  <div class="modal-box" style="max-width:1040px;width:96vw;max-height:88vh;display:flex;flex-direction:column;animation:modalUp .22s cubic-bezier(0.16,1,0.3,1)">
+  <div class="modal-box" style="max-width:1000px;width:96vw;max-height:88vh;display:flex;flex-direction:column;animation:modalUp .22s cubic-bezier(0.16,1,0.3,1)">
     <div class="modal-header" style="flex-shrink:0;padding-bottom:12px">
       <div>
         <div class="modal-title" id="at-inv-modal-title">Zambeel API Inventory</div>
@@ -2399,7 +2291,7 @@ Here is the complete, updated file with the integrated design enhancements:
     <div style="flex-shrink:0;display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px">
       <input id="at-inv-search" type="search" placeholder="Search path…"
         oninput="atInvFilter()"
-        style="flex:1;min-width:160px;padding:6px 12px;border-radius:6px;border:1.5px solid var(--border);background:var(--bg);color:var(--text);font-size:13px;outline:none">
+        style="flex:1;min-width:160px;padding:6px 10px;border-radius:6px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:13px;outline:none">
       <div id="at-inv-method-btns" style="display:flex;gap:4px;flex-wrap:wrap">
         <button class="inv-filter-btn active" data-method="ALL"   onclick="atInvSetMethod(this)">ALL</button>
         <button class="inv-filter-btn" data-method="GET"    onclick="atInvSetMethod(this)">GET</button>
@@ -3004,7 +2896,7 @@ async function loadScreenshots() {
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// ── Jira ────────────────━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// ── Jira ──────────────────────────────────────────────────────────────────────
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 async function jiraCreate() {
   const project     = document.getElementById('j-project').value;
@@ -3325,7 +3217,7 @@ function reportsView(filename, content) {
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// ── PR Review ────────────────━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// ── PR Review ─────────────────────────────────────────────────────────────────
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 async function prLoad(repo) {
   const btnId = `pr-load-${repo === 'frontend' ? 'fe' : 'be'}-btn`;
