@@ -2789,15 +2789,27 @@ async function testsRun() {
     state.testResults = data.results;
     saveTestResults(data.results);
     document.getElementById('test-count').textContent = data.results.length;
-    document.getElementById('tests-tbody').innerHTML = data.results.map(r => `
-      <tr class="fade-in">
-        <td class="td-mono">${esc(r.portal)}</td>
-        <td>${esc(r.env)}</td>
-        <td>${badge(r.status)}</td>
-        <td class="td-muted" style="max-width:380px;word-break:break-word;font-size:12px">${esc(r.message)}</td>
-        <td class="td-muted text-xs">${fmtDate(r.timestamp)}</td>
-      </tr>
-    `).join('');
+    document.getElementById('tests-tbody').innerHTML = data.results.map(r => {
+      const shots = (r.screenshots || []);
+      const shotHtml = shots.length ? `
+        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">
+          ${shots.map(s => `
+            <a href="${esc(API_BASE + s.url)}" target="_blank" title="${esc(s.label || s.filename)}">
+              <img src="${esc(API_BASE + s.url)}" style="height:48px;border-radius:4px;border:1px solid var(--border);cursor:pointer"
+                   loading="lazy" onerror="this.style.display='none'" />
+            </a>`).join('')}
+        </div>` : '';
+      return `
+        <tr class="fade-in">
+          <td class="td-mono">${esc(r.portal)}</td>
+          <td>${esc(r.env)}</td>
+          <td>${badge(r.status)}</td>
+          <td class="td-muted" style="max-width:380px;word-break:break-word;font-size:12px">
+            ${esc(r.message)}${shotHtml}
+          </td>
+          <td class="td-muted text-xs">${fmtDate(r.timestamp)}</td>
+        </tr>`;
+    }).join('');
     const passed = data.results.filter(r => r.status === 'PASS').length;
     toast(`${passed}/${data.results.length} tests passed`, passed === data.results.length ? 'success' : 'error');
     loadScreenshots();

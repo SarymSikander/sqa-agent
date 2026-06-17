@@ -5,16 +5,30 @@ from datetime import datetime
 from dotenv import load_dotenv
 from playwright.sync_api import sync_playwright
 
-load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), "..", ".env"))
+import pathlib as _pathlib
 
-LOCAL_URL      = os.getenv("LOCAL_URL")
-STAGING_URL    = os.getenv("STAGING_URL")
-PRODUCTION_URL = os.getenv("PRODUCTION_URL")
+# Load dashboard/api/.env first (non-override), then fall back to root .env
+# so that locally the root credentials are picked up while HF Space secrets take priority.
+_api_env = os.path.join(os.path.dirname(__file__), "..", ".env")
+load_dotenv(dotenv_path=_api_env, override=False)
+_root_env = str((_pathlib.Path(__file__).resolve().parent / ".." / ".." / ".." / ".env").resolve())
+if os.path.exists(_root_env):
+    load_dotenv(dotenv_path=_root_env, override=False)
+
+LOCAL_URL      = os.getenv("LOCAL_URL", "http://localhost:5173")
+STAGING_URL    = os.getenv("STAGING_URL", "https://staging.myzambeel.com")
+PRODUCTION_URL = os.getenv("PRODUCTION_URL", "https://portal.myzambeel.com")
 
 FRONTEND_REPO_PATH = os.getenv("FRONTEND_REPO_PATH")
 FRONTEND_DEV_CMD   = os.getenv("FRONTEND_DEV_CMD", "npm run dev")
 
-SCREENSHOTS_DIR = os.path.join(os.path.dirname(__file__), "..", "screenshots")
+# Prefer /data/screenshots (persistent on HuggingFace); fall back to local path.
+_data_shots = _pathlib.Path("/data/screenshots")
+try:
+    _data_shots.mkdir(parents=True, exist_ok=True)
+    SCREENSHOTS_DIR = str(_data_shots)
+except OSError:
+    SCREENSHOTS_DIR = os.path.join(os.path.dirname(__file__), "..", "screenshots")
 os.makedirs(SCREENSHOTS_DIR, exist_ok=True)
 
 URL_MAP = {
@@ -66,7 +80,12 @@ _ENV_SUFFIX = {"staging": "STAGING", "production": "PRODUCTION", "local": "LOCAL
 
 def login_to_portal(page, portal, env):
     """Fill the login form with credentials from .env and wait until off /login."""
-    base_url  = "https://staging.myzambeel.com" if env == "staging" else "https://portal.myzambeel.com"
+    if env == "staging":
+        base_url = STAGING_URL.rstrip("/")
+    elif env == "production":
+        base_url = PRODUCTION_URL.rstrip("/")
+    else:
+        base_url = LOCAL_URL.rstrip("/")
     suffix    = _ENV_SUFFIX.get(env, env.upper())
     email_key = f"{portal.upper()}_{suffix}_EMAIL"
     pass_key  = f"{portal.upper()}_{suffix}_PASSWORD"

@@ -17,8 +17,14 @@ from openai import OpenAI
 from playwright.sync_api import sync_playwright
 
 from dotenv import load_dotenv
+from pathlib import Path as _PathAlias
 
-load_dotenv()
+# Load local .env first; then fall back to root repo .env so that
+# portal credentials stored in the root are available locally.
+load_dotenv(override=False)
+_root_env = (_PathAlias(__file__).resolve().parent / ".." / ".." / ".env").resolve()
+if _root_env.exists():
+    load_dotenv(dotenv_path=str(_root_env), override=False)
 
 from fastapi import FastAPI, File, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
@@ -99,17 +105,19 @@ async def _auth_middleware(request: Request, call_next):
     return await call_next(request)
 
 _HERE = Path(__file__).resolve().parent
-SCREENSHOTS_DIR = _HERE / "screenshots"
 REPORTS_DIR = _HERE / "reports"
-SCREENSHOTS_DIR.mkdir(exist_ok=True)
 REPORTS_DIR.mkdir(exist_ok=True)
 
-# HF Docker spaces persist only /data — use it when available, else local reports/
+# HF Docker spaces persist only /data — use it for both screenshots and reports.
 _DATA_DIR = Path("/data")
 try:
     _DATA_DIR.mkdir(parents=True, exist_ok=True)
+    SCREENSHOTS_DIR = _DATA_DIR / "screenshots"
+    SCREENSHOTS_DIR.mkdir(exist_ok=True)
 except OSError:
     _DATA_DIR = REPORTS_DIR
+    SCREENSHOTS_DIR = _HERE / "screenshots"
+    SCREENSHOTS_DIR.mkdir(exist_ok=True)
 
 GITHUB_REPO = os.getenv("GITHUB_REPO", "SarymSikander/api-test-suite")
 GITHUB_WORKFLOW_FILE = os.getenv("GITHUB_WORKFLOW_FILE", "api-tests.yml")
@@ -348,6 +356,10 @@ import tools.github_tool     as _github
 import tools.pr_review_tool  as _pr
 import tools.jest_tool       as _jest
 
+# Keep playwright_tool's SCREENSHOTS_DIR in sync with main.py's resolved path
+# so screenshots always land in the same directory served by StaticFiles.
+_playwright.SCREENSHOTS_DIR = str(SCREENSHOTS_DIR)
+
 # ── Pydantic models ───────────────────────────────────────────────────────────
 
 class RunTestsBody(BaseModel):
@@ -543,15 +555,22 @@ async def run_tests(body: RunTestsBody):
     results = []
     for portal in portals:
         status, result = await asyncio.to_thread(_playwright.run_tests, portal, body.env)
+        r = result if isinstance(result, dict) else {}
         results.append({
             "portal": portal,
             "env": body.env,
             "status": status,
-            "message": result.get("message", "") if isinstance(result, dict) else str(result),
-            "url": result.get("url") if isinstance(result, dict) else None,
-            "console_errors": result.get("console_errors", []) if isinstance(result, dict) else [],
-            "nav_elements_found": result.get("nav_elements_found", []) if isinstance(result, dict) else [],
-            "load_time_ms": result.get("load_time_ms") if isinstance(result, dict) else None,
+            "message": r.get("message", "") or str(result),
+            "url": r.get("url"),
+            "console_errors": r.get("console_errors", []),
+            "nav_elements_found": r.get("nav_elements_found", []),
+            "load_time_ms": r.get("load_time_ms"),
+            "screenshots": [
+                {**s, "url": f"/screenshots/{s['filename']}"}
+                for s in r.get("screenshots", []) if s.get("filename")
+            ],
+            "execution_log": r.get("execution_log", []),
+            "feature_evidence": r.get("feature_evidence", []),
             "timestamp": datetime.now().isoformat(),
         })
     return {"results": results}
@@ -969,11 +988,19 @@ def _identify_pages_from_ticket(title: str, description: str, portal: str) -> li
     return [fallback] if fallback else []
 
 
+def _resolve_base_url(env: str) -> str:
+    if env == 'staging':
+        return os.getenv('STAGING_URL', 'https://staging.myzambeel.com').rstrip('/')
+    if env == 'production':
+        return os.getenv('PRODUCTION_URL', 'https://portal.myzambeel.com').rstrip('/')
+    return os.getenv('LOCAL_URL', 'http://localhost:5173').rstrip('/')
+
+
 def screenshot_page(portal, env, url_path):
     """Login, navigate to url_path, take an 800x600 screenshot, return base64."""
     from playwright.sync_api import sync_playwright
     import base64
-    base_url = 'https://staging.myzambeel.com' if env == 'staging' else 'https://portal.myzambeel.com'
+    base_url = _resolve_base_url(env)
     email    = os.getenv(f'{portal.upper()}_{env.upper()}_EMAIL', '').strip()
     password = os.getenv(f'{portal.upper()}_{env.upper()}_PASSWORD', '').strip()
     full_url = f'{base_url}{url_path}'
@@ -1037,7 +1064,7 @@ def extract_page_dom_live(portal, env, url_path) -> dict:
     GPT-4o the exact elements that exist on the live page.
     """
     from playwright.sync_api import sync_playwright
-    base_url = 'https://staging.myzambeel.com' if env == 'staging' else 'https://portal.myzambeel.com'
+    base_url = _resolve_base_url(env)
     email    = os.getenv(f'{portal.upper()}_{env.upper()}_EMAIL', '').strip()
     password = os.getenv(f'{portal.upper()}_{env.upper()}_PASSWORD', '').strip()
     full_url = f'{base_url}{url_path}'
