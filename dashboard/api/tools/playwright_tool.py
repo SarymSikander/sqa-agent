@@ -74,18 +74,20 @@ _ENV_SUFFIX = {"staging": "STAGING", "production": "PRODUCTION", "local": "LOCAL
 
 def login_to_portal(page, portal, env):
     """Fill the login form with credentials from .env and wait until off /login."""
+    # Read URLs fresh at call time so HF Space secret updates take effect without restart
     if env == "staging":
-        base_url = STAGING_URL.rstrip("/")
+        base_url = (os.getenv("STAGING_URL") or "https://staging.myzambeel.com").rstrip("/").split("/login")[0]
     elif env == "production":
-        base_url = PRODUCTION_URL.rstrip("/")
+        base_url = (os.getenv("PRODUCTION_URL") or "https://portal.myzambeel.com").rstrip("/").split("/login")[0]
     else:
-        base_url = LOCAL_URL.rstrip("/")
+        base_url = (os.getenv("LOCAL_URL") or "http://localhost:5173").rstrip("/")
     suffix    = _ENV_SUFFIX.get(env, env.upper())
     email_key = f"{portal.upper()}_{suffix}_EMAIL"
     pass_key  = f"{portal.upper()}_{suffix}_PASSWORD"
     email     = os.getenv(email_key, "").strip()
     password  = os.getenv(pass_key, "").strip()
-    print(f"[LOGIN] {portal}/{env} — email={email}")
+    print(f"[LOGIN] portal={portal} env={env} email_key={email_key} email={email!r} password_set={bool(password)}")
+    print(f"[LOGIN] navigating to: {base_url}/login")
     page.goto(f"{base_url}/login")
     page.wait_for_selector('input[type="email"], input[type="text"]', timeout=15000)
     page.fill('input[type="email"], input[type="text"]', email)
