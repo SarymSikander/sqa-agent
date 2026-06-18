@@ -17,14 +17,8 @@ from openai import OpenAI
 from playwright.sync_api import sync_playwright
 
 from dotenv import load_dotenv
-from pathlib import Path as _PathAlias
 
-# Load local .env first; then fall back to root repo .env so that
-# portal credentials stored in the root are available locally.
-load_dotenv(override=False)
-_root_env = (_PathAlias(__file__).resolve().parent / ".." / ".." / ".env").resolve()
-if _root_env.exists():
-    load_dotenv(dotenv_path=str(_root_env), override=False)
+load_dotenv()
 
 from fastapi import FastAPI, File, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
