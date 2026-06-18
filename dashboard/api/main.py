@@ -1157,24 +1157,33 @@ def generate_api_test_cases(ticket_key: str, title: str, description: str) -> li
         "- Do NOT test unrelated endpoints.\n"
         "- Output ONLY the JSON array, no markdown, no explanation.\n"
     )
-    for model in ("llama-3.3-70b-versatile", "llama3-70b-8192", "mixtral-8x7b-32768"):
+    import concurrent.futures
+    def _call_groq():
+        for model in ("llama-3.3-70b-versatile", "llama-3.1-8b-instant", "qwen/qwen-3-32b"):
+            try:
+                resp = client.chat.completions.create(
+                    model=model,
+                    messages=[{"role": "user", "content": prompt}],
+                    temperature=0.2,
+                    max_tokens=1024,
+                )
+                raw = resp.choices[0].message.content.strip()
+                raw = raw.removeprefix("```json").removeprefix("```").removesuffix("```").strip()
+                specs = _json.loads(raw)
+                if isinstance(specs, list):
+                    print(f"[generate_api_test_cases] model={model} → {len(specs)} specs")
+                    return specs
+            except Exception as e:
+                print(f"[generate_api_test_cases] model={model} error: {e}")
+        return []
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+        future = executor.submit(_call_groq)
         try:
-            resp = client.chat.completions.create(
-                model=model,
-                messages=[{"role": "user", "content": prompt}],
-                temperature=0.2,
-                max_tokens=1024,
-            )
-            raw = resp.choices[0].message.content.strip()
-            # Strip markdown fences if present
-            raw = raw.removeprefix("```json").removeprefix("```").removesuffix("```").strip()
-            specs = _json.loads(raw)
-            if isinstance(specs, list):
-                print(f"[generate_api_test_cases] model={model} → {len(specs)} specs")
-                return specs
-        except Exception as e:
-            print(f"[generate_api_test_cases] model={model} error: {e}")
-    return []
+            return future.result(timeout=20)
+        except concurrent.futures.TimeoutError:
+            print("[generate_api_test_cases] timed out after 20s — returning empty")
+            return []
 
 
 def run_api_tests(api_specs, env="production"):
