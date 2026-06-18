@@ -1078,6 +1078,174 @@ _ROUTE_KEYWORDS: dict[str, dict[str, list]] = {
 }
 
 
+_API_BUG_KEYWORDS = {
+    # HTTP / status codes
+    "401", "403", "404", "500", "502", "503", "422",
+    "returns 200", "returns 201", "status code", "http status",
+    # REST / API concepts
+    "api", "endpoint", "route", "request", "response", "payload",
+    "rest", "graphql", "webhook", "curl",
+    # Auth / security
+    "auth middleware", "missing auth", "token", "bearer", "jwt",
+    "rate limit", "throttl",
+    # Network / server
+    "timeout", "latency", "cors", "header", "content-type",
+    "400 bad request", "validation error", "schema",
+    # Backend data
+    "database", "query", "migration", "null pointer", "server error",
+    "stack trace", "exception",
+}
+
+_UI_OVERRIDE_KEYWORDS = {
+    "button", "modal", "dropdown", "form", "table", "page", "ui",
+    "display", "render", "layout", "css", "style", "click", "scroll",
+    "component", "view", "screen", "dialog", "tooltip", "icon",
+    "sidebar", "navbar", "menu", "tab", "accordion",
+}
+
+
+def is_api_bug_ticket(description: str, summary: str = "") -> bool:
+    """Return True when the ticket is clearly about backend API behaviour.
+
+    A ticket is classified as an API bug when:
+    - At least one API-specific keyword appears in the combined text, AND
+    - The UI override keywords do NOT outnumber API keywords
+      (avoids misclassifying 'the login button returns 401' as pure API).
+    """
+    text = f"{summary} {description}".lower()
+    api_hits = sum(1 for kw in _API_BUG_KEYWORDS if kw in text)
+    ui_hits  = sum(1 for kw in _UI_OVERRIDE_KEYWORDS if kw in text)
+    result   = api_hits >= 1 and api_hits > ui_hits
+    print(f"[is_api_bug_ticket] api_hits={api_hits} ui_hits={ui_hits} → {result}")
+    return result
+
+
+_API_ENVS = {
+    "local":      os.getenv("LOCAL_API_URL",      "http://localhost:3000"),
+    "staging":    os.getenv("STAGING_API_URL",    "https://api.staging.myzambeel.com"),
+    "production": os.getenv("PRODUCTION_API_URL", "https://api.myzambeel.com"),
+}
+
+
+def generate_api_test_cases(ticket_key: str, title: str, description: str) -> list:
+    """Use Groq to generate a list of HTTP test specs from a ticket description."""
+    from groq import Groq
+    import json as _json
+
+    client = Groq(api_key=os.getenv("GROQ_API_KEY"))
+    prompt = (
+        "You are a senior QA engineer writing API integration tests.\n\n"
+        f"Jira ticket: {ticket_key}\n"
+        f"Title: {title}\n"
+        f"Description: {description}\n\n"
+        "Generate a JSON array of HTTP test cases that directly verify the bug described above.\n"
+        "Each test case must be an object with these fields:\n"
+        "  test_name: string\n"
+        "  description: string  # what is being verified\n"
+        "  method: GET|POST|PUT|PATCH|DELETE\n"
+        "  path: string  # e.g. /api/v1/orders  (no base URL)\n"
+        "  headers: object  # e.g. {\"Authorization\": \"Bearer <token>\"} — use placeholder tokens\n"
+        "  body: object|null  # request body if applicable\n"
+        "  expected_status: integer  # HTTP status code that indicates success\n"
+        "  expected_body_contains: string|null  # substring to look for in response body\n"
+        "  should_not_contain: string|null  # substring that must NOT appear (for security checks)\n\n"
+        "RULES:\n"
+        "- Generate only test cases that directly test what the ticket describes.\n"
+        "- 1-3 test cases max.\n"
+        "- If the ticket is about a 401 / auth issue, include an unauthenticated request as one test.\n"
+        "- For rate-limit tickets, include a test that fires the endpoint rapidly.\n"
+        "- Do NOT test unrelated endpoints.\n"
+        "- Output ONLY the JSON array, no markdown, no explanation.\n"
+    )
+    for model in ("llama-3.3-70b-versatile", "llama3-70b-8192", "mixtral-8x7b-32768"):
+        try:
+            resp = client.chat.completions.create(
+                model=model,
+                messages=[{"role": "user", "content": prompt}],
+                temperature=0.2,
+                max_tokens=1024,
+            )
+            raw = resp.choices[0].message.content.strip()
+            # Strip markdown fences if present
+            raw = raw.removeprefix("```json").removeprefix("```").removesuffix("```").strip()
+            specs = _json.loads(raw)
+            if isinstance(specs, list):
+                print(f"[generate_api_test_cases] model={model} → {len(specs)} specs")
+                return specs
+        except Exception as e:
+            print(f"[generate_api_test_cases] model={model} error: {e}")
+    return []
+
+
+def run_api_tests(test_specs: list, env: str) -> list:
+    """Execute each HTTP test spec with requests; return a list of result dicts."""
+    import requests as _req
+
+    base_url = _API_ENVS.get(env, _API_ENVS["staging"]).rstrip("/")
+    results  = []
+
+    for spec in test_specs:
+        method   = spec.get("method", "GET").upper()
+        path     = spec.get("path", "/")
+        headers  = spec.get("headers") or {}
+        body     = spec.get("body")
+        exp_status = int(spec.get("expected_status", 200))
+        must_have  = spec.get("expected_body_contains")
+        must_not   = spec.get("should_not_contain")
+        url = f"{base_url}{path}"
+
+        try:
+            resp = _req.request(
+                method, url,
+                headers=headers,
+                json=body if body else None,
+                timeout=15,
+            )
+            actual_status = resp.status_code
+            body_text     = resp.text[:2000]
+
+            status_ok  = (actual_status == exp_status)
+            contain_ok = (must_have is None) or (must_have.lower() in body_text.lower())
+            absent_ok  = (must_not  is None) or (must_not.lower()  not in body_text.lower())
+            passed     = status_ok and contain_ok and absent_ok
+
+            failures = []
+            if not status_ok:
+                failures.append(f"expected HTTP {exp_status}, got {actual_status}")
+            if not contain_ok:
+                failures.append(f"response missing expected text: {must_have!r}")
+            if not absent_ok:
+                failures.append(f"response contains forbidden text: {must_not!r}")
+
+            results.append({
+                "test_name":      spec.get("test_name", path),
+                "description":    spec.get("description", ""),
+                "url":            url,
+                "method":         method,
+                "status":         "PASS" if passed else "FAIL",
+                "actual_status":  actual_status,
+                "expected_status": exp_status,
+                "failures":       failures,
+                "response_snippet": body_text[:500],
+            })
+            print(f"[run_api_tests] {method} {url} → {actual_status} {'PASS' if passed else 'FAIL'}")
+        except Exception as e:
+            results.append({
+                "test_name":      spec.get("test_name", path),
+                "description":    spec.get("description", ""),
+                "url":            url,
+                "method":         method,
+                "status":         "ERROR",
+                "actual_status":  None,
+                "expected_status": exp_status,
+                "failures":       [str(e)],
+                "response_snippet": "",
+            })
+            print(f"[run_api_tests] {method} {url} → ERROR: {e}")
+
+    return results
+
+
 def _identify_pages_from_ticket(title: str, description: str, portal: str) -> list:
     """Score each known route by keyword hits in the ticket text; return top matches."""
     text = f"{title} {description}".lower()
@@ -1776,6 +1944,112 @@ async def run_qa_endpoint(issue_key: str, body: RunQABody):
             yield evt({"stage": "done", "error": str(e)})
             return
         yield evt({"stage": "analysing_ticket", "status": "done"})
+
+        # ── Route: API bug vs UI bug ───────────────────────────────────────────
+        _is_api_ticket = is_api_bug_ticket(description, summary)
+        yield evt({"stage": "ticket_classified", "is_api_ticket": _is_api_ticket})
+        print(f"[run_qa] ticket_type={'api' if _is_api_ticket else 'ui'} for {issue_key}")
+
+        if _is_api_ticket:
+            # ── API path: generate + run HTTP tests, skip Playwright entirely ──
+            yield evt({"stage": "generating_api_tests", "status": "running"})
+            api_specs = await asyncio.to_thread(
+                generate_api_test_cases, issue_key, summary, description
+            )
+            yield evt({"stage": "generating_api_tests", "status": "done", "count": len(api_specs)})
+
+            yield evt({"stage": "running_tests", "status": "running"})
+            api_results = await asyncio.to_thread(run_api_tests, api_specs, body.env)
+            all_pass = bool(api_results) and all(r["status"] == "PASS" for r in api_results)
+
+            # Map to the same shape the rest of the function expects
+            test_results = [{
+                "portal":             "api",
+                "status":             ("PASS" if all_pass else "FAIL") if api_results else "ERROR",
+                "message":            "; ".join(
+                    f"{r['test_name']}: {', '.join(r['failures'])}"
+                    for r in api_results if r["status"] != "PASS"
+                ) or "All API tests passed",
+                "url":                None,
+                "console_errors":     [],
+                "load_time_ms":       0,
+                "nav_elements_found": [],
+                "screenshots":        [],
+                "execution_log":      [
+                    {"step": r["test_name"], "result": r["status"].lower(),
+                     "detail": f"{r['method']} {r['url']} → {r['actual_status']}; {'; '.join(r['failures'])}"}
+                    for r in api_results
+                ],
+                "feature_evidence":   [],
+                "steps_executed":     len(api_results),
+                "api_results":        api_results,
+            }]
+            yield evt({
+                "stage": "running_tests", "status": "done",
+                "all_pass": all_pass,
+                "api_results": api_results,
+            })
+
+            # Save API test specs as Jira comment
+            try:
+                lines = [f"*AI-Generated API Test Cases — {issue_key}* ({body.env.upper()})"]
+                for i, spec in enumerate(api_specs, 1):
+                    r = api_results[i - 1] if i <= len(api_results) else {}
+                    icon = "PASS" if r.get("status") == "PASS" else "FAIL"
+                    lines.append(
+                        f"\n*{i}. {spec.get('test_name', spec.get('path', ''))}* [{icon}]\n"
+                        f"_{spec.get('description', '')}_\n"
+                        f"{spec.get('method', 'GET')} `{spec.get('path', '')}` "
+                        f"→ expected {spec.get('expected_status')} "
+                        f"/ got {r.get('actual_status', '?')}"
+                    )
+                await asyncio.to_thread(_jira.add_comment, issue_key, "\n".join(lines))
+            except Exception:
+                pass
+
+            # ── Update Jira status ─────────────────────────────────────────────
+            total_steps_executed = len(api_results)
+            yield evt({"stage": "updating_jira", "status": "running"})
+            try:
+                if all_pass and total_steps_executed:
+                    new_status = "Ready for Review"
+                    await asyncio.to_thread(_jira.update_ticket_status, issue_key, new_status)
+                    comment = (
+                        f"QA Passed (API tests) — {body.env.upper()}\n"
+                        + "\n".join(
+                            f"- {r['method']} {r['url']} → {r['actual_status']} PASS"
+                            for r in api_results
+                        )
+                    )
+                    await asyncio.to_thread(_jira.add_comment, issue_key, comment)
+                else:
+                    new_status = "QA In Progress"
+                    if api_results:
+                        fail_lines = [
+                            f"- {r['test_name']}: {', '.join(r['failures'])}"
+                            for r in api_results if r["status"] != "PASS"
+                        ]
+                        comment = (
+                            f"QA Failed (API tests) — {body.env.upper()}\n"
+                            + "\n".join(fail_lines)
+                        )
+                        await asyncio.to_thread(_jira.add_comment, issue_key, comment)
+                yield evt({"stage": "updating_jira", "status": "done", "new_status": new_status})
+            except Exception as e:
+                yield evt({"stage": "updating_jira", "status": "error", "message": str(e)})
+
+            elapsed = round(time.time() - t0, 1)
+            yield evt({
+                "stage": "done",
+                "all_pass":  all_pass,
+                "results":   test_results,
+                "new_status": new_status,
+                "elapsed":   elapsed,
+                "ticket_type": "api",
+            })
+            return
+
+        # ── UI path continues below ────────────────────────────────────────────
 
         # ── Stage: switch branches (local only) ────────────────────────────────
         run_env = body.env  # may be overridden to 'staging' if repos unavailable
