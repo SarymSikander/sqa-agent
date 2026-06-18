@@ -1,9 +1,0 @@
-fastapi
-uvicorn[standard]
-python-multipart
-python-dotenv
-requests
-gitpython
-openai
-playwright
-mysql-connector-python

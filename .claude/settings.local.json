@@ -60,7 +60,12 @@
       "Bash(~/Desktop/sqa-agent/venv/bin/python3 -c \"import ast; ast.parse\\(open\\('tools/playwright_tool.py'\\).read\\(\\)\\); print\\('playwright_tool.py OK'\\)\")",
       "Bash(~/Desktop/sqa-agent/venv/bin/python3 -c \"import ast; ast.parse\\(open\\('tools/playwright_tool.py'\\).read\\(\\)\\); print\\('OK'\\)\")",
       "Bash(~/Desktop/sqa-agent/venv/bin/python3 *)",
-      "Skill(run)"
+      "Skill(run)",
+      "Bash(mkdir -p /Users/sarimsikandar/Desktop/sqa-agent/dashboard/api/knowledge/auth)",
+      "Bash(mkdir -p /Users/sarimsikandar/Desktop/sqa-agent/dashboard/api/knowledge/billing)",
+      "Bash(mkdir -p /Users/sarimsikandar/Desktop/sqa-agent/dashboard/api/knowledge/orders)",
+      "Bash(mkdir -p /Users/sarimsikandar/Desktop/sqa-agent/dashboard/api/knowledge/return_orders)",
+      "Bash(mkdir -p /Users/sarimsikandar/Desktop/sqa-agent/dashboard/api/knowledge/purchase_orders)"
     ]
   }
 }
