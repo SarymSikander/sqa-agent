@@ -78,6 +78,7 @@ def login_to_portal(page, portal, env):
     email     = os.getenv(email_key, "").strip()
     password  = os.getenv(pass_key, "").strip()
     print(f"[LOGIN] {portal}/{env} — email={email}")
+    print(f"[LOGIN] navigating to: {base_url}/login")
     page.goto(f"{base_url}/login")
     page.wait_for_selector('input[type="email"], input[type="text"]', timeout=15000)
     page.fill('input[type="email"], input[type="text"]', email)
