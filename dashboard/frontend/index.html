@@ -3531,6 +3531,15 @@ function _handleQAEvent(ev) {
     return;
   }
 
+  if (stage === 'ticket_classified') {
+    if (ev.is_api_ticket) {
+      const labelEl = document.querySelector('#qas-generating_test_cases > div > div:first-child');
+      if (labelEl) labelEl.textContent = 'Generating test cases (API mode — skipped)';
+      _setQAStage('generating_test_cases', 'skip', '');
+    }
+    return;
+  }
+
   if (!stage || !status) return;
 
   if (status === 'skipped') {
