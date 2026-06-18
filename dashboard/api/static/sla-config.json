@@ -1,10 +1,10 @@
 {
-  "_comment": "SLA thresholds in ms. Seeded from Postman p95 baselines. Run `node scripts/measure-baselines.js` to refresh from live system. Formula: pass=p95×1.2, warn=p95×1.5, fail=p95×2.0",
+  "_comment": "SLA thresholds. Auto-regenerated 2026-06-18 08:03:39 UTC from live p95 measurements. Formula: pass=p95×1.2, warn=p95×1.5, fail=p95×2.0. Never manually edit — rerun the suite to refresh.",
   "login": {
-    "pass": 1514,
-    "warn": 1892,
-    "fail": 2522,
-    "p95_baseline": 1261
+    "pass": 1874,
+    "warn": 2342,
+    "fail": 3122,
+    "p95_baseline": 1561
   },
   "getOrders": {
     "pass": 1800,
@@ -13,70 +13,70 @@
     "p95_baseline": 1500
   },
   "statusCounts": {
-    "pass": 226,
-    "warn": 282,
-    "fail": 376,
-    "p95_baseline": 188
+    "pass": 2970,
+    "warn": 3713,
+    "fail": 4950,
+    "p95_baseline": 2475
   },
   "orderDetails": {
-    "pass": 3329,
-    "warn": 4161,
-    "fail": 5548,
-    "p95_baseline": 2774
+    "pass": 656,
+    "warn": 819,
+    "fail": 1092,
+    "p95_baseline": 546
   },
   "orderLogs": {
-    "pass": 232,
-    "warn": 290,
-    "fail": 386,
-    "p95_baseline": 193
+    "pass": 1283,
+    "warn": 1604,
+    "fail": 2138,
+    "p95_baseline": 1069
   },
   "teamslist": {
-    "pass": 281,
-    "warn": 351,
-    "fail": 468,
-    "p95_baseline": 234
+    "pass": 10270,
+    "warn": 12837,
+    "fail": 17116,
+    "p95_baseline": 8558
   },
   "agentsList": {
-    "pass": 298,
-    "warn": 372,
-    "fail": 496,
-    "p95_baseline": 248
+    "pass": 8511,
+    "warn": 10638,
+    "fail": 14184,
+    "p95_baseline": 7092
   },
   "stockValidation": {
-    "pass": 248,
-    "warn": 309,
-    "fail": 412,
-    "p95_baseline": 206
+    "pass": 1068,
+    "warn": 1335,
+    "fail": 1780,
+    "p95_baseline": 890
   },
   "csvExport": {
-    "pass": 2772,
-    "warn": 3465,
-    "fail": 4620,
-    "p95_baseline": 2310
+    "pass": 16724,
+    "warn": 20904,
+    "fail": 27872,
+    "p95_baseline": 13936
   },
   "sellerDashboard": {
-    "pass": 225,
-    "warn": 281,
-    "fail": 374,
-    "p95_baseline": 187
+    "pass": 2060,
+    "warn": 2574,
+    "fail": 3432,
+    "p95_baseline": 1716
   },
   "updateStatusTags": {
-    "pass": 252,
-    "warn": 315,
-    "fail": 420,
-    "p95_baseline": 210
+    "pass": 2278,
+    "warn": 2847,
+    "fail": 3796,
+    "p95_baseline": 1898
   },
   "bulkRemarks": {
-    "pass": 276,
-    "warn": 345,
-    "fail": 460,
-    "p95_baseline": 230
+    "pass": 8987,
+    "warn": 11234,
+    "fail": 14978,
+    "p95_baseline": 7489
   },
   "assignCourier": {
-    "pass": 1440,
-    "warn": 1800,
-    "fail": 2400,
-    "p95_baseline": 1200
+    "pass": 1829,
+    "warn": 2286,
+    "fail": 3048,
+    "p95_baseline": 1524
   },
   "inventoryMovements": {
     "pass": 618,
@@ -85,42 +85,40 @@
     "p95_baseline": 515
   },
   "orderAnalytics": {
-    "pass": 564,
-    "warn": 705,
-    "fail": 940,
-    "p95_baseline": 470
+    "pass": 1850,
+    "warn": 2312,
+    "fail": 3082,
+    "p95_baseline": 1541
   },
   "ticketList": {
-    "pass": 446,
-    "warn": 558,
-    "fail": 744,
-    "p95_baseline": 372
+    "pass": 3326,
+    "warn": 4157,
+    "fail": 5542,
+    "p95_baseline": 2771
   },
   "ticketComments": {
-    "pass": 228,
-    "warn": 285,
-    "fail": 380,
-    "p95_baseline": 190
+    "pass": 9244,
+    "warn": 11555,
+    "fail": 15406,
+    "p95_baseline": 7703
   },
   "sellerOrders": {
-    "status": "DEAD",
     "pass": null,
     "warn": null,
     "fail": null,
     "p95_baseline": null
   },
   "substatusOrders": {
-    "status": "DEAD",
     "pass": null,
     "warn": null,
     "fail": null,
     "p95_baseline": null
   },
   "checkEmail": {
-    "pass": 240,
-    "warn": 300,
-    "fail": 400,
-    "p95_baseline": 200
+    "pass": 1019,
+    "warn": 1274,
+    "fail": 1698,
+    "p95_baseline": 849
   },
   "bulkCsvUpdate": {
     "pass": null,
@@ -129,34 +127,34 @@
     "p95_baseline": null
   },
   "courierReport": {
-    "pass": null,
-    "warn": null,
-    "fail": null,
-    "p95_baseline": null
+    "pass": 1163,
+    "warn": 1454,
+    "fail": 1938,
+    "p95_baseline": 969
   },
   "dispatchBatches": {
-    "pass": 198,
-    "warn": 248,
-    "fail": 330,
-    "p95_baseline": 165
+    "pass": 5330,
+    "warn": 6662,
+    "fail": 8882,
+    "p95_baseline": 4441
   },
   "trackingReport": {
-    "pass": 201,
-    "warn": 251,
-    "fail": 334,
-    "p95_baseline": 167
+    "pass": 10845,
+    "warn": 13556,
+    "fail": 18074,
+    "p95_baseline": 9037
   },
   "adminGoldUsers": {
-    "pass": 227,
-    "warn": 284,
-    "fail": 378,
-    "p95_baseline": 189
+    "pass": 1174,
+    "warn": 1467,
+    "fail": 1956,
+    "p95_baseline": 978
   },
   "agencyApplications": {
-    "pass": 1252,
-    "warn": 1565,
-    "fail": 2086,
-    "p95_baseline": 1043
+    "pass": 1010,
+    "warn": 1262,
+    "fail": 1682,
+    "p95_baseline": 841
   },
   "batchIds": {
     "pass": 4205,
@@ -165,7 +163,6 @@
     "p95_baseline": 3504
   },
   "substatusOrdersForCsv": {
-    "status": "DEAD",
     "pass": null,
     "warn": null,
     "fail": null,
@@ -220,7 +217,6 @@
     "p95_baseline": 181
   },
   "tc_004": {
-    "status": "DEAD",
     "pass": null,
     "warn": null,
     "fail": null,
