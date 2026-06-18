@@ -2736,7 +2736,7 @@ _GH_HEADERS = {
 
 
 @app.post("/api-tests/run")
-async def run_api_tests(body: ApiTestRunBody = None):
+async def run_api_tests_endpoint(body: ApiTestRunBody = None):
     if body is None:
         body = ApiTestRunBody()
 
