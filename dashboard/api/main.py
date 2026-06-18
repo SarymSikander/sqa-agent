@@ -1960,14 +1960,46 @@ async def run_qa_endpoint(issue_key: str, body: RunQABody):
         print(f"[run_qa] ticket_type={'api' if _is_api_ticket else 'ui'} for {issue_key}")
 
         if _is_api_ticket:
-            # ── API path: generate + run HTTP tests, skip Playwright entirely ──
             yield evt({"stage": "generating_api_tests", "status": "running"})
-            api_specs = await asyncio.to_thread(
-                generate_api_test_cases, issue_key, summary, description
-            )
-            yield evt({"stage": "generating_api_tests", "status": "done", "count": len(api_specs)})
 
+            # Extract endpoints directly from ticket description — no LLM needed
+            import re as _re2
+            import requests as _req2
+
+            found_endpoints = list(dict.fromkeys(_re2.findall(r'/api/[\w/:\-]+', description)))[:8]
+            print(f"[run_qa] API ticket — extracted endpoints: {found_endpoints}")
+
+            api_base = _API_ENVS.get(body.env, _API_ENVS["production"]).rstrip("/")
+
+            # Build test specs directly from what we found — no LLM
+            api_specs = []
+            for ep in found_endpoints:
+                api_specs.append({
+                    "test_name": f"{ep} — no auth should return 401",
+                    "description": f"Unauthenticated request to {ep} must return 401",
+                    "method": "GET",
+                    "path": ep,
+                    "headers": {},
+                    "body": None,
+                    "expected_status": 401,
+                    "expected_body_contains": None,
+                    "should_not_contain": None,
+                })
+                api_specs.append({
+                    "test_name": f"{ep} — expired token should return 401",
+                    "description": f"Expired token request to {ep} must return 401",
+                    "method": "GET",
+                    "path": ep,
+                    "headers": {"Authorization": "Bearer eyJhbGciOiJIUzI1NiJ9.expired.token"},
+                    "body": None,
+                    "expected_status": 401,
+                    "expected_body_contains": None,
+                    "should_not_contain": None,
+                })
+
+            yield evt({"stage": "generating_api_tests", "status": "done", "count": len(api_specs)})
             yield evt({"stage": "running_tests", "status": "running"})
+
             api_results = await asyncio.to_thread(run_api_tests, api_specs, body.env)
             all_pass = bool(api_results) and all(r["status"] == "PASS" for r in api_results)
 
