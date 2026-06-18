@@ -2079,6 +2079,29 @@ async def run_qa_endpoint(issue_key: str, body: RunQABody):
             except Exception as e:
                 yield evt({"stage": "updating_jira", "status": "error", "message": str(e)})
 
+            # ── Slack report for API ticket ───────────────────────────────────
+            try:
+                _api_results = test_results[0].get("api_results", []) if test_results else []
+                _pass_count = sum(1 for r in _api_results if r.get("status") == "PASS")
+                _fail_count = sum(1 for r in _api_results if r.get("status") != "PASS")
+                _results_lines = "\n".join(
+                    f"{'✅' if r.get('status') == 'PASS' else '❌'} `{r.get('method','GET')} {r.get('url','')}` → {r.get('actual_status','?')} ({'PASS' if r.get('status')=='PASS' else 'FAIL'})"
+                    for r in _api_results
+                )
+                slack_msg = (
+                    f"🤖 *QA Run Complete* — <https://zambeel.atlassian.net/browse/{issue_key}|{issue_key}>\n"
+                    f"*{summary}*\n\n"
+                    f"*Type:* API Security Tests\n"
+                    f"*Environment:* `{body.env.upper()}`\n\n"
+                    f"*Results:* {_pass_count} passed · {_fail_count} failed\n"
+                    f"{_results_lines}\n\n"
+                    f"*Jira Status →* {'Ready for Review ✅' if all_pass else 'QA In Progress 🔄'}\n"
+                    f"*Time:* {round(time.time() - t0, 1)}s"
+                )
+                await asyncio.to_thread(_slack.send_message, slack_msg)
+            except Exception as _se:
+                print(f"[slack] API ticket report error: {_se}")
+
             elapsed = round(time.time() - t0, 1)
             yield evt({
                 "stage": "done",
