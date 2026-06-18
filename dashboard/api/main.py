@@ -1122,8 +1122,8 @@ def is_api_bug_ticket(description: str, summary: str = "") -> bool:
 
 _API_ENVS = {
     "local":      os.getenv("LOCAL_API_URL",      "http://localhost:3000"),
-    "staging":    os.getenv("STAGING_API_URL",    "https://api.staging.myzambeel.com"),
-    "production": os.getenv("PRODUCTION_API_URL", "https://api.myzambeel.com"),
+    "staging":    os.getenv("STAGING_API_URL",    "https://staging.myzambeel.com"),
+    "production": os.getenv("PRODUCTION_API_URL", "https://portal.myzambeel.com"),
 }
 
 
