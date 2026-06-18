@@ -7,13 +7,7 @@ from playwright.sync_api import sync_playwright
 
 import pathlib as _pathlib
 
-# Load dashboard/api/.env first (non-override), then fall back to root .env
-# so that locally the root credentials are picked up while HF Space secrets take priority.
-_api_env = os.path.join(os.path.dirname(__file__), "..", ".env")
-load_dotenv(dotenv_path=_api_env, override=False)
-_root_env = str((_pathlib.Path(__file__).resolve().parent / ".." / ".." / ".." / ".env").resolve())
-if os.path.exists(_root_env):
-    load_dotenv(dotenv_path=_root_env, override=False)
+load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), "..", ".env"))
 
 LOCAL_URL      = os.getenv("LOCAL_URL", "http://localhost:5173")
 STAGING_URL    = os.getenv("STAGING_URL", "https://staging.myzambeel.com")
