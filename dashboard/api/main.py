@@ -2088,6 +2088,7 @@ async def run_qa_endpoint(issue_key: str, body: RunQABody):
                 "elapsed":   elapsed,
                 "ticket_type": "api",
             })
+            yield "data: {\"stage\": \"done\"}\n\n"
             return
 
         # ── UI path continues below ────────────────────────────────────────────

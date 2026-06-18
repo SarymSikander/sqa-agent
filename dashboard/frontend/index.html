@@ -3526,7 +3526,8 @@ function _handleQAEvent(ev) {
   }
 
   if (stage === 'done') {
-    _showQAFinalResult(ev.result, ev.error);
+    btnLoad('jira-run-qa-btn', false);
+    _showQAFinalResult(ev.result ?? (ev.results ? { test_results: ev.results, all_pass: ev.all_pass, elapsed_seconds: ev.elapsed } : null), ev.error);
     return;
   }
 
