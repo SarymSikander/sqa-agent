@@ -1846,7 +1846,6 @@
     <!-- ══ PR Review ══════════════════════════════════════════════════════════════ -->
     <section id="page-pr-review" class="page">
       <div class="page-inner">
-        <div class="notice">🤖 AI reviews run 3 passes (Code Quality · Security · Dependencies) via Claude Opus 4.7 and post a comment on the PR. Takes ~1–2 min.</div>
 
         <div class="grid-2 mb24" id="pr-grid">
           <!-- Frontend -->
@@ -2146,7 +2145,7 @@
 <div id="qa-clarify-modal" class="modal-overlay" style="z-index:9999">
   <div class="modal-box" style="max-width:480px">
     <div class="modal-header">
-      <div class="modal-title">🤖 QA Clarification Needed</div>
+      <div class="modal-title">QA Clarification Needed</div>
     </div>
     <div class="modal-body" style="padding:16px 0 8px">
       <p id="qa-clarify-question" style="font-size:13px;color:var(--text);margin-bottom:16px;line-height:1.6;white-space:pre-wrap"></p>
@@ -2225,7 +2224,7 @@
   </div>
   <div class="panel-footer">
     <button class="btn btn-primary w100" id="pr-panel-review-btn" onclick="prReviewFromPanel()" style="justify-content:center">
-      <div class="spin"></div><span class="label">🤖 Review with AI</span>
+      <div class="spin"></div><span class="label">Review with AI</span>
     </button>
   </div>
 </div>
@@ -3240,7 +3239,7 @@ async function prLoad(repo) {
         </div>
         <button class="btn btn-sm btn-secondary" id="pr-review-btn-${repo}-${pr.number}"
           onclick="event.stopPropagation();prReview('${repo}', ${pr.number}, '${esc(pr.title).replace(/'/g,"\\'")}')">
-          <div class="spin"></div><span class="label">🤖 Review</span>
+          <div class="spin"></div><span class="label">Review</span>
         </button>
       </div>`;
     }).join('');
@@ -3258,12 +3257,12 @@ async function prReview(repo, prNumber, title) {
   const btnId = `pr-review-btn-${repo}-${prNumber}`;
   const btn   = document.getElementById(btnId);
   if (btn) { btnLoad(btn, true); }
-  toast(`Reviewing PR #${prNumber} — running 3 Claude passes…`, 'info', 12000);
+  toast(`Reviewing PR #${prNumber}…`, 'info', 12000);
 
   const wrap    = document.getElementById('pr-review-wrap');
   const content = document.getElementById('pr-review-content');
-  document.getElementById('pr-review-title').textContent = `🤖 AI Review: #${prNumber} — ${title}`;
-  content.innerHTML = '<div style="color:var(--text3);font-size:13px;padding:16px 0">Analyzing code — this takes 1–2 minutes…<br><br>'
+  document.getElementById('pr-review-title').textContent = `AI Review: #${prNumber} — ${title}`;
+  content.innerHTML = '<div style="color:var(--text3);font-size:13px;padding:16px 0">Analyzing code…<br><br>'
     + '<div class="skel-line skeleton" style="height:12px;margin-bottom:8px;width:80%"></div>'
     + '<div class="skel-line skeleton" style="height:12px;margin-bottom:8px;width:60%"></div>'
     + '<div class="skel-line skeleton" style="height:12px;width:70%"></div></div>';
@@ -3431,7 +3430,7 @@ function _buildProgressHTML(env, key) {
     </div>`).join('');
   return `
     <div class="qa-progress-header">
-      🤖 Running QA
+      Running QA
       <span class="qa-progress-key">${esc(key)}</span>
     </div>
     ${rows}
@@ -3798,7 +3797,7 @@ async function prReviewFromPanel() {
       '<div class="skel-line skeleton" style="height:12px;margin-bottom:8px;width:60%"></div>' +
       '<div class="skel-line skeleton" style="height:12px;width:70%"></div>';
   }
-  toast(`Reviewing PR #${number} — running 3 Claude passes…`, 'info', 12000);
+  toast(`Reviewing PR #${number}…`, 'info', 12000);
   try {
     const data = await api('/pr/review', {
       method: 'POST',
