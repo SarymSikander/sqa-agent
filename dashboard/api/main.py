@@ -205,6 +205,125 @@ APP_CONTEXT = _load_knowledge_base()
 print(f"[startup] APP_CONTEXT total: {len(APP_CONTEXT)} chars")
 
 
+# ── Semantic KB index for /ai/chat ────────────────────────────────────────────
+import math as _math
+import re as _re_kb
+
+_STOPWORDS = {
+    'a','an','the','is','are','was','were','be','been','being',
+    'have','has','had','do','does','did','will','would','could',
+    'should','may','might','shall','can','need','to','of','in',
+    'on','at','by','for','with','about','as','into','through',
+    'from','up','down','and','or','but','if','then','that','this',
+    'these','those','it','its','i','we','you','he','she','they',
+    'them','their','there','what','which','who','how','when',
+    'where','why','all','any','both','each','more','most','other',
+    'some','such','no','not','only','own','same','so','than','too',
+    'very','just','because','while','also','are','its','get',
+}
+
+_KB_CHUNKS: list[dict] = []
+_KB_IDF: dict[str, float] = {}
+
+
+def _kb_tokenize(text: str) -> set:
+    return {w for w in _re_kb.findall(r'[a-z0-9_]+', text.lower())
+            if w not in _STOPWORDS and len(w) > 2}
+
+
+def _build_kb_index():
+    global _KB_CHUNKS, _KB_IDF
+    chunks = []
+    kb_dir = KNOWLEDGE_DIR
+    if not kb_dir.exists():
+        return
+    for fpath in sorted(kb_dir.rglob("*.md")):
+        rel = str(fpath.relative_to(kb_dir))
+        try:
+            text = fpath.read_text(encoding="utf-8", errors="ignore")
+        except Exception:
+            continue
+        # Split on ## headings (keep the heading with its section body)
+        sections = _re_kb.split(r'\n(?=#{1,2} )', text)
+        for sec in sections:
+            sec = sec.strip()
+            if len(sec) < 80:
+                continue
+            heading = sec.split('\n')[0].strip('#').strip()
+            chunks.append({
+                "file": rel,
+                "title": heading or rel,
+                "text": sec,
+                "tokens": _kb_tokenize(sec),
+            })
+    # Compute IDF
+    df: dict = {}
+    for c in chunks:
+        for t in c["tokens"]:
+            df[t] = df.get(t, 0) + 1
+    n = max(len(chunks), 1)
+    idf = {t: _math.log(n / (d + 1)) for t, d in df.items()}
+    _KB_CHUNKS = chunks
+    _KB_IDF = idf
+    print(f"[startup] KB semantic index: {len(_KB_CHUNKS)} chunks across {len(set(c['file'] for c in _KB_CHUNKS))} files")
+
+
+_build_kb_index()
+
+
+def _retrieve_kb(query: str, top_k: int = 5, char_limit: int = 7000) -> str:
+    """Return the top_k most relevant KB sections for query, capped at char_limit chars."""
+    # Always anchor with system_data (factual ground truth), capped at 2000 chars
+    result_parts: list[str] = []
+    sd_path = KNOWLEDGE_DIR / "shared" / "system_data.md"
+    if sd_path.exists():
+        sd_text = sd_path.read_text(encoding="utf-8", errors="ignore")[:2000]
+        result_parts.append(f"[shared/system_data.md]\n{sd_text}")
+
+    char_used = sum(len(p) for p in result_parts)
+
+    if not _KB_CHUNKS:
+        return "\n\n---\n\n".join(result_parts) or APP_CONTEXT[:char_limit]
+
+    query_tokens = _kb_tokenize(query)
+    if not query_tokens:
+        return "\n\n---\n\n".join(result_parts)
+
+    # Score every chunk by sum of IDF weights for matching terms
+    scored: list[tuple[float, int]] = []
+    for i, chunk in enumerate(_KB_CHUNKS):
+        overlap = query_tokens & chunk["tokens"]
+        if not overlap:
+            continue
+        score = sum(_KB_IDF.get(t, 0.0) for t in overlap)
+        scored.append((score, i))
+
+    scored.sort(reverse=True)
+
+    seen = {"shared/system_data.md"}
+    retrieved = 0
+    for _score, idx in scored[:top_k * 3]:
+        if retrieved >= top_k:
+            break
+        chunk = _KB_CHUNKS[idx]
+        # Skip exact duplicate file already included as system_data
+        if chunk["file"] in seen and chunk["file"] == "shared/system_data.md":
+            continue
+        label = f"[{chunk['file']} — {chunk['title']}]"
+        entry = f"{label}\n{chunk['text']}"
+        if char_used + len(entry) > char_limit:
+            budget = char_limit - char_used - len(label) - 4
+            if budget > 200:
+                result_parts.append(f"{label}\n{chunk['text'][:budget]}…")
+                char_used += len(result_parts[-1])
+            break
+        result_parts.append(entry)
+        char_used += len(entry)
+        retrieved += 1
+
+    return "\n\n---\n\n".join(result_parts)
+
+
 def _load_knowledge_file(rel_path: str) -> str:
     """Read a single knowledge file by relative path (e.g. 'oms/selectors.md')."""
     for candidate in [
@@ -2542,28 +2661,8 @@ async def ai_chat(request: Request):
     body = await request.json()
     message = body.get("message", "")
 
-    msg_lower = message.lower()
-    if "seller" in msg_lower:
-        dirs = ["seller", "shared"]
-    elif "agency" in msg_lower:
-        dirs = ["agency", "shared"]
-    else:
-        dirs = ["oms", "shared"]
-
-    kb = ""
-    # Always load system_data first - most important factual data
-    system_data_path = KNOWLEDGE_DIR / "shared" / "system_data.md"
-    if system_data_path.exists():
-        kb += system_data_path.read_text()[:3000]
-
-    # Then load portal-specific files
-    for d in dirs:
-        path = KNOWLEDGE_DIR / d
-        if path.exists():
-            for f in sorted(path.glob("*.md")):
-                kb += f.read_text()[:800]
-
-    kb = kb[:8000]  # hard cap to stay under Groq free tier token limit
+    kb = _retrieve_kb(message, top_k=5, char_limit=7000)
+    print(f"[ai/chat] retrieved KB: {len(kb)} chars for query: {message[:80]!r}")
 
     live_data = get_live_db_data()
 
@@ -2580,7 +2679,7 @@ Portals:
 
 {live_data}
 
-KNOWLEDGE BASE:
+RELEVANT KNOWLEDGE BASE SECTIONS:
 {kb}"""
 
     try:
@@ -2597,7 +2696,7 @@ KNOWLEDGE BASE:
             fallback = OpenAI(base_url='https://models.inference.ai.azure.com', api_key=os.getenv('GITHUB_TOKEN'))
             response = fallback.chat.completions.create(
                 model='gpt-4o',
-                messages=[{'role': 'system', 'content': system[:3000]}, {'role': 'user', 'content': message}],
+                messages=[{'role': 'system', 'content': system}, {'role': 'user', 'content': message}],
                 max_tokens=1000
             )
             answer = response.choices[0].message.content
