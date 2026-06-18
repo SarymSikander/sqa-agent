@@ -6,7 +6,7 @@
   <title>Zambeel SQA — Dashboard</title>
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 84 61'%3E%3Cpath d='M61.1145 50.8117H84V51.85C84 56.9117 79.904 61 74.8328 61H52.1424L49.4118 57.4309C48.1765 55.8085 47.5263 53.8617 47.5263 51.85C47.5263 49.9681 48.1114 48.0862 49.2817 46.4638L67.8762 21.0904C58.1238 17.067 46.291 13.3032 27.1765 13.3032C3.51084 13.3032 3.44582 23.7511 3.44582 25.6979C3.44582 32.1872 7.34675 38.1575 7.34675 39.0011C7.34675 39.066 7.34675 39.1309 7.28173 39.1309C6.50155 39.1309 0 31.2138 0 22.583C0 5.77554 15.9938 0 27.1765 0C44.4056 0 62.935 6.29468 73.3375 10.383C78.2786 12.3298 81.5294 17.1319 81.5294 22.4532L61.1145 50.8117Z' fill='%235B3DF5'/%3E%3C/svg%3E" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
   <style>
     /* ── Tokens ─────────────────────────────────────────────────────────────── */
     :root {
@@ -46,9 +46,12 @@
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     html, body { height: 100%; overflow: hidden; }
     body {
-      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
       font-size: 14px;
       line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+      letter-spacing: -0.01em;
       background: var(--bg);
       color: var(--text);
       display: flex;
