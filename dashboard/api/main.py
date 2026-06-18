@@ -63,7 +63,7 @@ except Exception:
     _USERS = {}
 
 # Paths that bypass the auth middleware
-_AUTH_EXEMPT_PREFIXES = ("/api-tests/",)
+_AUTH_EXEMPT_PREFIXES = ("/api-tests/", "/screenshots/")
 _AUTH_EXEMPT = {
     ("POST", "/auth/login"),
     ("GET",  "/health"),
