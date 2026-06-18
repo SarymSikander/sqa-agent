@@ -1177,14 +1177,14 @@ def generate_api_test_cases(ticket_key: str, title: str, description: str) -> li
     return []
 
 
-def run_api_tests(test_specs: list, env: str) -> list:
+def run_api_tests(api_specs, env="production"):
     """Execute each HTTP test spec with requests; return a list of result dicts."""
     import requests as _req
 
     base_url = _API_ENVS.get(env, _API_ENVS["staging"]).rstrip("/")
     results  = []
 
-    for spec in test_specs:
+    for spec in api_specs:
         method   = spec.get("method", "GET").upper()
         path     = spec.get("path", "/")
         headers  = spec.get("headers") or {}
