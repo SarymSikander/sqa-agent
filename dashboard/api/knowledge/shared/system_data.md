@@ -5,14 +5,14 @@ _Queried from production (zambeel-production.c2knh0obsufa.eu-west-3.rds.amazonaw
 
 ## Live Counts
 <!-- LIVE_COUNTS_START -->
-_Last updated: 2026-06-01 (manual baseline — auto-refresh runs daily at 9 AM)_
+_Last updated: 2026-06-18 09:04_
 
 | Metric | Count |
 |--------|-------|
-| Total Orders | 734,944 |
-| Total Tickets | 22,127 |
-| Total Stores | 21,611 |
-| Total Users | 58,534 |
+| Total Orders | 779,515 |
+| Total Tickets | 24,150 |
+| Total Stores | 22,884 |
+| Total Users | 61,228 |
 | Supported Countries | 9 |
 <!-- LIVE_COUNTS_END -->
 
