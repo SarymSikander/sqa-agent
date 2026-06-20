@@ -3387,6 +3387,7 @@ function openRunQAModal() {
   if (suggestEl) suggestEl.style.display = 'none';
   document.getElementById('rqa-pages-field').style.display = 'none';
   document.getElementById('rqa-pages-section').innerHTML = '<div style="color:var(--text3);font-size:12px">Loading pages…</div>';
+  document.getElementById('rqa-confirm-btn').disabled = true;
   document.getElementById('run-qa-modal').classList.add('open');
   loadPortalPages('');
 }
@@ -3458,18 +3459,24 @@ async function loadPortalPages(portal) {
     }
   } catch(e) {
     section.innerHTML = `<div style="color:var(--error);font-size:12px">Failed to load pages: ${esc(e.message)}</div>`;
+    const _cBtn = document.getElementById('rqa-confirm-btn');
+    if (_cBtn) _cBtn.disabled = false;
     return;
   }
 
   if (!allPages.length) {
     section.innerHTML = '<div style="color:var(--text3);font-size:12px">No pages found for this portal.</div>';
     _rqaPagesLoaded = true;
+    const _cBtn = document.getElementById('rqa-confirm-btn');
+    if (_cBtn) _cBtn.disabled = false;
     return;
   }
 
   // Render immediately — all unchecked, all groups expanded
   _renderPageCheckboxes(section, portal, allPages);
   _rqaPagesLoaded = true;
+  const _cBtn = document.getElementById('rqa-confirm-btn');
+  if (_cBtn) _cBtn.disabled = false;
 
   // ── Phase 2: fetch suggest-pages (slow — calls Jira) — non-blocking ───────
   const suggestEl = document.getElementById('rqa-suggest-status');

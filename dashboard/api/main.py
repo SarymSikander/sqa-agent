@@ -1290,7 +1290,7 @@ def generate_api_test_cases(ticket_key: str, title: str, description: str) -> li
     )
     import concurrent.futures
     def _call_groq():
-        for model in ("llama-3.3-70b-versatile", "llama-3.1-8b-instant", "qwen/qwen-3-32b"):
+        for model in ("llama-3.3-70b-versatile", "llama-3.1-8b-instant", "openai/gpt-oss-20b"):
             try:
                 resp = client.chat.completions.create(
                     model=model,
@@ -1477,8 +1477,6 @@ def extract_page_dom_live(portal, env, url_path) -> dict:
     from playwright.sync_api import sync_playwright
     from urllib.parse import urlparse as _urlparse
     base_url = _resolve_base_url(env)
-    email    = os.getenv(f'{portal.upper()}_{env.upper()}_EMAIL', '').strip()
-    password = os.getenv(f'{portal.upper()}_{env.upper()}_PASSWORD', '').strip()
     full_url = f'{base_url}{url_path}'
     print(f'[extract_page_dom_live] {portal}/{env} → {full_url}')
     try:
@@ -1501,11 +1499,7 @@ def extract_page_dom_live(portal, env, url_path) -> dict:
                     pass
             page.on("response", _on_response)
 
-            page.goto(f'{base_url}/login')
-            page.fill('input[type="email"]', email)
-            page.fill('input[type="password"]', password)
-            page.click('button[type="submit"]')
-            page.wait_for_url(lambda u: '/login' not in u, timeout=30000)
+            _playwright.login_to_portal(page, portal, env)
             page.goto(full_url)
             page.wait_for_load_state('networkidle')
             page.wait_for_timeout(2000)
@@ -1876,7 +1870,6 @@ def generate_test_cases(ticket_key, title, description, screenshots: list = None
         _groq_models = [
             "llama-3.3-70b-versatile",
             "llama-3.1-8b-instant",
-            "qwen/qwen-3-32b",
             "openai/gpt-oss-20b",
         ]
         output = ""
@@ -2052,6 +2045,9 @@ def learn_from_run(test_cases: list, test_results: list):
         return
 
     cwd = str(KNOWLEDGE_DIR.parent)
+    if not Path(cwd, '.git').exists():
+        print("[learn_from_run] knowledge file(s) updated locally (no git repo — skipping commit)")
+        return
     try:
         for f in changed_files:
             subprocess.run(["git", "add", str(f)], check=True, capture_output=True, cwd=cwd)
@@ -2104,12 +2100,15 @@ def learn_page_structure(portal: str, url_path: str, dom_data: dict, network_cal
         print(f"[learn_page_structure] appended structure for {url_path} → {selectors_file.name}")
 
         cwd = str(KNOWLEDGE_DIR.parent)
-        subprocess.run(["git", "add", str(selectors_file)], check=True, capture_output=True, cwd=cwd)
-        subprocess.run(
-            ["git", "commit", "-m", f"chore(knowledge): page structure for {url_path} ({today})"],
-            check=True, capture_output=True, cwd=cwd,
-        )
-        print("[learn_page_structure] committed to git")
+        if Path(cwd, '.git').exists():
+            subprocess.run(["git", "add", str(selectors_file)], check=True, capture_output=True, cwd=cwd)
+            subprocess.run(
+                ["git", "commit", "-m", f"chore(knowledge): page structure for {url_path} ({today})"],
+                check=True, capture_output=True, cwd=cwd,
+            )
+            print("[learn_page_structure] committed to git")
+        else:
+            print("[learn_page_structure] knowledge file updated locally (no git repo — skipping commit)")
     except Exception as e:
         print(f"[learn_page_structure] error (non-fatal): {e}")
 
