@@ -1386,6 +1386,14 @@ def run_api_tests(api_specs, env="production"):
     return results
 
 
+def _resolve_page_portal(url_path: str, fallback: str = "seller") -> str:
+    """Return the portal name (admin/seller/agency) that owns url_path via _ROUTE_KEYWORDS."""
+    for portal_name, routes in _ROUTE_KEYWORDS.items():
+        if url_path in routes:
+            return portal_name
+    return fallback
+
+
 def _identify_pages_from_ticket(title: str, description: str, portal: str) -> list:
     """Score each known route by keyword hits in the ticket text; return top matches."""
     text = f"{title} {description}".lower()
@@ -2466,14 +2474,18 @@ async def run_qa_endpoint(issue_key: str, body: RunQABody):
                     print(f"[run_qa] no confirmed pages — AI guess fallback: {pages}")
                 for url_path in pages:
                     yield f": keepalive\n\n"
+                    page_portal = (
+                        body.portal if (body.portal and body.portal != "all")
+                        else _resolve_page_portal(url_path, fallback="seller")
+                    )
                     shot = await asyncio.to_thread(
-                        screenshot_page, portal_for_inspect, run_env, url_path
+                        screenshot_page, page_portal, run_env, url_path
                     )
                     if shot and not shot.get("error"):
                         screenshots.append(shot)
                         try:
                             dom_result = await asyncio.to_thread(
-                                extract_page_dom_live, portal_for_inspect, run_env, url_path
+                                extract_page_dom_live, page_portal, run_env, url_path
                             )
                             if dom_result and not dom_result.get("error"):
                                 shot["dom"] = dom_result.get("dom", {})
@@ -2482,7 +2494,7 @@ async def run_qa_endpoint(issue_key: str, body: RunQABody):
                             print(f"[dom_extract] non-fatal error for {url_path}: {_de}")
                         try:
                             await asyncio.to_thread(
-                                learn_page_structure, portal_for_inspect, url_path,
+                                learn_page_structure, page_portal, url_path,
                                 shot.get("dom", {}), shot.get("network_calls", [])
                             )
                         except Exception as _lps:
@@ -2575,6 +2587,11 @@ async def run_qa_endpoint(issue_key: str, body: RunQABody):
 
             # Strip error sentinel objects returned by generate_test_cases on failure
             test_cases = [tc for tc in test_cases if not tc.get("is_error") and "error" not in tc]
+
+            # User's explicit portal selection overrides whatever the LLM assigned
+            if body.portal and body.portal != "all":
+                for tc in test_cases:
+                    tc["portal"] = body.portal
 
             # Derive portals from test case metadata; fall back to body.portal or all
             if test_cases:
