@@ -516,6 +516,7 @@ class RunQABody(BaseModel):
     frontend_branch: str
     backend_branch: str
     portal: Optional[str] = None
+    confirmed_pages: Optional[list[str]] = None
 
 class ClarifyBody(BaseModel):
     run_id: str
@@ -849,6 +850,35 @@ async def get_ticket_detail(issue_key: str):
         ],
     }
 
+@app.get("/jira/portal-pages/{portal}")
+async def get_portal_pages(portal: str):
+    """Return all known pages for a portal derived from _ROUTE_KEYWORDS."""
+    route_map = _ROUTE_KEYWORDS.get(portal.lower(), {})
+    pages = []
+    for path in route_map:
+        last_seg = path.rstrip("/").rsplit("/", 1)[-1]
+        label = last_seg.replace("-", " ").title()
+        pages.append({"path": path, "label": label})
+    return {"pages": pages}
+
+
+@app.get("/jira/suggest-pages/{issue_key}")
+async def suggest_pages(issue_key: str, portal: str = "admin"):
+    """Return AI-suggested pages for this ticket + portal combination."""
+    try:
+        ticket   = await asyncio.to_thread(_jira.get_ticket, issue_key)
+        fields   = ticket.get("fields", {})
+        summary  = fields.get("summary", "")
+        desc_raw = fields.get("description")
+        description = _adf_to_text(desc_raw) if isinstance(desc_raw, (dict, list)) else (desc_raw or "")
+        suggested = await asyncio.to_thread(
+            _identify_pages_from_ticket, summary, description, portal
+        )
+        return {"suggested_pages": suggested or []}
+    except Exception as e:
+        return {"suggested_pages": [], "error": str(e)}
+
+
 def extract_selectors_from_source(keywords: list) -> str:
     """
     Extract real UI elements from zambeel-fe/src matching the given keywords.
@@ -938,6 +968,107 @@ def extract_selectors_from_source(keywords: list) -> str:
         return f"REAL SELECTORS FROM SOURCE:\n(No UI elements found in {source} for: {', '.join(list(kw_set)[:8])})"
     content_str = f"Source: {source}\n" + "\n".join(items)
     return f"REAL SELECTORS FROM SOURCE:\n{content_str[:2000]}"
+
+
+def extract_selectors_from_github(keywords: list, repo_api_name: str = None) -> str:
+    """Search GitHub source for real UI elements matching the given keywords.
+
+    Uses the GitHub Code Search API so it works on HuggingFace (no local checkout needed).
+    Returns a formatted string in the same style as extract_selectors_from_source.
+    Returns "" on any error (missing token, rate-limit, etc.) — never crashes callers.
+    """
+    import re as _re_gh
+    import base64 as _b64
+    import concurrent.futures
+
+    repo = repo_api_name or REPO_API_NAMES.get("frontend", "")
+    if not repo:
+        print("[extract_selectors_from_github] GITHUB_FRONTEND_REPO_API not configured — skipping")
+        return ""
+    if not GITHUB_TOKEN:
+        print("[extract_selectors_from_github] GITHUB_TOKEN not configured — skipping")
+        return ""
+
+    kw_set = {w.lower() for w in keywords if len(w) >= 3}
+    if not kw_set:
+        return ""
+
+    def _fetch():
+        headers = {
+            "Accept": "application/vnd.github+json",
+            "Authorization": f"Bearer {GITHUB_TOKEN}",
+        }
+        # Build search query — join first 5 keywords with OR
+        query_terms = list(kw_set)[:5]
+        q = " OR ".join(query_terms) + f"+repo:{repo}+language:TypeScript+language:JavaScript"
+        search_url = f"https://api.github.com/search/code?q={q}&per_page=5"
+        try:
+            r = requests.get(search_url, headers=headers, timeout=10)
+            r.raise_for_status()
+            items = r.json().get("items", [])
+        except Exception as e:
+            print(f"[extract_selectors_from_github] search error: {e}")
+            return ""
+
+        matches: list = []
+        for item in items[:3]:
+            file_path = item.get("path", "")
+            contents_url = f"https://api.github.com/repos/{repo}/contents/{file_path}"
+            try:
+                cr = requests.get(contents_url, headers=headers, timeout=10)
+                cr.raise_for_status()
+                raw_b64 = cr.json().get("content", "")
+                content = _b64.b64decode(raw_b64.replace("\n", "")).decode("utf-8", errors="ignore")
+            except Exception as e:
+                print(f"[extract_selectors_from_github] fetch {file_path} error: {e}")
+                continue
+
+            if not any(kw in content.lower() for kw in kw_set):
+                continue
+
+            matches.append(f"[File: {file_path}]")
+            for m in _re_gh.finditer(r"<[Bb]utton[^>]*>\s*([^<{]{1,60})\s*</[Bb]utton>", content):
+                txt = m.group(1).strip()
+                if txt:
+                    matches.append(f"Button: '{txt}'")
+            for m in _re_gh.finditer(r'placeholder=["\']([^"\']{1,80})["\']', content):
+                matches.append(f"Input placeholder: '{m.group(1)}'")
+            for m in _re_gh.finditer(r"<label[^>]*>\s*([^<]{1,60})\s*</label>", content, _re_gh.IGNORECASE):
+                txt = m.group(1).strip()
+                if txt:
+                    matches.append(f"Label: '{txt}'")
+            for m in _re_gh.finditer(r"""path:\s*['"]([^'"]{2,80})['"]""", content):
+                matches.append(f"Route: {m.group(1)}")
+            for m in _re_gh.finditer(r"""to=['"](/[^'"]{1,80})['"]""", content):
+                matches.append(f"Nav link: {m.group(1)}")
+            for m in _re_gh.finditer(r'(?:data-testid|id)=["\']([^"\']{3,60})["\']', content):
+                matches.append(f"ID/testid: #{m.group(1)}")
+            for m in _re_gh.finditer(r'className=["\']([^"\']{4,60})["\']', content):
+                cls = m.group(1).split()[0]
+                if any(kw in cls.lower() for kw in kw_set):
+                    matches.append(f"CSS class: .{cls}")
+            for m in _re_gh.finditer(
+                r'export\s+(?:default\s+)?(?:function|const)\s+([A-Z][A-Za-z0-9]+)', content
+            ):
+                matches.append(f"Component: {m.group(1)}")
+
+        seen: set = set()
+        unique = [x for x in matches if not (x in seen or seen.add(x))][:120]  # type: ignore
+        if not unique:
+            return ""
+        result = "REAL SELECTORS FROM SOURCE (GitHub):\n" + "\n".join(unique)
+        return result[:2000]
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+        future = executor.submit(_fetch)
+        try:
+            return future.result(timeout=15) or ""
+        except concurrent.futures.TimeoutError:
+            print("[extract_selectors_from_github] timed out after 15s — skipping")
+            return ""
+        except Exception as e:
+            print(f"[extract_selectors_from_github] unexpected error: {e}")
+            return ""
 
 
 def _extract_relevant_context(title: str, description: str, max_chars: int = 4000) -> str:
@@ -1348,12 +1479,9 @@ def extract_page_dom(page) -> dict:
 
 
 def extract_page_dom_live(portal, env, url_path) -> dict:
-    """Login, navigate to url_path, extract DOM, return structured data.
-
-    No screenshot is taken — DOM data is compact (<1000 tokens) and gives
-    GPT-4o the exact elements that exist on the live page.
-    """
+    """Login, navigate to url_path, extract DOM + network calls, return structured data."""
     from playwright.sync_api import sync_playwright
+    from urllib.parse import urlparse as _urlparse
     base_url = _resolve_base_url(env)
     email    = os.getenv(f'{portal.upper()}_{env.upper()}_EMAIL', '').strip()
     password = os.getenv(f'{portal.upper()}_{env.upper()}_PASSWORD', '').strip()
@@ -1363,6 +1491,22 @@ def extract_page_dom_live(portal, env, url_path) -> dict:
         with sync_playwright() as p:
             browser = p.chromium.launch(headless=True)
             page = browser.new_page(viewport={'width': 1440, 'height': 900})
+
+            # Register network listener before navigation so all calls are captured
+            network_calls: list = []
+            def _on_response(response):
+                try:
+                    if '/api/' in response.url:
+                        parsed = _urlparse(response.url)
+                        network_calls.append({
+                            "method": response.request.method,
+                            "path":   parsed.path,
+                            "status": response.status,
+                        })
+                except Exception:
+                    pass
+            page.on("response", _on_response)
+
             page.goto(f'{base_url}/login')
             page.fill('input[type="email"]', email)
             page.fill('input[type="password"]', password)
@@ -1374,9 +1518,13 @@ def extract_page_dom_live(portal, env, url_path) -> dict:
             dom = extract_page_dom(page)
             browser.close()
         print(f'[extract_page_dom_live] done — buttons={len(dom["buttons"])} '
-              f'inputs={len(dom["inputs"])} selects={len(dom["selects"])}')
+              f'inputs={len(dom["inputs"])} selects={len(dom["selects"])} '
+              f'network_calls={len(network_calls)}')
         print(f'[DOM] buttons={dom["buttons"][:5]}, inputs={dom["inputs"][:3]}, selects={dom["selects"]}')
-        return {'dom': dom, 'portal': portal, 'env': env, 'url_path': url_path, 'url': full_url}
+        return {
+            'dom': dom, 'network_calls': network_calls,
+            'portal': portal, 'env': env, 'url_path': url_path, 'url': full_url,
+        }
     except Exception as e:
         print(f'[extract_page_dom_live] ERROR: {e}')
         return {'error': str(e), 'portal': portal, 'env': env, 'url_path': url_path}
@@ -1624,7 +1772,7 @@ _TEST_CASE_JSON_SCHEMA = (
 )
 
 
-def generate_test_cases(ticket_key, title, description, screenshots: list = None):
+def generate_test_cases(ticket_key, title, description, screenshots: list = None, dom_context: list = None, user_notes: str = ""):
     import re
     from groq import Groq
 
@@ -1642,6 +1790,21 @@ def generate_test_cases(ticket_key, title, description, screenshots: list = None
 
     knowledge_base = get_portal_knowledge(portal_hint)
 
+    # Extract keywords from ticket for GitHub source search (Part 3)
+    import re as _re_kw
+    _kw_raw = f"{title} {description}"
+    _kw_stopwords = {
+        'this', 'that', 'with', 'from', 'have', 'will', 'been', 'they', 'when',
+        'what', 'which', 'where', 'then', 'also', 'should', 'would', 'could',
+        'button', 'modal', 'table', 'page', 'click', 'scroll',
+    }
+    _keywords = list(dict.fromkeys(
+        w for w in _re_kw.findall(r'[a-zA-Z]{4,}', _kw_raw)
+        if w.lower() not in _kw_stopwords
+    ))[:8]
+    _github_selectors = extract_selectors_from_github(_keywords)
+    print(f"[generate_test_cases] github_selectors={len(_github_selectors)} chars, keywords={_keywords[:5]}")
+
     if not screenshots:
         print(f"[generate_test_cases] no screenshots for {ticket_key} — skipping test generation")
         return []
@@ -1653,6 +1816,27 @@ def generate_test_cases(ticket_key, title, description, screenshots: list = None
           f"portal={portal_hint}, kb={len(knowledge_base):,} chars")
 
     pages_summary = ", ".join(s.get("url_path", s.get("url", "")) for s in valid_shots)
+
+    # Build DOM context section (Part 2)
+    _dom_section = ""
+    if dom_context:
+        _dom_parts = []
+        for dc in dom_context:
+            dom = dc.get("dom", {})
+            nc  = dc.get("network_calls", [])
+            url_p = dc.get("url_path", dc.get("url", ""))
+            _dom_parts.append(
+                f"Page: {url_p}\n"
+                f"Buttons: {', '.join(dom.get('buttons', [])[:15])}\n"
+                f"Inputs: {', '.join((i.get('placeholder') or i.get('name') or '') for i in dom.get('inputs', [])[:8])}\n"
+                f"Headings: {', '.join(dom.get('headings', [])[:8])}\n"
+                f"Network calls: {', '.join(c['method'] + ' ' + c['path'] for c in nc[:10])}"
+            )
+        _dom_section = (
+            "LIVE DOM CONTEXT (extracted from actual page — use these as selector evidence):\n"
+            + "\n---\n".join(_dom_parts)
+            + "\n\n"
+        )
 
     complexity_instruction = (
         f"Analyze this ticket and decide how many test cases are needed:\n"
@@ -1677,7 +1861,8 @@ def generate_test_cases(ticket_key, title, description, screenshots: list = None
         f"CRITICAL: Generate test cases ONLY for the feature described in the ticket. "
         f"Do NOT generate tests for login, navigation, or unrelated features. "
         f"Every test case must directly test: {title}\n\n"
-        "Cross-reference the KNOWLEDGE BASE below to confirm exact selector text:\n"
+        + (_dom_section)
+        + "Cross-reference the KNOWLEDGE BASE below to confirm exact selector text:\n"
         "1. Identify every relevant UI element — exact button labels, input placeholders, "
         "dropdown option text, heading text.\n"
         f"2. {complexity_instruction}\n"
@@ -1686,6 +1871,8 @@ def generate_test_cases(ticket_key, title, description, screenshots: list = None
         "3. Never invent placeholder text or button labels not present in the KNOWLEDGE BASE.\n\n"
         f"KNOWLEDGE BASE ({portal_hint} portal):\n"
         f"{knowledge_base}\n\n"
+        + (f"REAL SELECTORS FROM GITHUB SOURCE:\n{_github_selectors}\n\n" if _github_selectors else "")
+        + (f"USER CLARIFICATIONS:\n{user_notes}\n\n" if user_notes else "")
         + _TEST_CASE_JSON_SCHEMA
     )
 
@@ -1759,6 +1946,67 @@ def _check_uncertain_steps(test_cases: list) -> list:
     return uncertain
 
 
+def _check_page_confidence(
+    ticket_title: str,
+    ticket_description: str,
+    portal: str,
+    confirmed_pages: list,
+    dom_results: list,
+) -> list:
+    """Return plain-English questions for pages where the DOM has no match to the ticket.
+
+    Never mentions selectors, CSS, DOM, or code — questions are human-readable.
+    """
+    import re as _re_conf
+
+    _stopwords = {
+        'this', 'that', 'with', 'from', 'have', 'will', 'been', 'they', 'when',
+        'what', 'which', 'where', 'then', 'also', 'should', 'would', 'could',
+        'page', 'button', 'form', 'list', 'item', 'data', 'info', 'show',
+        'does', 'dont', 'cant', 'wont', 'isnt', 'arent',
+    }
+    combined = f"{ticket_title} {ticket_description}".lower()
+    key_terms = list(dict.fromkeys(
+        w for w in _re_conf.findall(r'[a-z]{4,}', combined)
+        if w not in _stopwords
+    ))[:10]
+
+    if not key_terms:
+        return []
+
+    # Build a lookup: url_path → dom dict from screenshots
+    path_to_dom: dict = {}
+    for shot in dom_results:
+        if shot.get("dom") and shot.get("url_path"):
+            path_to_dom[shot["url_path"]] = shot["dom"]
+
+    questions = []
+    for url_path in confirmed_pages:
+        dom = path_to_dom.get(url_path)
+        if not dom:
+            continue  # no DOM data — can't judge confidence
+
+        buttons  = [b.lower() for b in dom.get("buttons",  []) if b]
+        headings = [h.lower() for h in dom.get("headings", []) if h]
+        inputs   = [
+            (i.get("placeholder") or i.get("name") or "").lower()
+            for i in dom.get("inputs", [])
+        ]
+        all_text = " ".join(buttons + headings + inputs)
+
+        if any(term in all_text for term in key_terms):
+            continue  # at least one term found — confident
+
+        top_term = key_terms[0]
+        questions.append(
+            f"I didn't find anything matching '{top_term}' on the page you selected "
+            f"({url_path}). Is this the right page for this feature, or has the page "
+            f"layout changed recently?"
+        )
+
+    return questions
+
+
 def learn_from_run(test_cases: list, test_results: list):
     """Append newly-discovered working selectors to the relevant knowledge/selectors.md files
     and commit the changes to git."""
@@ -1821,6 +2069,55 @@ def learn_from_run(test_cases: list, test_results: list):
     except subprocess.CalledProcessError as e:
         stderr = e.stderr.decode() if e.stderr else str(e)
         print(f"[learn_from_run] git error: {stderr}")
+
+
+def learn_page_structure(portal: str, url_path: str, dom_data: dict, network_calls: list):
+    """Append discovered page structure to the portal's selectors.md knowledge file."""
+    import subprocess
+    try:
+        portal_dir = {"admin": "oms", "seller": "seller", "agency": "agency"}.get(portal, "oms")
+        selectors_file = KNOWLEDGE_DIR / portal_dir / "selectors.md"
+        if not selectors_file.exists():
+            print(f"[learn_page_structure] {selectors_file} not found — skipping")
+            return
+
+        today = datetime.now().strftime("%Y-%m-%d")
+        existing = selectors_file.read_text()
+
+        section_header = f"### Page structure — {url_path} ({today})"
+        if section_header in existing:
+            print(f"[learn_page_structure] already recorded for {url_path} today")
+            return
+
+        buttons   = dom_data.get("buttons", [])[:20]
+        inputs    = dom_data.get("inputs",  [])[:10]
+        net_lines = [
+            f"  {nc['method']} {nc['path']} → {nc['status']}"
+            for nc in (network_calls or [])[:15]
+        ]
+
+        new_section = f"\n\n## Learned from QA runs\n" if "## Learned from QA runs" not in existing else ""
+        new_section += f"\n{section_header}\n"
+        if buttons:
+            new_section += "Buttons: " + ", ".join(f"'{b}'" for b in buttons) + "\n"
+        if inputs:
+            _inp_strs = ["placeholder='" + i.get("placeholder", "") + "'" for i in inputs if i.get("placeholder")]
+            new_section += "Inputs: " + ", ".join(_inp_strs) + "\n"
+        if net_lines:
+            new_section += "Network calls:\n" + "\n".join(net_lines) + "\n"
+
+        selectors_file.write_text(existing + new_section)
+        print(f"[learn_page_structure] appended structure for {url_path} → {selectors_file.name}")
+
+        cwd = str(KNOWLEDGE_DIR.parent)
+        subprocess.run(["git", "add", str(selectors_file)], check=True, capture_output=True, cwd=cwd)
+        subprocess.run(
+            ["git", "commit", "-m", f"chore(knowledge): page structure for {url_path} ({today})"],
+            check=True, capture_output=True, cwd=cwd,
+        )
+        print("[learn_page_structure] committed to git")
+    except Exception as e:
+        print(f"[learn_page_structure] error (non-fatal): {e}")
 
 
 def _build_qa_report(*, issue_key, summary, env, frontend_branch, backend_branch,
@@ -2158,17 +2455,22 @@ async def run_qa_endpoint(issue_key: str, body: RunQABody):
                 yield evt({"stage": "switching_branches", "status": "done"})
 
         try:
-            # ── Stage: screenshot relevant pages ──────────────────────────────────
+            # ── Stage: screenshot relevant pages + DOM extraction ──────────────────
             screenshots: list = []
+            pages: list = []
+            portal_for_inspect = (
+                body.portal if (body.portal and body.portal != "all") else "seller"
+            )
             yield evt({"stage": "inspecting_page", "status": "running"})
             try:
-                portal_for_inspect = (
-                    body.portal if (body.portal and body.portal != "all") else "seller"
-                )
-                pages = await asyncio.to_thread(
-                    _identify_pages_from_ticket, summary, description, portal_for_inspect
-                )
-                print(f"[inspecting_page] Identified pages: {pages}")
+                if body.confirmed_pages:
+                    pages = body.confirmed_pages
+                    print(f"[run_qa] using user-confirmed pages: {pages}")
+                else:
+                    pages = await asyncio.to_thread(
+                        _identify_pages_from_ticket, summary, description, portal_for_inspect
+                    )
+                    print(f"[run_qa] no confirmed pages — AI guess fallback: {pages}")
                 for url_path in pages:
                     yield f": keepalive\n\n"
                     shot = await asyncio.to_thread(
@@ -2176,6 +2478,22 @@ async def run_qa_endpoint(issue_key: str, body: RunQABody):
                     )
                     if shot and not shot.get("error"):
                         screenshots.append(shot)
+                        try:
+                            dom_result = await asyncio.to_thread(
+                                extract_page_dom_live, portal_for_inspect, run_env, url_path
+                            )
+                            if dom_result and not dom_result.get("error"):
+                                shot["dom"] = dom_result.get("dom", {})
+                                shot["network_calls"] = dom_result.get("network_calls", [])
+                        except Exception as _de:
+                            print(f"[dom_extract] non-fatal error for {url_path}: {_de}")
+                        try:
+                            await asyncio.to_thread(
+                                learn_page_structure, portal_for_inspect, url_path,
+                                shot.get("dom", {}), shot.get("network_calls", [])
+                            )
+                        except Exception as _lps:
+                            print(f"[learn_page_structure] non-fatal: {_lps}")
                 yield evt({
                     "stage": "inspecting_page",
                     "status": "done",
@@ -2185,11 +2503,38 @@ async def run_qa_endpoint(issue_key: str, body: RunQABody):
                 print(f"[inspecting_page] ERROR: {e}")
                 yield evt({"stage": "inspecting_page", "status": "error", "message": str(e)})
 
+            # ── Stage: page confidence check ──────────────────────────────────────
+            _user_notes_parts: list = []
+            if screenshots:
+                _confidence_questions = _check_page_confidence(
+                    summary, description, portal_for_inspect, pages, screenshots
+                )
+                for _cq_text in _confidence_questions:
+                    _cq_run_id = f"{issue_key}_conf_{int(time.time())}"
+                    _cq_queue: asyncio.Queue = asyncio.Queue()
+                    _clarification_store[_cq_run_id] = _cq_queue
+                    yield evt({
+                        "type": "clarification_needed",
+                        "run_id": _cq_run_id,
+                        "question": _cq_text,
+                    })
+                    try:
+                        _cq_ans = await asyncio.wait_for(_cq_queue.get(), timeout=300)
+                        if _cq_ans:
+                            _user_notes_parts.append(f"Q: {_cq_text}\nA: {_cq_ans}")
+                    except asyncio.TimeoutError:
+                        pass
+                    finally:
+                        _clarification_store.pop(_cq_run_id, None)
+            _user_notes = "\n\n".join(_user_notes_parts)
+
             # ── Stage: generate test cases ─────────────────────────────────────────
             yield evt({"stage": "generating_test_cases", "status": "running"})
             yield f": keepalive\n\n"
+            dom_context = [s for s in screenshots if s.get("dom")]
             test_cases = await asyncio.to_thread(
-                generate_test_cases, issue_key, summary, description, screenshots or None
+                generate_test_cases, issue_key, summary, description,
+                screenshots or None, dom_context or None, _user_notes
             )
             # save as Jira comment regardless of parse success
             if test_cases:

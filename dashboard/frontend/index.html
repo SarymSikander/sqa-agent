@@ -1160,6 +1160,19 @@
       margin-top: 7px; font-size: 12px; color: var(--text2); cursor: pointer;
     }
     .rqa-checkbox-row input[type="checkbox"] { accent-color: #5B3DF5; cursor: pointer; }
+    .rqa-page-group { margin-bottom: 8px; }
+    .rqa-page-group-header {
+      display: flex; align-items: center; gap: 6px; cursor: pointer;
+      font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em;
+      color: var(--text3); padding: 4px 0; user-select: none;
+    }
+    .rqa-page-group-header:hover { color: var(--text2); }
+    .rqa-page-group-body { padding-left: 8px; }
+    .rqa-pages-all-label {
+      display:flex;align-items:center;gap:5px;font-size:11px;color:var(--text3);
+      margin-bottom:6px;cursor:pointer;
+    }
+    .rqa-pages-all-label:hover{color:var(--text2);}
     .rqa-actions { display: flex; gap: 8px; margin-top: 20px; }
     .rqa-actions .btn { flex: 1; justify-content: center; }
 
@@ -2066,12 +2079,22 @@
 
       <div class="rqa-field">
         <label>Portal</label>
-        <select id="rqa-portal">
+        <select id="rqa-portal" onchange="loadPortalPages(this.value)">
           <option value="">All</option>
           <option value="seller">Seller</option>
           <option value="admin">Admin</option>
           <option value="agency">Agency</option>
         </select>
+      </div>
+
+      <div class="rqa-field" id="rqa-pages-field" style="display:none">
+        <label style="display:flex;align-items:center;gap:6px">
+          Pages to Test
+          <span style="font-size:11px;color:var(--text3);font-weight:400">(AI pre-selects based on ticket)</span>
+        </label>
+        <div id="rqa-pages-section" style="margin-top:6px;max-height:220px;overflow-y:auto;border:1px solid var(--border);border-radius:var(--r-sm);padding:8px 10px">
+          <div id="rqa-pages-loading" style="color:var(--text3);font-size:12px">Loading pages…</div>
+        </div>
       </div>
 
       <div class="rqa-actions">
@@ -3357,12 +3380,116 @@ function openRunQAModal() {
   document.getElementById('rqa-modal-key').textContent = _rqaCurrentKey;
   document.querySelector('input[name="rqa-env"][value="staging"]').checked = true;
   document.getElementById('rqa-portal').value = '';
+  // Reset pages section
+  document.getElementById('rqa-pages-field').style.display = 'none';
+  document.getElementById('rqa-pages-section').innerHTML = '<div id="rqa-pages-loading" style="color:var(--text3);font-size:12px">Loading pages…</div>';
   document.getElementById('run-qa-modal').classList.add('open');
+  // Load pages for the default portal (All = '' means show all)
+  loadPortalPages('');
 }
 
 function closeRunQAModal() {
   document.getElementById('run-qa-modal').classList.remove('open');
   btnLoad('rqa-confirm-btn', false);
+}
+
+async function loadPortalPages(portal) {
+  const key = _rqaCurrentKey;
+  const section  = document.getElementById('rqa-pages-section');
+  const field    = document.getElementById('rqa-pages-field');
+  if (!section) return;
+  section.innerHTML = '<div style="color:var(--text3);font-size:12px">Loading pages…</div>';
+  field.style.display = '';
+
+  const token = sessionStorage.getItem('sqa_token') || '';
+  const hdrs  = token ? { 'Authorization': `Bearer ${token}` } : {};
+
+  try {
+    let allPages   = [];  // [{path, label, portalGroup?}]
+    let suggested  = [];
+
+    if (!portal) {
+      // All portals — fetch each group and suggest from admin as default
+      const [sr, ar, gr, sugR] = await Promise.all([
+        fetch(API_BASE + '/jira/portal-pages/seller',  { headers: hdrs }),
+        fetch(API_BASE + '/jira/portal-pages/admin',   { headers: hdrs }),
+        fetch(API_BASE + '/jira/portal-pages/agency',  { headers: hdrs }),
+        key ? fetch(API_BASE + `/jira/suggest-pages/${key}?portal=admin`, { headers: hdrs }) : null,
+      ]);
+      const sellerPages = sr.ok ? (await sr.json()).pages : [];
+      const adminPages  = ar.ok ? (await ar.json()).pages : [];
+      const agencyPages = gr.ok ? (await gr.json()).pages : [];
+      suggested = sugR && sugR.ok ? (await sugR.json()).suggested_pages : [];
+      sellerPages.forEach(p => allPages.push({...p, portalGroup:'Seller'}));
+      adminPages .forEach(p => allPages.push({...p, portalGroup:'Admin'}));
+      agencyPages.forEach(p => allPages.push({...p, portalGroup:'Agency'}));
+    } else {
+      const [pr, sugR] = await Promise.all([
+        fetch(API_BASE + `/jira/portal-pages/${portal}`,  { headers: hdrs }),
+        key ? fetch(API_BASE + `/jira/suggest-pages/${key}?portal=${portal}`, { headers: hdrs }) : null,
+      ]);
+      allPages  = pr.ok ? (await pr.json()).pages : [];
+      suggested = sugR && sugR.ok ? (await sugR.json()).suggested_pages : [];
+    }
+
+    if (!allPages.length) {
+      section.innerHTML = '<div style="color:var(--text3);font-size:12px">No pages found for this portal.</div>';
+      return;
+    }
+
+    const sugSet = new Set(suggested);
+
+    if (!portal) {
+      // Grouped view with collapsible sections
+      const groups = ['Seller', 'Admin', 'Agency'];
+      let html = '';
+      for (const grp of groups) {
+        const grpPages = allPages.filter(p => p.portalGroup === grp);
+        if (!grpPages.length) continue;
+        const grpId = 'rqa-grp-' + grp.toLowerCase();
+        html += `<div class="rqa-page-group">
+          <div class="rqa-page-group-header" onclick="togglePageGroup('${grpId}')">
+            <span id="${grpId}-arrow" style="font-size:10px">▶</span> ${esc(grp)} Portal
+          </div>
+          <div class="rqa-page-group-body" id="${grpId}" style="display:none">`;
+        for (const p of grpPages) {
+          const chk = sugSet.has(p.path) ? 'checked' : '';
+          html += `<label class="rqa-checkbox-row"><input type="checkbox" class="rqa-page-cb" value="${esc(p.path)}" ${chk}> ${esc(p.label)}</label>`;
+        }
+        html += `</div></div>`;
+      }
+      section.innerHTML = html;
+    } else {
+      // Flat list
+      let html = `<label class="rqa-pages-all-label" onclick="toggleAllPages(this)"><input type="checkbox" style="accent-color:#5B3DF5"> Select all</label>`;
+      for (const p of allPages) {
+        const chk = sugSet.has(p.path) ? 'checked' : '';
+        html += `<label class="rqa-checkbox-row"><input type="checkbox" class="rqa-page-cb" value="${esc(p.path)}" ${chk}> ${esc(p.label)}</label>`;
+      }
+      section.innerHTML = html;
+    }
+  } catch(e) {
+    section.innerHTML = `<div style="color:var(--error);font-size:12px">Failed to load pages: ${esc(e.message)}</div>`;
+  }
+}
+
+function togglePageGroup(id) {
+  const body  = document.getElementById(id);
+  const arrow = document.getElementById(id + '-arrow');
+  if (!body) return;
+  const open = body.style.display !== 'none';
+  body.style.display  = open ? 'none' : '';
+  if (arrow) arrow.textContent = open ? '▶' : '▼';
+}
+
+function toggleAllPages(labelEl) {
+  const cb = labelEl.querySelector('input[type="checkbox"]');
+  const all = document.querySelectorAll('.rqa-page-cb');
+  all.forEach(c => c.checked = cb.checked);
+}
+
+function _getSelectedPages() {
+  return Array.from(document.querySelectorAll('.rqa-page-cb:checked')).map(c => c.value);
 }
 
 
@@ -3410,6 +3537,8 @@ async function confirmRunQA() {
   const key    = _rqaCurrentKey;
   if (!key) { toast('No ticket selected', 'error'); return; }
 
+  const selectedPages = _getSelectedPages();
+
   btnLoad('rqa-confirm-btn', true);
   closeRunQAModal();
 
@@ -3421,22 +3550,24 @@ async function confirmRunQA() {
   document.getElementById('jira-panel').classList.add('open');
   btnLoad('jira-run-qa-btn', true);
 
-  await _runQAStream(key, env, key || 'main', 'main', portal);
+  await _runQAStream(key, env, key || 'main', 'main', portal, null, selectedPages.length ? selectedPages : null);
   btnLoad('jira-run-qa-btn', false);
 }
 
-async function _runQAStream(key, env, fe, be, portal, apiBase) {
+async function _runQAStream(key, env, fe, be, portal, apiBase, confirmedPages) {
   const base = apiBase || API_BASE;
-  console.log('[RunQA] stream start', { key, env, fe, be, portal, base });
+  console.log('[RunQA] stream start', { key, env, fe, be, portal, base, confirmedPages });
   try {
     const _qaAbort = new AbortController();
     const _qaTimeout = setTimeout(() => _qaAbort.abort(), 15 * 60 * 1000);
     const _rqaToken = sessionStorage.getItem('sqa_token') || '';
     const _rqaUrl = `${base}/jira/tickets/${key}/run-qa${_rqaToken ? `?token=${encodeURIComponent(_rqaToken)}` : ''}`;
+    const _rqaBody = { env, frontend_branch: fe, backend_branch: be, portal };
+    if (confirmedPages && confirmedPages.length) _rqaBody.confirmed_pages = confirmedPages;
     const resp = await fetch(_rqaUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ env, frontend_branch: fe, backend_branch: be, portal }),
+      body: JSON.stringify(_rqaBody),
       signal: _qaAbort.signal,
     });
     clearTimeout(_qaTimeout);
