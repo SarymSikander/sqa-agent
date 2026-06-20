@@ -1422,19 +1422,13 @@ def screenshot_page(portal, env, url_path):
     from playwright.sync_api import sync_playwright
     import base64
     base_url = _resolve_base_url(env)
-    email    = os.getenv(f'{portal.upper()}_{env.upper()}_EMAIL', '').strip()
-    password = os.getenv(f'{portal.upper()}_{env.upper()}_PASSWORD', '').strip()
     full_url = f'{base_url}{url_path}'
     print(f'[screenshot_page] {portal}/{env} → {full_url}')
     try:
         with sync_playwright() as p:
             browser = p.chromium.launch(headless=True)
             page = browser.new_page(viewport={'width': 800, 'height': 600})
-            page.goto(f'{base_url}/login')
-            page.fill('input[type="email"]', email)
-            page.fill('input[type="password"]', password)
-            page.click('button[type="submit"]')
-            page.wait_for_url(lambda u: '/login' not in u, timeout=30000)
+            _playwright.login_to_portal(page, portal, env)
             page.goto(full_url)
             page.wait_for_load_state('networkidle')
             page.wait_for_timeout(2000)
