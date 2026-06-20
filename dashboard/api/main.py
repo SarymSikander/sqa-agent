@@ -1897,13 +1897,13 @@ def generate_test_cases(ticket_key, title, description, screenshots: list = None
                     continue
                 raise
         if not output:
-            return [{"error": "Groq daily limit reached on all models. Please try again in a few hours.",
-                     "test_name": "Error", "steps": [], "evidence_selector": ""}]
+            return [{"is_error": True, "test_name": "Error", "steps": [], "evidence_selector": "",
+                     "error": "Groq daily limit reached on all models. Please try again in a few hours."}]
         return _parse_test_cases(output)
     except Exception as _top_err:
         print(f"[generate_test_cases] unexpected error: {_top_err}")
-        return [{"error": f"Test generation failed: {str(_top_err)[:200]}",
-                 "test_name": "Error", "steps": [], "evidence_selector": ""}]
+        return [{"is_error": True, "test_name": "Error", "steps": [], "evidence_selector": "",
+                 "error": f"Test generation failed: {str(_top_err)[:200]}"}]
 
 
 def _check_uncertain_steps(test_cases: list) -> list:
@@ -2572,6 +2572,9 @@ async def run_qa_endpoint(issue_key: str, body: RunQABody):
 
             # ── Stage: run Playwright tests ────────────────────────────────────────
             yield evt({"stage": "running_tests", "status": "running"})
+
+            # Strip error sentinel objects returned by generate_test_cases on failure
+            test_cases = [tc for tc in test_cases if not tc.get("is_error") and "error" not in tc]
 
             # Derive portals from test case metadata; fall back to body.portal or all
             if test_cases:
