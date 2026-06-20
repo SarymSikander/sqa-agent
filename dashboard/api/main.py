@@ -1643,7 +1643,8 @@ def generate_test_cases(ticket_key, title, description, screenshots: list = None
     knowledge_base = get_portal_knowledge(portal_hint)
 
     if not screenshots:
-        raise RuntimeError("generate_test_cases: no screenshots provided — cannot generate test cases")
+        print(f"[generate_test_cases] no screenshots for {ticket_key} — skipping test generation")
+        return []
     valid_shots = [s for s in screenshots if s.get("base64")]
     if not valid_shots:
         errors = [s.get("error", "no base64") for s in screenshots]
@@ -2156,340 +2157,345 @@ async def run_qa_endpoint(issue_key: str, body: RunQABody):
                 branches_switched = True
                 yield evt({"stage": "switching_branches", "status": "done"})
 
-        # ── Stage: screenshot relevant pages ──────────────────────────────────
-        screenshots: list = []
-        yield evt({"stage": "inspecting_page", "status": "running"})
         try:
-            portal_for_inspect = (
-                body.portal if (body.portal and body.portal != "all") else "seller"
-            )
-            pages = await asyncio.to_thread(
-                _identify_pages_from_ticket, summary, description, portal_for_inspect
-            )
-            print(f"[inspecting_page] Identified pages: {pages}")
-            for url_path in pages:
-                yield f": keepalive\n\n"
-                shot = await asyncio.to_thread(
-                    screenshot_page, portal_for_inspect, run_env, url_path
+            # ── Stage: screenshot relevant pages ──────────────────────────────────
+            screenshots: list = []
+            yield evt({"stage": "inspecting_page", "status": "running"})
+            try:
+                portal_for_inspect = (
+                    body.portal if (body.portal and body.portal != "all") else "seller"
                 )
-                if shot and not shot.get("error"):
-                    screenshots.append(shot)
-            yield evt({
-                "stage": "inspecting_page",
-                "status": "done",
-                "pages_inspected": [s.get("url") for s in screenshots],
-            })
-        except Exception as e:
-            print(f"[inspecting_page] ERROR: {e}")
-            yield evt({"stage": "inspecting_page", "status": "error", "message": str(e)})
-
-        # ── Stage: generate test cases ─────────────────────────────────────────
-        yield evt({"stage": "generating_test_cases", "status": "running"})
-        yield f": keepalive\n\n"
-        test_cases = await asyncio.to_thread(
-            generate_test_cases, issue_key, summary, description, screenshots or None
-        )
-        # save as Jira comment regardless of parse success
-        if test_cases:
-            try:
-                _env_label = body.env.upper()
-                _branch_label = f" | fe:`{body.frontend_branch}` be:`{body.backend_branch}`" if body.env == "local" else ""
-                lines = [f"🤖 *AI-Generated QA Test Cases — {issue_key}* ({_env_label}{_branch_label})"]
-                for i, tc in enumerate(test_cases, 1):
-                    lines.append(f"\n*{i}. {tc.get('test_name','Test')}*\n_{tc.get('description','')}_")
-                    for s in (tc.get("steps") or []):
-                        lines.append(f"• {s}")
-                    lines.append(f"✅ Expected: {tc.get('expected_result','')}")
-                await asyncio.to_thread(_jira.add_comment, issue_key, "\n".join(lines))
-            except Exception:
-                pass
-        yield evt({"stage": "generating_test_cases", "status": "done", "count": len(test_cases)})
-
-        # ── Stage: interactive clarification for uncertain selectors ───────────
-        if test_cases:
-            _run_id = f"{issue_key}_{int(time.time())}"
-            _uncertain = _check_uncertain_steps(test_cases)
-            for _u in _uncertain:
-                _q: asyncio.Queue = asyncio.Queue()
-                _clarification_store[_run_id] = _q
-                yield evt({
-                    "type": "clarification_needed",
-                    "run_id": _run_id,
-                    "question": _u["question"],
-                })
-                try:
-                    _answer = await asyncio.wait_for(_q.get(), timeout=300)
-                    if _answer:
-                        # Patch the uncertain step in-place with user's guidance as a comment
-                        _tc = test_cases[_u["tc_index"]]
-                        _old_step = _tc["steps"][_u["step_index"]]
-                        _tc["steps"][_u["step_index"]] = f"{_old_step}  # user: {_answer}"
-                        print(f"[clarify] step updated: {_tc['steps'][_u['step_index']][:120]}")
-                except asyncio.TimeoutError:
-                    print(f"[clarify] timeout waiting for answer to: {_u['question'][:80]}")
-                finally:
-                    _clarification_store.pop(_run_id, None)
-
-        # ── Stage: run Playwright tests ────────────────────────────────────────
-        yield evt({"stage": "running_tests", "status": "running"})
-
-        # Derive portals from test case metadata; fall back to body.portal or all
-        if test_cases:
-            seen_portals: set = set()
-            portals: list = []
-            for _tc in test_cases:
-                _p = (_tc.get("portal") or "seller").lower()
-                if _p not in seen_portals:
-                    portals.append(_p)
-                    seen_portals.add(_p)
-            print(f"\n[run_tests] AI test cases derive portals={portals}")
-        else:
-            portals = [body.portal] if (body.portal and body.portal != "all") else ["seller", "admin", "agency"]
-            print(f"\n[run_tests] No test cases — login-only for portals={portals}")
-
-        # ── Pre-loop debug dump ───────────────────────────────────────────────
-        print(f"\n[run_qa DEBUG] ── test_cases generated: {len(test_cases)}")
-        print(f"[run_qa DEBUG] ── portals to run: {portals}")
-        print(f"[run_qa DEBUG] ── execution path: {'run_qa_test_cases' if test_cases else 'run_tests (fallback — no test cases)'}")
-        for _i, _tc in enumerate(test_cases):
-            print(f"[run_qa DEBUG]    tc[{_i}] portal={_tc.get('portal')} name={_tc.get('test_name')} "
-                  f"url={_tc.get('url_path')} steps={len(_tc.get('steps') or [])}")
-        if not test_cases:
-            print("[run_qa DEBUG]    (full test_cases list is empty)")
-        else:
-            print(f"[run_qa DEBUG]    full test_cases: {json.dumps(test_cases, indent=2)}")
-        print(f"[run_qa DEBUG] ────────────────────────────────────────────────\n")
-
-        for portal in portals:
-            yield f": keepalive\n\n"
-            print(f"\n[run_tests] Running portal={portal} env={run_env} "
-                  f"path={'run_qa_test_cases' if test_cases else 'run_tests fallback'}")
-            try:
-                if test_cases:
-                    portal_tcs = [tc for tc in test_cases if tc.get("portal", "seller").lower() == portal]
-                    _cq_req  = _stdlib_queue.Queue()
-                    _cq_resp = _stdlib_queue.Queue()
-                    _loop    = asyncio.get_running_loop()
-                    _future  = _loop.run_in_executor(
-                        None,
-                        lambda: _playwright.run_qa_test_cases(
-                            portal, run_env, portal_tcs, _cq_req, _cq_resp
-                        ),
+                pages = await asyncio.to_thread(
+                    _identify_pages_from_ticket, summary, description, portal_for_inspect
+                )
+                print(f"[inspecting_page] Identified pages: {pages}")
+                for url_path in pages:
+                    yield f": keepalive\n\n"
+                    shot = await asyncio.to_thread(
+                        screenshot_page, portal_for_inspect, run_env, url_path
                     )
-                    # Poll for mid-run clarification requests while the thread executes
-                    while not _future.done():
-                        try:
-                            _cq_item = _cq_req.get_nowait()
-                            _cq_run_id = f"{issue_key}_step_{int(time.time())}"
-                            _cq_q: asyncio.Queue = asyncio.Queue()
-                            _clarification_store[_cq_run_id] = _cq_q
-                            yield evt({
-                                "type":    "clarification_needed",
-                                "run_id":  _cq_run_id,
-                                "question": _cq_item["question"],
-                                "step":    _cq_item["step"],
-                            })
-                            try:
-                                _cq_answer = await asyncio.wait_for(_cq_q.get(), timeout=300)
-                            except asyncio.TimeoutError:
-                                _cq_answer = ""
-                            finally:
-                                _clarification_store.pop(_cq_run_id, None)
-                            _cq_resp.put(_cq_answer)
-                        except _stdlib_queue.Empty:
-                            await asyncio.sleep(0.1)
-                    r = _future.result()
-                    status = r.get("status", "FAIL")
-                    print(f"[run_tests] run_qa_test_cases: portal={portal} status={status} "
-                          f"steps={r.get('steps_executed',0)} evidence={len(r.get('feature_evidence',[]))}")
-                    screenshots_for_portal = r.get("screenshots", [])
-                    test_results.append({
-                        "portal":             portal,
-                        "status":             status,
-                        "message":            r.get("message", ""),
-                        "url":                r.get("url"),
-                        "console_errors":     r.get("console_errors", []),
-                        "load_time_ms":       r.get("load_time_ms", 0),
-                        "nav_elements_found": r.get("nav_elements_found", []),
-                        "screenshots":        [
-                            {**s, "url": f"/screenshots/{s['filename']}"}
-                            for s in screenshots_for_portal if s.get("filename")
-                        ],
-                        "execution_log":      r.get("execution_log", []),
-                        "feature_evidence":   r.get("feature_evidence", []),
-                        "steps_executed":     r.get("steps_executed", 0),
-                    })
-                else:
-                    status, res = await asyncio.to_thread(_playwright.run_tests, portal, run_env)
-                    r = res if isinstance(res, dict) else {}
-                    print(f"[run_tests] run_tests done: portal={portal} status={status}")
-                    screenshots_for_portal = r.get("screenshots", [])
-                    test_results.append({
-                        "portal":             portal,
-                        "status":             status,
-                        "message":            r.get("message", "") or str(res),
-                        "url":                r.get("url"),
-                        "console_errors":     r.get("console_errors", []),
-                        "load_time_ms":       r.get("load_time_ms", 0),
-                        "nav_elements_found": r.get("nav_elements_found", []),
-                        "screenshots":        [
-                            {**s, "url": f"/screenshots/{s['filename']}"}
-                            for s in screenshots_for_portal if s.get("filename")
-                        ],
-                        "execution_log":      r.get("execution_log", []),
-                        "feature_evidence":   r.get("feature_evidence", []),
-                        "steps_executed":     0,
-                    })
-            except Exception as e:
-                print(f"[run_tests] ERROR for portal={portal}: {type(e).__name__}: {e}")
-                test_results.append({
-                    "portal": portal, "status": "ERROR", "message": str(e),
-                    "url": None, "console_errors": [], "load_time_ms": 0,
-                    "nav_elements_found": [], "screenshots": [],
-                    "execution_log": [{"step": "Run test", "result": "fail", "detail": str(e)}],
-                    "feature_evidence": [], "steps_executed": 0,
+                    if shot and not shot.get("error"):
+                        screenshots.append(shot)
+                yield evt({
+                    "stage": "inspecting_page",
+                    "status": "done",
+                    "pages_inspected": [s.get("url") for s in screenshots],
                 })
-            yield evt({"stage": "running_tests", "status": "progress",
-                       "portal": portal, "result": test_results[-1]["status"]})
-        all_pass = bool(test_results) and all(r["status"] == "PASS" for r in test_results)
-        yield evt({"stage": "running_tests", "status": "done", "all_pass": all_pass})
-
-        # ── Auto-learn: record working selectors to knowledge files ───────────
-        try:
-            await asyncio.to_thread(learn_from_run, test_cases, test_results)
-        except Exception as _le:
-            print(f"[learn_from_run] error (non-fatal): {_le}")
-
-        # ── Stage: update Jira ────────────────────────────────────────────────
-        yield evt({"stage": "updating_jira", "status": "running"})
-        total_steps_executed = sum(r.get("steps_executed", 0) for r in test_results)
-        if not test_cases or total_steps_executed == 0:
-            yield evt({
-                "stage": "updating_jira", "status": "skipped",
-                "message": (
-                    "QA Incomplete — no test cases generated. Ticket stays QA In Progress."
-                    if not test_cases
-                    else "QA Incomplete — zero steps executed. Ticket stays QA In Progress."
-                ),
-            })
-        else:
-            _branch_suffix = (
-                f" | fe:`{body.frontend_branch}` be:`{body.backend_branch}`"
-                if body.env == "local" else ""
-            )
-            try:
-                if all_pass:
-                    new_status = "Ready for Review"
-                    await asyncio.to_thread(_jira.update_ticket_status, issue_key, new_status)
-                else:
-                    new_status = "QA In Progress"
-                    # already QA In Progress — no transition needed
-                if all_pass:
-                    comment_lines = [f"✅ *QA Passed* — {body.env.upper()}{_branch_suffix}"]
-                    for r in test_results:
-                        comment_lines.append(f"• {r['portal'].upper()}: PASS — {r.get('url') or ''} | load: {r.get('load_time_ms',0)}ms")
-                        found_ev = [e for e in (r.get("feature_evidence") or []) if e.get("found")]
-                        if found_ev:
-                            comment_lines.append("  Evidence: " + "; ".join(
-                                f"{e['description']} ({e.get('detail','found')})" for e in found_ev[:4]
-                            ))
-                        shots = r.get("screenshots") or []
-                        if shots:
-                            comment_lines.append("  Screenshots: " + ", ".join(s["filename"] for s in shots))
-                    if assignee:
-                        comment_lines.append(f"\n@{assignee} All tests passing — moving to Ready for Review.")
-                else:
-                    comment_lines = [f"❌ *QA Failed* — {body.env.upper()}{_branch_suffix}"]
-                    for r in test_results:
-                        icon = "✅" if r["status"] == "PASS" else "❌"
-                        comment_lines.append(f"• {r['portal'].upper()}: {icon} {r['status']} — {str(r.get('message',''))[:200]}")
-                        for err in (r.get("console_errors") or [])[:3]:
-                            comment_lines.append(f"  Console error: {str(err)[:120]}")
-                        found_ev = [e for e in (r.get("feature_evidence") or []) if e.get("found")]
-                        if found_ev:
-                            comment_lines.append("  Elements found: " + "; ".join(
-                                e["description"] for e in found_ev[:4]
-                            ))
-                        shots = r.get("screenshots") or []
-                        if shots:
-                            comment_lines.append("  Screenshots: " + ", ".join(s["filename"] for s in shots))
-                    if assignee:
-                        comment_lines.append(f"\n@{assignee} Tests failing — ticket stays in QA In Progress.")
-                await asyncio.to_thread(_jira.add_comment, issue_key, "\n".join(comment_lines))
             except Exception as e:
-                yield evt({"stage": "updating_jira", "status": "error", "message": str(e)})
-            else:
-                yield evt({"stage": "updating_jira", "status": "done", "new_status": new_status})
+                print(f"[inspecting_page] ERROR: {e}")
+                yield evt({"stage": "inspecting_page", "status": "error", "message": str(e)})
 
-        # ── Restore branches ──────────────────────────────────────────────────
-        if body.env == "local" and branches_switched:
-            fe_path = REPO_PATHS.get("frontend", "")
-            be_path = REPO_PATHS.get("backend", "")
-            for path in [fe_path, be_path]:
+            # ── Stage: generate test cases ─────────────────────────────────────────
+            yield evt({"stage": "generating_test_cases", "status": "running"})
+            yield f": keepalive\n\n"
+            test_cases = await asyncio.to_thread(
+                generate_test_cases, issue_key, summary, description, screenshots or None
+            )
+            # save as Jira comment regardless of parse success
+            if test_cases:
                 try:
-                    await asyncio.to_thread(_github.switch_branch, path, "main")
+                    _env_label = body.env.upper()
+                    _branch_label = f" | fe:`{body.frontend_branch}` be:`{body.backend_branch}`" if body.env == "local" else ""
+                    lines = [f"🤖 *AI-Generated QA Test Cases — {issue_key}* ({_env_label}{_branch_label})"]
+                    for i, tc in enumerate(test_cases, 1):
+                        lines.append(f"\n*{i}. {tc.get('test_name','Test')}*\n_{tc.get('description','')}_")
+                        for s in (tc.get("steps") or []):
+                            lines.append(f"• {s}")
+                        lines.append(f"✅ Expected: {tc.get('expected_result','')}")
+                    await asyncio.to_thread(_jira.add_comment, issue_key, "\n".join(lines))
                 except Exception:
                     pass
+            yield evt({"stage": "generating_test_cases", "status": "done", "count": len(test_cases)})
 
-        # ── Stage: Slack report ───────────────────────────────────────────────
-        yield evt({"stage": "sending_slack", "status": "running"})
-        elapsed = round(time.time() - t0, 1)
-        try:
-            tc_summary = "\n".join(f"• {tc.get('test_name','')}" for tc in test_cases) or "No test cases generated"
-            results_summary = "\n".join(
-                f"• {r['portal'].upper()}: {'✅ PASS' if r['status']=='PASS' else '❌ FAIL'} {r.get('url') or ''}"
-                for r in test_results
-            ) or "No tests run"
-            _branch_lines = (
-                f"*Frontend Branch:* `{body.frontend_branch}`\n"
-                f"*Backend Branch:* `{body.backend_branch}`\n"
-            ) if run_env == "local" else ""
-            slack_msg = (
-                f"🤖 *QA Run Complete* — <https://zambeel.atlassian.net/browse/{issue_key}|{issue_key}>\n"
-                f"*{summary}*\n\n"
-                f"*Environment:* `{run_env.upper()}`{' *(local repos unavailable, ran on staging)*' if run_env != body.env else ''}\n"
-                f"{_branch_lines}"
-                f"*AI-Generated Test Cases:*\n{tc_summary}\n\n"
-                f"*Playwright Results:*\n{results_summary}\n\n"
-                f"*Jira Status →* {'Ready for Review ✅' if all_pass else 'QA In Progress 🔄'}\n"
-                f"*Time:* {elapsed}s"
+            # ── Stage: interactive clarification for uncertain selectors ───────────
+            if test_cases:
+                _run_id = f"{issue_key}_{int(time.time())}"
+                _uncertain = _check_uncertain_steps(test_cases)
+                for _u in _uncertain:
+                    _q: asyncio.Queue = asyncio.Queue()
+                    _clarification_store[_run_id] = _q
+                    yield evt({
+                        "type": "clarification_needed",
+                        "run_id": _run_id,
+                        "question": _u["question"],
+                    })
+                    try:
+                        _answer = await asyncio.wait_for(_q.get(), timeout=300)
+                        if _answer:
+                            # Patch the uncertain step in-place with user's guidance as a comment
+                            _tc = test_cases[_u["tc_index"]]
+                            _old_step = _tc["steps"][_u["step_index"]]
+                            _tc["steps"][_u["step_index"]] = f"{_old_step}  # user: {_answer}"
+                            print(f"[clarify] step updated: {_tc['steps'][_u['step_index']][:120]}")
+                    except asyncio.TimeoutError:
+                        print(f"[clarify] timeout waiting for answer to: {_u['question'][:80]}")
+                    finally:
+                        _clarification_store.pop(_run_id, None)
+
+            # ── Stage: run Playwright tests ────────────────────────────────────────
+            yield evt({"stage": "running_tests", "status": "running"})
+
+            # Derive portals from test case metadata; fall back to body.portal or all
+            if test_cases:
+                seen_portals: set = set()
+                portals: list = []
+                for _tc in test_cases:
+                    _p = (_tc.get("portal") or "seller").lower()
+                    if _p not in seen_portals:
+                        portals.append(_p)
+                        seen_portals.add(_p)
+                print(f"\n[run_tests] AI test cases derive portals={portals}")
+            else:
+                portals = [body.portal] if (body.portal and body.portal != "all") else ["seller", "admin", "agency"]
+                print(f"\n[run_tests] No test cases — login-only for portals={portals}")
+
+            # ── Pre-loop debug dump ───────────────────────────────────────────────
+            print(f"\n[run_qa DEBUG] ── test_cases generated: {len(test_cases)}")
+            print(f"[run_qa DEBUG] ── portals to run: {portals}")
+            print(f"[run_qa DEBUG] ── execution path: {'run_qa_test_cases' if test_cases else 'run_tests (fallback — no test cases)'}")
+            for _i, _tc in enumerate(test_cases):
+                print(f"[run_qa DEBUG]    tc[{_i}] portal={_tc.get('portal')} name={_tc.get('test_name')} "
+                      f"url={_tc.get('url_path')} steps={len(_tc.get('steps') or [])}")
+            if not test_cases:
+                print("[run_qa DEBUG]    (full test_cases list is empty)")
+            else:
+                print(f"[run_qa DEBUG]    full test_cases: {json.dumps(test_cases, indent=2)}")
+            print(f"[run_qa DEBUG] ────────────────────────────────────────────────\n")
+
+            for portal in portals:
+                yield f": keepalive\n\n"
+                print(f"\n[run_tests] Running portal={portal} env={run_env} "
+                      f"path={'run_qa_test_cases' if test_cases else 'run_tests fallback'}")
+                try:
+                    if test_cases:
+                        portal_tcs = [tc for tc in test_cases if tc.get("portal", "seller").lower() == portal]
+                        _cq_req  = _stdlib_queue.Queue()
+                        _cq_resp = _stdlib_queue.Queue()
+                        _loop    = asyncio.get_running_loop()
+                        _future  = _loop.run_in_executor(
+                            None,
+                            lambda: _playwright.run_qa_test_cases(
+                                portal, run_env, portal_tcs, _cq_req, _cq_resp
+                            ),
+                        )
+                        # Poll for mid-run clarification requests while the thread executes
+                        while not _future.done():
+                            try:
+                                _cq_item = _cq_req.get_nowait()
+                                _cq_run_id = f"{issue_key}_step_{int(time.time())}"
+                                _cq_q: asyncio.Queue = asyncio.Queue()
+                                _clarification_store[_cq_run_id] = _cq_q
+                                yield evt({
+                                    "type":    "clarification_needed",
+                                    "run_id":  _cq_run_id,
+                                    "question": _cq_item["question"],
+                                    "step":    _cq_item["step"],
+                                })
+                                try:
+                                    _cq_answer = await asyncio.wait_for(_cq_q.get(), timeout=300)
+                                except asyncio.TimeoutError:
+                                    _cq_answer = ""
+                                finally:
+                                    _clarification_store.pop(_cq_run_id, None)
+                                _cq_resp.put(_cq_answer)
+                            except _stdlib_queue.Empty:
+                                await asyncio.sleep(0.1)
+                        r = _future.result()
+                        status = r.get("status", "FAIL")
+                        print(f"[run_tests] run_qa_test_cases: portal={portal} status={status} "
+                              f"steps={r.get('steps_executed',0)} evidence={len(r.get('feature_evidence',[]))}")
+                        screenshots_for_portal = r.get("screenshots", [])
+                        test_results.append({
+                            "portal":             portal,
+                            "status":             status,
+                            "message":            r.get("message", ""),
+                            "url":                r.get("url"),
+                            "console_errors":     r.get("console_errors", []),
+                            "load_time_ms":       r.get("load_time_ms", 0),
+                            "nav_elements_found": r.get("nav_elements_found", []),
+                            "screenshots":        [
+                                {**s, "url": f"/screenshots/{s['filename']}"}
+                                for s in screenshots_for_portal if s.get("filename")
+                            ],
+                            "execution_log":      r.get("execution_log", []),
+                            "feature_evidence":   r.get("feature_evidence", []),
+                            "steps_executed":     r.get("steps_executed", 0),
+                        })
+                    else:
+                        status, res = await asyncio.to_thread(_playwright.run_tests, portal, run_env)
+                        r = res if isinstance(res, dict) else {}
+                        print(f"[run_tests] run_tests done: portal={portal} status={status}")
+                        screenshots_for_portal = r.get("screenshots", [])
+                        test_results.append({
+                            "portal":             portal,
+                            "status":             status,
+                            "message":            r.get("message", "") or str(res),
+                            "url":                r.get("url"),
+                            "console_errors":     r.get("console_errors", []),
+                            "load_time_ms":       r.get("load_time_ms", 0),
+                            "nav_elements_found": r.get("nav_elements_found", []),
+                            "screenshots":        [
+                                {**s, "url": f"/screenshots/{s['filename']}"}
+                                for s in screenshots_for_portal if s.get("filename")
+                            ],
+                            "execution_log":      r.get("execution_log", []),
+                            "feature_evidence":   r.get("feature_evidence", []),
+                            "steps_executed":     0,
+                        })
+                except Exception as e:
+                    print(f"[run_tests] ERROR for portal={portal}: {type(e).__name__}: {e}")
+                    test_results.append({
+                        "portal": portal, "status": "ERROR", "message": str(e),
+                        "url": None, "console_errors": [], "load_time_ms": 0,
+                        "nav_elements_found": [], "screenshots": [],
+                        "execution_log": [{"step": "Run test", "result": "fail", "detail": str(e)}],
+                        "feature_evidence": [], "steps_executed": 0,
+                    })
+                yield evt({"stage": "running_tests", "status": "progress",
+                           "portal": portal, "result": test_results[-1]["status"]})
+            all_pass = bool(test_results) and all(r["status"] == "PASS" for r in test_results)
+            yield evt({"stage": "running_tests", "status": "done", "all_pass": all_pass})
+
+            # ── Auto-learn: record working selectors to knowledge files ───────────
+            try:
+                await asyncio.to_thread(learn_from_run, test_cases, test_results)
+            except Exception as _le:
+                print(f"[learn_from_run] error (non-fatal): {_le}")
+
+            # ── Stage: update Jira ────────────────────────────────────────────────
+            yield evt({"stage": "updating_jira", "status": "running"})
+            total_steps_executed = sum(r.get("steps_executed", 0) for r in test_results)
+            if not test_cases or total_steps_executed == 0:
+                yield evt({
+                    "stage": "updating_jira", "status": "skipped",
+                    "message": (
+                        "QA Incomplete — no test cases generated. Ticket stays QA In Progress."
+                        if not test_cases
+                        else "QA Incomplete — zero steps executed. Ticket stays QA In Progress."
+                    ),
+                })
+            else:
+                _branch_suffix = (
+                    f" | fe:`{body.frontend_branch}` be:`{body.backend_branch}`"
+                    if body.env == "local" else ""
+                )
+                try:
+                    if all_pass:
+                        new_status = "Ready for Review"
+                        await asyncio.to_thread(_jira.update_ticket_status, issue_key, new_status)
+                    else:
+                        new_status = "QA In Progress"
+                        # already QA In Progress — no transition needed
+                    if all_pass:
+                        comment_lines = [f"✅ *QA Passed* — {body.env.upper()}{_branch_suffix}"]
+                        for r in test_results:
+                            comment_lines.append(f"• {r['portal'].upper()}: PASS — {r.get('url') or ''} | load: {r.get('load_time_ms',0)}ms")
+                            found_ev = [e for e in (r.get("feature_evidence") or []) if e.get("found")]
+                            if found_ev:
+                                comment_lines.append("  Evidence: " + "; ".join(
+                                    f"{e['description']} ({e.get('detail','found')})" for e in found_ev[:4]
+                                ))
+                            shots = r.get("screenshots") or []
+                            if shots:
+                                comment_lines.append("  Screenshots: " + ", ".join(s["filename"] for s in shots))
+                        if assignee:
+                            comment_lines.append(f"\n@{assignee} All tests passing — moving to Ready for Review.")
+                    else:
+                        comment_lines = [f"❌ *QA Failed* — {body.env.upper()}{_branch_suffix}"]
+                        for r in test_results:
+                            icon = "✅" if r["status"] == "PASS" else "❌"
+                            comment_lines.append(f"• {r['portal'].upper()}: {icon} {r['status']} — {str(r.get('message',''))[:200]}")
+                            for err in (r.get("console_errors") or [])[:3]:
+                                comment_lines.append(f"  Console error: {str(err)[:120]}")
+                            found_ev = [e for e in (r.get("feature_evidence") or []) if e.get("found")]
+                            if found_ev:
+                                comment_lines.append("  Elements found: " + "; ".join(
+                                    e["description"] for e in found_ev[:4]
+                                ))
+                            shots = r.get("screenshots") or []
+                            if shots:
+                                comment_lines.append("  Screenshots: " + ", ".join(s["filename"] for s in shots))
+                        if assignee:
+                            comment_lines.append(f"\n@{assignee} Tests failing — ticket stays in QA In Progress.")
+                    await asyncio.to_thread(_jira.add_comment, issue_key, "\n".join(comment_lines))
+                except Exception as e:
+                    yield evt({"stage": "updating_jira", "status": "error", "message": str(e)})
+                else:
+                    yield evt({"stage": "updating_jira", "status": "done", "new_status": new_status})
+
+            # ── Restore branches ──────────────────────────────────────────────────
+            if body.env == "local" and branches_switched:
+                fe_path = REPO_PATHS.get("frontend", "")
+                be_path = REPO_PATHS.get("backend", "")
+                for path in [fe_path, be_path]:
+                    try:
+                        await asyncio.to_thread(_github.switch_branch, path, "main")
+                    except Exception:
+                        pass
+
+            # ── Stage: Slack report ───────────────────────────────────────────────
+            yield evt({"stage": "sending_slack", "status": "running"})
+            elapsed = round(time.time() - t0, 1)
+            try:
+                tc_summary = "\n".join(f"• {tc.get('test_name','')}" for tc in test_cases) or "No test cases generated"
+                results_summary = "\n".join(
+                    f"• {r['portal'].upper()}: {'✅ PASS' if r['status']=='PASS' else '❌ FAIL'} {r.get('url') or ''}"
+                    for r in test_results
+                ) or "No tests run"
+                _branch_lines = (
+                    f"*Frontend Branch:* `{body.frontend_branch}`\n"
+                    f"*Backend Branch:* `{body.backend_branch}`\n"
+                ) if run_env == "local" else ""
+                slack_msg = (
+                    f"🤖 *QA Run Complete* — <https://zambeel.atlassian.net/browse/{issue_key}|{issue_key}>\n"
+                    f"*{summary}*\n\n"
+                    f"*Environment:* `{run_env.upper()}`{' *(local repos unavailable, ran on staging)*' if run_env != body.env else ''}\n"
+                    f"{_branch_lines}"
+                    f"*AI-Generated Test Cases:*\n{tc_summary}\n\n"
+                    f"*Playwright Results:*\n{results_summary}\n\n"
+                    f"*Jira Status →* {'Ready for Review ✅' if all_pass else 'QA In Progress 🔄'}\n"
+                    f"*Time:* {elapsed}s"
+                )
+                await asyncio.to_thread(_slack.send_message, slack_msg)
+            except Exception as e:
+                yield evt({"stage": "sending_slack", "status": "error", "message": str(e)})
+            else:
+                yield evt({"stage": "sending_slack", "status": "done"})
+
+            # ── Generate markdown QA report ───────────────────────────────────────
+            report_markdown = _build_qa_report(
+                issue_key=issue_key, summary=summary, env=body.env,
+                frontend_branch=body.frontend_branch, backend_branch=body.backend_branch,
+                test_cases=test_cases, test_results=test_results,
+                all_pass=all_pass, new_status=new_status, elapsed=elapsed,
             )
-            await asyncio.to_thread(_slack.send_message, slack_msg)
+            try:
+                report_ts   = datetime.now().strftime("%Y%m%d_%H%M%S")
+                report_file = REPORTS_DIR / f"qa_{issue_key}_{report_ts}.md"
+                report_file.write_text(report_markdown)
+            except Exception:
+                pass
+
+            # ── Final result ──────────────────────────────────────────────────────
+            yield evt({
+                "stage": "done",
+                "result": {
+                    "issue_key":       issue_key,
+                    "env":             body.env,
+                    "frontend_branch": body.frontend_branch,
+                    "backend_branch":  body.backend_branch,
+                    "test_cases":      test_cases,
+                    "test_results":    test_results,
+                    "all_pass":        all_pass,
+                    "new_status":      new_status,
+                    "elapsed_seconds": elapsed,
+                    "report_markdown": report_markdown,
+                },
+            })
         except Exception as e:
-            yield evt({"stage": "sending_slack", "status": "error", "message": str(e)})
-        else:
-            yield evt({"stage": "sending_slack", "status": "done"})
-
-        # ── Generate markdown QA report ───────────────────────────────────────
-        report_markdown = _build_qa_report(
-            issue_key=issue_key, summary=summary, env=body.env,
-            frontend_branch=body.frontend_branch, backend_branch=body.backend_branch,
-            test_cases=test_cases, test_results=test_results,
-            all_pass=all_pass, new_status=new_status, elapsed=elapsed,
-        )
-        try:
-            report_ts   = datetime.now().strftime("%Y%m%d_%H%M%S")
-            report_file = REPORTS_DIR / f"qa_{issue_key}_{report_ts}.md"
-            report_file.write_text(report_markdown)
-        except Exception:
-            pass
-
-        # ── Final result ──────────────────────────────────────────────────────
-        yield evt({
-            "stage": "done",
-            "result": {
-                "issue_key":       issue_key,
-                "env":             body.env,
-                "frontend_branch": body.frontend_branch,
-                "backend_branch":  body.backend_branch,
-                "test_cases":      test_cases,
-                "test_results":    test_results,
-                "all_pass":        all_pass,
-                "new_status":      new_status,
-                "elapsed_seconds": elapsed,
-                "report_markdown": report_markdown,
-            },
-        })
+            print(f"[run_qa UI] unhandled exception: {type(e).__name__}: {e}")
+            yield evt({"stage": "done", "error": str(e), "result": {"all_pass": False}})
+            return
 
     return StreamingResponse(
         generate(),
