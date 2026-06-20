@@ -2088,9 +2088,10 @@
       </div>
 
       <div class="rqa-field" id="rqa-pages-field" style="display:none">
-        <label style="display:flex;align-items:center;gap:6px">
+        <label style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
           Pages to Test
           <span style="font-size:11px;color:var(--text3);font-weight:400">(AI pre-selects based on ticket)</span>
+          <span id="rqa-suggest-status" style="display:none;font-size:11px;color:var(--text3);font-style:italic">Suggesting…</span>
         </label>
         <div id="rqa-pages-section" style="margin-top:6px;max-height:220px;overflow-y:auto;border:1px solid var(--border);border-radius:var(--r-sm);padding:8px 10px">
           <div id="rqa-pages-loading" style="color:var(--text3);font-size:12px">Loading pages…</div>
@@ -3371,7 +3372,8 @@ const QA_STAGES = [
   { id: 'sending_slack',         label: 'Sending Slack report'     },
 ];
 
-let _rqaEnv = 'staging';
+let _rqaEnv         = 'staging';
+let _rqaPagesLoaded = false;
 
 function openRunQAModal() {
   if (!_jiraCurrentKey) return;
@@ -3380,11 +3382,12 @@ function openRunQAModal() {
   document.getElementById('rqa-modal-key').textContent = _rqaCurrentKey;
   document.querySelector('input[name="rqa-env"][value="staging"]').checked = true;
   document.getElementById('rqa-portal').value = '';
-  // Reset pages section
+  _rqaPagesLoaded = false;
+  const suggestEl = document.getElementById('rqa-suggest-status');
+  if (suggestEl) suggestEl.style.display = 'none';
   document.getElementById('rqa-pages-field').style.display = 'none';
-  document.getElementById('rqa-pages-section').innerHTML = '<div id="rqa-pages-loading" style="color:var(--text3);font-size:12px">Loading pages…</div>';
+  document.getElementById('rqa-pages-section').innerHTML = '<div style="color:var(--text3);font-size:12px">Loading pages…</div>';
   document.getElementById('run-qa-modal').classList.add('open');
-  // Load pages for the default portal (All = '' means show all)
   loadPortalPages('');
 }
 
@@ -3393,83 +3396,101 @@ function closeRunQAModal() {
   btnLoad('rqa-confirm-btn', false);
 }
 
+function _renderPageCheckboxes(section, portal, allPages) {
+  if (!portal) {
+    const groups = ['Seller', 'Admin', 'Agency'];
+    let html = '';
+    for (const grp of groups) {
+      const grpPages = allPages.filter(p => p.portalGroup === grp);
+      if (!grpPages.length) continue;
+      const grpId = 'rqa-grp-' + grp.toLowerCase();
+      html += `<div class="rqa-page-group">
+        <div class="rqa-page-group-header" onclick="togglePageGroup('${grpId}')">
+          <span id="${grpId}-arrow" style="font-size:10px">▼</span> ${esc(grp)} Portal
+        </div>
+        <div class="rqa-page-group-body" id="${grpId}">`;
+      for (const p of grpPages) {
+        html += `<label class="rqa-checkbox-row"><input type="checkbox" class="rqa-page-cb" value="${esc(p.path)}"> ${esc(p.label)}</label>`;
+      }
+      html += `</div></div>`;
+    }
+    section.innerHTML = html;
+  } else {
+    let html = `<label class="rqa-pages-all-label" onclick="toggleAllPages(this)"><input type="checkbox" style="accent-color:#5B3DF5"> Select all</label>`;
+    for (const p of allPages) {
+      html += `<label class="rqa-checkbox-row"><input type="checkbox" class="rqa-page-cb" value="${esc(p.path)}"> ${esc(p.label)}</label>`;
+    }
+    section.innerHTML = html;
+  }
+}
+
 async function loadPortalPages(portal) {
-  const key = _rqaCurrentKey;
-  const section  = document.getElementById('rqa-pages-section');
-  const field    = document.getElementById('rqa-pages-field');
-  if (!section) return;
+  _rqaPagesLoaded = false;
+  const key     = _rqaCurrentKey;
+  const section = document.getElementById('rqa-pages-section');
+  const field   = document.getElementById('rqa-pages-field');
+  if (!section || !field) return;
+
   section.innerHTML = '<div style="color:var(--text3);font-size:12px">Loading pages…</div>';
   field.style.display = '';
 
   const token = sessionStorage.getItem('sqa_token') || '';
   const hdrs  = token ? { 'Authorization': `Bearer ${token}` } : {};
 
+  // ── Phase 1: fetch portal-pages (fast — no Jira) ──────────────────────────
+  let allPages = [];
   try {
-    let allPages   = [];  // [{path, label, portalGroup?}]
-    let suggested  = [];
-
     if (!portal) {
-      // All portals — fetch each group and suggest from admin as default
-      const [sr, ar, gr, sugR] = await Promise.all([
-        fetch(API_BASE + '/jira/portal-pages/seller',  { headers: hdrs }),
-        fetch(API_BASE + '/jira/portal-pages/admin',   { headers: hdrs }),
-        fetch(API_BASE + '/jira/portal-pages/agency',  { headers: hdrs }),
-        key ? fetch(API_BASE + `/jira/suggest-pages/${key}?portal=admin`, { headers: hdrs }) : null,
+      const [sr, ar, gr] = await Promise.all([
+        fetch(API_BASE + '/jira/portal-pages/seller', { headers: hdrs }),
+        fetch(API_BASE + '/jira/portal-pages/admin',  { headers: hdrs }),
+        fetch(API_BASE + '/jira/portal-pages/agency', { headers: hdrs }),
       ]);
       const sellerPages = sr.ok ? (await sr.json()).pages : [];
       const adminPages  = ar.ok ? (await ar.json()).pages : [];
       const agencyPages = gr.ok ? (await gr.json()).pages : [];
-      suggested = sugR && sugR.ok ? (await sugR.json()).suggested_pages : [];
-      sellerPages.forEach(p => allPages.push({...p, portalGroup:'Seller'}));
-      adminPages .forEach(p => allPages.push({...p, portalGroup:'Admin'}));
-      agencyPages.forEach(p => allPages.push({...p, portalGroup:'Agency'}));
+      sellerPages.forEach(p => allPages.push({...p, portalGroup: 'Seller'}));
+      adminPages .forEach(p => allPages.push({...p, portalGroup: 'Admin'}));
+      agencyPages.forEach(p => allPages.push({...p, portalGroup: 'Agency'}));
     } else {
-      const [pr, sugR] = await Promise.all([
-        fetch(API_BASE + `/jira/portal-pages/${portal}`,  { headers: hdrs }),
-        key ? fetch(API_BASE + `/jira/suggest-pages/${key}?portal=${portal}`, { headers: hdrs }) : null,
-      ]);
+      const pr = await fetch(API_BASE + `/jira/portal-pages/${portal}`, { headers: hdrs });
       allPages  = pr.ok ? (await pr.json()).pages : [];
-      suggested = sugR && sugR.ok ? (await sugR.json()).suggested_pages : [];
-    }
-
-    if (!allPages.length) {
-      section.innerHTML = '<div style="color:var(--text3);font-size:12px">No pages found for this portal.</div>';
-      return;
-    }
-
-    const sugSet = new Set(suggested);
-
-    if (!portal) {
-      // Grouped view with collapsible sections
-      const groups = ['Seller', 'Admin', 'Agency'];
-      let html = '';
-      for (const grp of groups) {
-        const grpPages = allPages.filter(p => p.portalGroup === grp);
-        if (!grpPages.length) continue;
-        const grpId = 'rqa-grp-' + grp.toLowerCase();
-        html += `<div class="rqa-page-group">
-          <div class="rqa-page-group-header" onclick="togglePageGroup('${grpId}')">
-            <span id="${grpId}-arrow" style="font-size:10px">▶</span> ${esc(grp)} Portal
-          </div>
-          <div class="rqa-page-group-body" id="${grpId}" style="display:none">`;
-        for (const p of grpPages) {
-          const chk = sugSet.has(p.path) ? 'checked' : '';
-          html += `<label class="rqa-checkbox-row"><input type="checkbox" class="rqa-page-cb" value="${esc(p.path)}" ${chk}> ${esc(p.label)}</label>`;
-        }
-        html += `</div></div>`;
-      }
-      section.innerHTML = html;
-    } else {
-      // Flat list
-      let html = `<label class="rqa-pages-all-label" onclick="toggleAllPages(this)"><input type="checkbox" style="accent-color:#5B3DF5"> Select all</label>`;
-      for (const p of allPages) {
-        const chk = sugSet.has(p.path) ? 'checked' : '';
-        html += `<label class="rqa-checkbox-row"><input type="checkbox" class="rqa-page-cb" value="${esc(p.path)}" ${chk}> ${esc(p.label)}</label>`;
-      }
-      section.innerHTML = html;
     }
   } catch(e) {
     section.innerHTML = `<div style="color:var(--error);font-size:12px">Failed to load pages: ${esc(e.message)}</div>`;
+    return;
+  }
+
+  if (!allPages.length) {
+    section.innerHTML = '<div style="color:var(--text3);font-size:12px">No pages found for this portal.</div>';
+    _rqaPagesLoaded = true;
+    return;
+  }
+
+  // Render immediately — all unchecked, all groups expanded
+  _renderPageCheckboxes(section, portal, allPages);
+  _rqaPagesLoaded = true;
+
+  // ── Phase 2: fetch suggest-pages (slow — calls Jira) — non-blocking ───────
+  const suggestEl = document.getElementById('rqa-suggest-status');
+  if (suggestEl) suggestEl.style.display = '';
+
+  const sugPortal = portal || 'admin';
+  try {
+    const sigR = key
+      ? await fetch(API_BASE + `/jira/suggest-pages/${key}?portal=${sugPortal}`, { headers: hdrs })
+      : null;
+    const suggested = (sigR && sigR.ok) ? (await sigR.json()).suggested_pages : [];
+    if (suggested.length) {
+      const sugSet = new Set(suggested);
+      document.querySelectorAll('.rqa-page-cb').forEach(cb => {
+        if (sugSet.has(cb.value)) cb.checked = true;
+      });
+    }
+  } catch(e) {
+    console.warn('[loadPortalPages] suggest-pages error (non-fatal):', e);
+  } finally {
+    if (suggestEl) suggestEl.style.display = 'none';
   }
 }
 
@@ -3477,9 +3498,9 @@ function togglePageGroup(id) {
   const body  = document.getElementById(id);
   const arrow = document.getElementById(id + '-arrow');
   if (!body) return;
-  const open = body.style.display !== 'none';
-  body.style.display  = open ? 'none' : '';
-  if (arrow) arrow.textContent = open ? '▶' : '▼';
+  const isOpen = body.style.display !== 'none';
+  body.style.display = isOpen ? 'none' : '';
+  if (arrow) arrow.textContent = isOpen ? '▶' : '▼';
 }
 
 function toggleAllPages(labelEl) {
@@ -3538,6 +3559,11 @@ async function confirmRunQA() {
   if (!key) { toast('No ticket selected', 'error'); return; }
 
   const selectedPages = _getSelectedPages();
+
+  if (_rqaPagesLoaded && selectedPages.length === 0) {
+    const go = confirm('No pages selected — the system will guess based on the ticket. Continue?');
+    if (!go) return;
+  }
 
   btnLoad('rqa-confirm-btn', true);
   closeRunQAModal();
