@@ -28,6 +28,8 @@
 | `/orders-management/invoice-upload` | (Invoice Upload) | `InvoiceUploadPage` | Admin only | Upload invoices for seller stores |
 | `/orders-management/invoice-update` | (Invoice Update) | `InvoiceUpdatePage` | Admin only | Update existing invoices |
 | `/orders-management/ticker-config` | **Global Ticker Configuration** | `TickerConfigPage` | Admin only | Configure marquee ticker bar |
+| `/orders-management/contracts` | **Contracts** | `OMSContractsPage` | Admin only | Manage contract templates and seller contracts |
+| `/orders-management/broadcast-notifications` | **Broadcast Notifications** | `BroadcastNotificationsPage` | Admin only | Send FYI messages to sellers; view delivery analytics |
 | `/orders-management/profile` | (Profile) | `Profile` | Admin/Agent | Admin user profile page |
 
 > **Bold** = h1 text confirmed from screenshot. Others are inferred from source code.
@@ -293,6 +295,83 @@ Country | Commission Type | Value | Currency
 **Empty state button:** `Create First Model`
 
 **Validation alert:** `Each country can only appear once inside the same model.`
+
+---
+
+### Contracts (`/orders-management/contracts`)
+
+**h1:** "Contracts"
+**Sub-text:** "Manage contract templates and seller contracts"
+
+**Two-tab layout:**
+
+| Tab | Purpose |
+|-----|---------|
+| **Templates** | Create, edit, delete reusable contract bodies |
+| **Contracts** | Create, view, revoke, and track contracts sent to sellers |
+
+**Templates tab UI:**
+- Table columns: Name | Created By | Created Date | Actions (Edit | Delete)
+- `+ New Template` button
+- Create/Edit: modal with Name field + rich text content editor
+- Delete: confirm modal "Delete this template?"
+
+**Contracts tab UI:**
+- Search input: placeholder "Search by seller or contract title..."
+- Status filter: All / Draft / Pending / Approved / Revoked
+- Table columns: Seller | Title | Status | Sent Date | Signed Date | Actions
+- Status badges: Draft (gray) | Pending (amber) | Approved (green) | Revoked (red)
+- Per-row actions: View (eye) | Edit (pencil, Draft only) | Revoke (Draft/Pending/Approved, confirm) | Delete (trash, Draft only)
+- `New Contract` button → opens `CreateContractWizard` (3-step: pick template + seller → edit content → send/save as draft)
+- Pagination: 10 per page; "Page N of N · total" + Previous/Next buttons
+
+**Revoke confirm modal message:** "Revoking [title] cannot be undone. The seller will still see it with a Revoked status. To re-engage them you must create a new contract."
+
+**Delete confirm modal message:** "Delete the draft [title]? This permanently removes it."
+
+**API:** See `knowledge/contracts/business_logic.md` for all 16 endpoints.
+
+---
+
+### Broadcast Notifications (`/orders-management/broadcast-notifications`)
+
+**h1:** "Broadcast Notifications"
+**Sub-text:** "Send FYI communications to sellers via the platform. Compose individually, upload via CSV, or review delivery analytics in the sent log."
+
+**Three-tab layout:**
+
+| Tab | Icon | Purpose |
+|-----|------|---------|
+| **Compose** (`compose`) | Send icon | Manual single or all-sellers notification compose form |
+| **CSV** (`csv`) | FileSpreadsheet icon | Upload CSV to send personalised bulk notifications |
+| **Sent Log** (`sent-log`) | History icon | Paginated sent log with read/unread analytics |
+
+**Compose tab form fields:**
+| Field | Type | Constraints |
+|-------|------|-------------|
+| Title | Text input | Max 100 chars |
+| Message | Textarea | Max 500 chars |
+| Category | Select | Pricing / Inventory / Zambeel Updates / Payments |
+| Expiry Date | Date-time picker | Must be a future date (min: 1 minute from now) |
+| Image | File upload / drag-drop | Optional; S3-hosted |
+| Recipients | Toggle: "Select sellers" or "Send to all sellers" | All-sellers mode requires 6-digit PIN (shown in modal) |
+| Seller search | Search by email / phone / user ID (when targeted mode) | Results from `/admin/broadcast-notifications/sellers/search` |
+
+**Live preview:** Right panel shows `SellerNotificationPreview` as the compose form is filled.
+
+**CSV tab:**
+- Download CSV template button
+- Upload / drag-drop CSV file
+- `Validate CSV` button → shows per-row errors if invalid
+- `Send Notifications` button (enabled only after successful validation)
+- Error display: per-row errors with row number
+
+**Sent Log tab:**
+- Paginated table: Title | Category | Sent At | Recipients | Read | Unread | Expiry | Actions
+- Click row → opens detail drawer with per-recipient list (Username | Email | Phone | Read At)
+- Detail pagination: 10 recipients per page
+
+**API:** See `knowledge/notifications/broadcast.md` for all 11 endpoints.
 
 ---
 

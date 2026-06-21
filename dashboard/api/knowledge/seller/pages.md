@@ -28,6 +28,11 @@
 | `/zambeel-academy-arabic` | `AcademyArabicPage` | Academy (Arabic) |
 | `/zambeel-academy-urdu` | `AcademyUrduPage` | Academy (Urdu) |
 | `/shopify/bind` | `ShopifyBind` | Bind Shopify store OAuth modal |
+| `/lightfunnels/bind` | `LightFunnelsBind` | LightFunnels OAuth bind page — store selection + confirm after redirect from `/lightfunnels/oauth/callback` |
+| `/woocommerce/callback` | `WooCommerceCallbackPage` | WooCommerce OAuth callback landing page — shows success/error state, refreshes connected stores |
+| `/gold-subscription/subscription` | `GoldSubscriptionSubscriptionPage` | Gold plan subscription management (plan selection sub-page) |
+| `/gold-subscription/products` | `GoldSubscriptionProductsPage` | Gold subscription product catalog sub-page |
+| `/notifications` | `NotificationsPage` | Seller broadcast notification inbox — category filter, read/unread tracking, mark-all-read |
 
 ---
 
@@ -208,3 +213,85 @@
 **Phone validation pattern:** `/^\+\d{10,15}$/` (international format, e.g. +9715012345678)
 
 **Color validation:** `/^#[0-9A-Fa-f]{6}$/` (6-char hex)
+
+---
+
+### Notifications (`/notifications`)
+
+**h1:** "Alerts & Notifications"
+
+**Sub-text (unread):** "You have {{count}} unread notification(s)"
+**Sub-text (all read):** "You're all caught up!"
+
+**Category filter tabs:** All | Pricing | Inventory | Zambeel Updates | Payments
+
+**Notification card fields:** Category badge | Title | Message | Sent date | Read/unread indicator
+**Expand behavior:** Clicking a notification card marks it as read and expands the full message.
+
+**Buttons:**
+- `Mark all as read` (top-right; disabled when no unread, shows spinner during mutation)
+
+**Confirm modal for mark-all-read:** "Are you sure you want to mark all notifications as read?"
+
+**Empty states:**
+- "No notifications" (per category filter)
+
+**API calls:**
+- `GET /broadcast-notifications?category=X` — fetches all notifications; sort: unread first, then newest
+- `PATCH /broadcast-notifications/:recipientId/read` — on card expand/click
+- `PATCH /broadcast-notifications/read-all` — on "Mark all as read"
+- `GET /broadcast-notifications/unread-count` — on page mount (syncs bell badge)
+
+---
+
+### LightFunnels Bind (`/lightfunnels/bind`)
+
+**Purpose:** Landing page after the LightFunnels OAuth2 callback. Seller arrives here after authorizing on LightFunnels' site.
+
+**URL query params on arrival:** `fromLightFunnelsInstall=true&sessionId=<id>`
+
+**Flow:**
+1. Calls `GET /lightfunnels/oauth/check-user` — confirms seller is logged in + has primary bank account.
+2. Calls `GET /lightfunnels/oauth/account?sessionId=X` — fetches pending LF account data + `stores[]`.
+3. If `stores.length > 1`: shows store-selection dropdown.
+4. Optionally calls `GET /lightfunnels/oauth/check-store-exists` — warns if store already connected.
+5. Seller enters store display name, confirms store selection, submits.
+6. Calls `POST /lightfunnels/oauth/bind-store` → on success: redirects to `/stores/integration`.
+
+**Pre-requisite gate:** If seller has no primary bank account, shows blocking error before allowing bind.
+
+---
+
+### WooCommerce Callback (`/woocommerce/callback`)
+
+**Purpose:** OAuth callback landing page after WooCommerce store authorization. No interactive elements — automatically refreshes the seller's connected stores and shows result.
+
+**Success state:** Green checkmark icon, "Store Connected" message, button to go to Store Integrations.
+**Error state:** Amber alert icon, error message from store refresh, button to retry or continue.
+
+**API call on mount:** `fetchAllConnectedStores(userId)` — refreshes store list after WC bind completes.
+
+---
+
+### Payment Status (`/payment-status`)
+
+**Purpose:** PayTabs payment result page. Arrived at after PayTabs redirect following a payment attempt.
+
+**URL query params:** `tran_ref` (transaction reference) | `cart_id` | `error`
+
+**States:**
+- Loading (spinner) — while verifying payment
+- Success — green checkmark, "Payment Successful" + transaction reference + amount
+- Error — red X icon, error message
+
+**On error param:** `missing_payment_details` → "Payment details are missing. Please contact support." | Other → "Payment processing error occurred. Please try again."
+
+**API call:** `POST /payments/verify` with `tran_ref` + `cart_id`
+
+---
+
+### Payments (`/payments`)
+
+Currently shows a "coming soon" placeholder. No functional content. Route exists but feature is pending.
+
+**Placeholder text:** "comming soon" (h1, centered)
