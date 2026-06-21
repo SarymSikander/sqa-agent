@@ -65,7 +65,8 @@
       "Bash(mkdir -p /Users/sarimsikandar/Desktop/sqa-agent/dashboard/api/knowledge/billing)",
       "Bash(mkdir -p /Users/sarimsikandar/Desktop/sqa-agent/dashboard/api/knowledge/orders)",
       "Bash(mkdir -p /Users/sarimsikandar/Desktop/sqa-agent/dashboard/api/knowledge/return_orders)",
-      "Bash(mkdir -p /Users/sarimsikandar/Desktop/sqa-agent/dashboard/api/knowledge/purchase_orders)"
+      "Bash(mkdir -p /Users/sarimsikandar/Desktop/sqa-agent/dashboard/api/knowledge/purchase_orders)",
+      "Bash(awk -F: '$2 > 1103')"
     ]
   }
 }
