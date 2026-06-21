@@ -4,7 +4,7 @@
 
 The notifications domain covers two distinct systems:
 
-1. **Broadcast Notifications** — admin-authored messages pushed to a targeted set of seller users. Admins can send to selected sellers, all sellers at once (PIN-protected), or via CSV upload. Sellers see their notification inbox, mark items read, and filter by category.
+1. **Broadcast Notifications** — admin-authored messages pushed to a targeted set of seller users. Admins can send to selected sellers, all sellers at once (PIN-protected), or via CSV upload. Sellers see their notification inbox, mark items read, and filter by category. **See also**: `knowledge/notifications/broadcast.md` for frontend page detail, comparison with standard notifications, and Socket.IO delivery specifics.
 
 2. **Customer.io Integration** — server-side event tracking for user lifecycle events (signup, profile update). Fires silently in the background; never blocks the main request flow.
 

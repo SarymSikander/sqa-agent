@@ -79,7 +79,8 @@ Received → Confirmation Pending → Approved → Dispatching in Process → Sh
 **Post-dispatch statuses (SHIPPED_STATUSES):** Shipped, Delivered, Undelivered, Return in Transit, Return
 
 ### Enforcement Rules
-- **Cannot move backward** from `Dispatching in Process` to `Approved` (enforced in single and bulk approve endpoints).
+- **Cannot move backward** from `Dispatching in Process` to `Approved` via the single/bulk approve endpoints.
+- **DIP→Confirmation Pending is allowed** via `PUT /orders/revert-dispatching-in-process` (see below). This is the only supported backward transition out of Dispatching in Process.
 - **Cannot update** archived orders (`archive === true`).
 - **Bulk CSV update** cannot push a shipped order back to a pre-shipped status.
 - Orders in `Received` status appear only in the seller's `getSellerOrders` (pending confirmation queue), not in the main OMS admin order list.
@@ -240,7 +241,32 @@ This is the "accept order" action triggered by a seller or agency. Logic:
 6. Calls `maybeRecordCommissionOnDelivered` (agency commission service) after each status change.
 7. Logs all changes to `OrderLog`.
 
-### 6. Duplicate Detection
+### 6. Reverting Orders from Dispatching in Process (`PUT /orders/revert-dispatching-in-process`)
+
+This is the only supported backward transition out of `Dispatching in Process`. It reverts selected orders to `Confirmation Pending` with a specific tag/substatus chosen by the admin.
+
+**Request body:** `{ orderIds: number[], tagId: number }`
+- `tagId` must correspond to an `OrderTag` whose sub-status belongs to the `Confirmation Pending` status — enforced in the controller.
+
+**For each order (per-order transaction; failures are skipped, not aborted globally):**
+1. **Cancel courier shipment** (if one was assigned):
+   - iMile courier → calls `imileService.cancelOrder(imileOrderNo, waybill)`; fails hard if no waybill found.
+   - Smartlane integrator → calls `smartlaneService.cancelConsignment("ZAMPAK-{orderId}")`.
+   - Tawseel courier → calls `tawseelService.cancelOrder(awbNumber)`; fails hard if no AWB found.
+   - Zajel couriers are **not** auto-cancelled by this flow (no Zajel cancel call here).
+2. **Restore warehouse inventory:** for each `OrderProductVariant`, increments `WarehouseVariant.quantity` for the variant in the customer's country warehouse (resolves "UAE" alias → `United Arab Emirates`).
+3. **Remove from batch:** if order is in a `BatchOrder`, destroys the `BatchOrder` row.
+4. **Reset order fields:**
+   - `status → { status: "Confirmation Pending", substatus: tag.subStatus.sub_status, tag: tag.tag }`
+   - `fk_courier_id`, `fk_integrator_id`, `fk_vendor_id`, `tracking_number`, `courier_tracking_id`, `awb_file_path`, `zambeel_tracking_id` — all set to `null`.
+5. **Creates `OrderLog`** with `action: STATUS_UPDATE`, `field_changed: "status"`, previous and new status recorded.
+6. On any error for an order: rolls back the transaction and adds to `skippedOrders` with reason. Continues processing remaining orders.
+
+**Response:** `{ updatedCount, skippedCount, updatedOrders: [{orderId, orderNumber}], skippedOrders: [{orderId, reason}] }`
+
+**When to use:** Admin uses this when orders were incorrectly dispatched, the shipment needs to be recalled, or there's a system error that put orders in DIP before they were ready. It is a destructive action that cancels the courier booking and restores stock.
+
+### 7. Duplicate Detection
 Orders are flagged as duplicates if the customer's phone number appears on at least one other non-`Received` order. Uses the `status_value` generated column for efficient filtering.
 
 ---
@@ -265,7 +291,7 @@ Orders are flagged as duplicates if the customer's phone number appears on at le
 ## Constraints and Rules
 
 1. **Archived orders cannot be updated** — all mutation endpoints check `order.archive === true` and reject with 400.
-2. **Status can only move forward** — DIP → Approved is blocked; shipped → pre-shipped is blocked in bulk CSV update.
+2. **Status generally moves forward** — DIP → Approved is blocked; shipped → pre-shipped is blocked in bulk CSV update. Exception: `PUT /orders/revert-dispatching-in-process` allows DIP → Confirmation Pending (cancels courier booking and restores inventory).
 3. **Variants must exist in country warehouse** — both for seller CSV upload (creation) and for courier assignment.
 4. **Duplicate SKUs not allowed** in a single CSV order group.
 5. **Payment method = prepaid** bypasses confirmation message and sets tag directly to `Address Verification`.
