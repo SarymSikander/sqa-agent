@@ -338,8 +338,21 @@
 | DELETE | `/youcan/webhooks/delete` | Remove YouCan webhooks |
 | GET | `/easyorders/install-link` | EasyOrder install link |
 | POST | `/easyorders/disconnect` | Disconnect EasyOrder |
-| GET | `/lightfunnels/auth` | LightFunnels OAuth |
-| DELETE | `/lightfunnels/webhooks/delete` | Remove LightFunnels webhooks |
+| POST | `/lightfunnels/auth` | verifySeller | LightFunnels legacy API-key auth |
+| DELETE | `/lightfunnels/webhooks/delete` | verifySeller | Remove LightFunnels webhooks |
+| GET | `/lightfunnels/oauth/auth` | None | LightFunnels OAuth2: initiate (session + redirect) |
+| GET | `/lightfunnels/oauth/callback` | None | LightFunnels OAuth2: exchange code, store pending session |
+| GET | `/lightfunnels/oauth/check-user` | verifySeller | LightFunnels OAuth2: check seller logged in + bank account |
+| GET | `/lightfunnels/oauth/account` | verifySeller | LightFunnels OAuth2: fetch pending account + store list |
+| GET | `/lightfunnels/oauth/check-store-exists` | verifySeller | LightFunnels OAuth2: check if selected store already connected |
+| POST | `/lightfunnels/oauth/bind-store` | verifySeller | LightFunnels OAuth2: create/update store row + register webhook |
+| GET | `/woocommerce/install` | None | WooCommerce: build authorize URL |
+| GET/POST | `/woocommerce/callback` | None | WooCommerce OAuth callback (plain or parameterized path) |
+| GET/POST | `/woocommerce/callback/u/:our_user_id/s/:store_host/n/:store_name` | None | WooCommerce callback with seller/host/name params |
+| GET/POST | `/woocommerce/callback/u/:our_user_id/s/:store_host` | None | WooCommerce callback with seller/host params |
+| GET | `/woocommerce/stores/:store_id` | verifySeller | Get WooCommerce store info |
+| POST | `/woocommerce/stores/:store_id/test` | verifySeller | Test WooCommerce connection |
+| DELETE | `/woocommerce/disconnect` | verifySeller | Disconnect WooCommerce store |
 
 ---
 
@@ -392,10 +405,77 @@ All webhook routes are public (no JWT auth — verified by platform signatures w
 | POST | `/lightfunnels/webhook` | LightFunnels | Order events |
 | POST | `/salla/webhook` | Salla | Order events |
 | POST | `/smartlane/webhook` | Smartlane | Courier tracking update |
-| POST | `/wati/webhook` | WATI (WhatsApp) | Message/conversation events |
+| POST | `/webhooks/wati/uae` | WATI (WhatsApp) | Inbound messages/events — UAE WATI account |
+| POST | `/webhooks/wati/ksa` | WATI (WhatsApp) | Inbound messages/events — Saudi Arabia WATI account |
+| POST | `/webhooks/wati/pk` | WATI (WhatsApp) | Inbound messages/events — Pakistan WATI account |
 | POST | `/youcan/webhook` | YouCan | Order events |
 | POST | `/imile/webhook` | iMile | Courier tracking update |
 | POST | `/tawseel/webhook` | Tawseel | Courier tracking update |
+| POST | `/zajel/webhook` | Zajel | Courier tracking/delivery status update |
+| POST | `/webhooks/woocommerce/orders` | WooCommerce | Order created/updated events |
+
+---
+
+## N1LLC (Manual/Internal Shopify Channel)
+
+Routes mounted at `/api/n1llc` directly in `server.js` (outside the main router).
+
+| Method | Path | Auth | Purpose |
+|--------|------|------|---------|
+| POST | `/n1llc/shopify/orders` | None | Manual Shopify order webhook trigger |
+| DELETE | `/n1llc/shopify/store/delete/:id` | verifyAdminAndSeller | Archive/delete a manual Shopify store |
+
+---
+
+## Contracts
+
+All routes mounted at `/api/contracts`. Templates managed by admins; contracts sent to sellers for signing.
+
+| Method | Path | Auth | Purpose |
+|--------|------|------|---------|
+| GET | `/contracts/templates` | Admin only | List all contract templates |
+| POST | `/contracts/templates` | Admin only | Create a template |
+| GET | `/contracts/templates/:id` | Admin only | Get template by ID |
+| PUT | `/contracts/templates/:id` | Admin only | Update template |
+| DELETE | `/contracts/templates/:id` | Admin only | Delete template (hard delete) |
+| GET | `/contracts/sellers/search` | Admin only | Search sellers for contract assignment |
+| GET | `/contracts` | Admin only | Paginated contract list (filter by status, search) |
+| POST | `/contracts` | Admin only | Create contract (from template); body: `{fk_template_id, title, content, fk_seller_id, send, force}` |
+| GET | `/contracts/:id` | Admin only | Get contract with seller + audit trail |
+| PUT | `/contracts/:id` | Admin only | Update contract — only Draft status |
+| DELETE | `/contracts/:id` | Admin only | Soft-delete contract — only Draft status |
+| POST | `/contracts/:id/revoke` | Admin only | Revoke Pending or Approved contract |
+| GET | `/contracts/my` | Seller/Agency | List non-Draft contracts for authenticated seller |
+| GET | `/contracts/my/:id` | Seller/Agency | View single contract (non-Draft) |
+| POST | `/contracts/my/:id/sign` | Seller/Agency | Sign Pending contract — body: `{signed_name}` (min 2 chars) |
+| GET | `/contracts/my/:id/pdf` | Seller/Agency | Download signed contract as PDF (Approved only) |
+
+---
+
+## Broadcast Notifications
+
+Admin-to-seller messaging subsystem. See `knowledge/notifications/broadcast.md` for full business logic.
+
+### Admin Endpoints (mounted at `/api/admin/broadcast-notifications/`)
+
+| Method | Path | Auth | Purpose |
+|--------|------|------|---------|
+| GET | `/admin/broadcast-notifications/sellers/search` | verifyAdminOnly | Search active sellers for targeting |
+| POST | `/admin/broadcast-notifications/manual` | verifyAdminOnly | Send manual notification to selected sellers or all sellers |
+| POST | `/admin/broadcast-notifications/csv/validate` | verifyAdminOnly | Validate CSV rows without sending |
+| POST | `/admin/broadcast-notifications/csv` | verifyAdminOnly | Validate and send CSV rows (one notification per row) |
+| GET | `/admin/broadcast-notifications` | verifyUser | Paginated sent log with read/unread counts |
+| GET | `/admin/broadcast-notifications/:id` | verifyUser | Notification detail with per-recipient read status |
+| PATCH | `/admin/broadcast-notifications/:id/expiry` | verifyAdminOnly | Update notification expiry date |
+
+### Seller Endpoints (mounted at `/api/broadcast-notifications/`)
+
+| Method | Path | Auth | Purpose |
+|--------|------|------|---------|
+| GET | `/broadcast-notifications/unread-count` | verifySeller | Get count of unread notifications for bell badge |
+| GET | `/broadcast-notifications` | verifySeller | List notifications (optional `?category=X` filter) |
+| PATCH | `/broadcast-notifications/read-all` | verifySeller | Mark all as read |
+| PATCH | `/broadcast-notifications/:recipientId/read` | verifySeller | Mark single notification as read |
 
 ---
 
