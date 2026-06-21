@@ -63,21 +63,86 @@ Zambeel integrates with multiple e-commerce platforms (order sources), courier p
 
 ### 3. LightFunnels
 
-**Purpose**: Funnel-builder platform (popular in MENA). Orders sync into Zambeel.
+**Purpose**: Funnel-builder platform (popular in MENA). Orders sync into Zambeel via webhook and periodic background sync.
 
-**Auth Flow (OAuth2 + GraphQL)**:
-1. Session-based OAuth: `GET /api/lightfunnels/auth` stores pending state, redirects to LightFunnels OAuth.
-2. Callback (`GET /api/lightfunnels/callback`) exchanges code for token, then:
-   - Calls LightFunnels GraphQL `profile.connected_accounts[0]._id` to get `accountId`
-   - Calls `GET_ACCOUNT_INFO` GraphQL query to fetch store metadata
-   - Creates/updates `stores` row (platform = `"lightfunnels"`, token AES-encrypted)
-3. Registers LightFunnels webhook for `order.created` events via `registerLightFunnelsWebhook()`.
+There are **two separate integration paths** — a legacy API-key route and the current OAuth2 flow. The OAuth2 flow is the active one for new integrations.
 
-**Background Sync**: `services/lightfunnelsOrderSyncService.js` provides periodic order syncing beyond webhooks.
+---
 
-**Key Config Keys**: `LIGHTFUNNELS_CLIENT_ID`, `LIGHTFUNNELS_CLIENT_SECRET`, `LIGHTFUNNELS_REDIRECT_URI`
+#### 3a. Legacy API-Key Flow (routes: `/api/lightfunnels/`)
 
-**Key Files**: `controllers/lightFunnelsController.js`, `routes/lightFunnels-routes.js`, `routes/lightFunnelsOAuthRoutes.js`, `webhooks/lightFunnels.js`, `services/lightfunnelsOrderSyncService.js`
+Two endpoints still mounted at `/api/lightfunnels/` via `routes/lightFunnels-routes.js`:
+
+| Method | Path | Auth | Purpose |
+|--------|------|------|---------|
+| `POST` | `/lightfunnels/auth` | `verifySeller` | Authenticate via LightFunnels email/password; returns access token |
+| `DELETE` | `/lightfunnels/webhooks/delete` | `verifySeller` | Delete all registered LightFunnels webhooks for the connected store |
+
+**Key Files**: `controllers/lightFunnelsController.js`, `routes/lightFunnels-routes.js`
+
+---
+
+#### 3b. OAuth2 Flow (routes: `/api/lightfunnels/oauth/`)
+
+The current integration path. Six endpoints mounted at `/api/lightfunnels/oauth/` via `routes/lightFunnelsOAuthRoutes.js` and `controllers/lightFunnelsOAuthController.js`:
+
+| Method | Path | Auth | Purpose |
+|--------|------|------|---------|
+| `GET` | `/lightfunnels/oauth/auth` | None | Initiate OAuth — stores state in session, redirects to LightFunnels |
+| `GET` | `/lightfunnels/oauth/callback` | None | Handle OAuth callback — exchanges code, fetches stores, stores pending session data |
+| `GET` | `/lightfunnels/oauth/check-user` | `verifySeller` | Check if seller is logged in and has a primary bank account |
+| `GET` | `/lightfunnels/oauth/account` | `verifySeller` | Fetch pending LightFunnels account + store list from session |
+| `GET` | `/lightfunnels/oauth/check-store-exists` | `verifySeller` | Check if the selected LF store is already connected |
+| `POST` | `/lightfunnels/oauth/bind-store` | `verifySeller` | Create or update `stores` row and register `order/created` webhook |
+
+**Step-by-step OAuth flow**:
+
+1. **Initiate** (`GET /lightfunnels/oauth/auth?store_name=X&userId=Y`):
+   - Builds `statePayload = {nonce, store_name, userId}` (encoded as base64url JSON).
+   - Saves payload to `req.session.pendingLightFunnelsAuth`.
+   - Redirects to `https://app.lightfunnels.com/admin/oauth` with `client_id`, `redirect_uri`, `scope=funnels,orders,products,customers`, `state`.
+
+2. **Callback** (`GET /lightfunnels/oauth/callback?code=X&state=Y`):
+   - Resolves `userId` and `store_name` from session OR decoded state param (whichever has them).
+   - Exchanges `code` for `access_token` via `POST https://api.lightfunnels.com/api/access_token` (Basic auth: `clientId:clientSecret`, `grant_type: authorization_code`).
+   - Gets `accountId` via GraphQL (`account.id`; falls back to `profile.connected_accounts[0]._id`).
+   - Fetches all stores via paginated GraphQL query (`AccountStoresPaginatedQuery`) — handles accounts with many stores.
+   - Stores `{id, access_token, accountId, shopData, stores[], store_name, userId}` into `req.session.pendingLightFunnelsData`.
+   - Clears `req.session.pendingLightFunnelsAuth`.
+   - Redirects to `{frontendUrl}/lightfunnels/bind?fromLightFunnelsInstall=true&sessionId=<id>`.
+
+3. **Frontend bind page** (`/lightfunnels/bind`):
+   - Calls `GET /lightfunnels/oauth/check-user` — confirms seller is logged in and has a primary bank account (required before binding is allowed).
+   - Calls `GET /lightfunnels/oauth/account?sessionId=X` — fetches `{account, stores[], store_name}` from the pending session stored in the `Sessions` DB table.
+   - If `stores.length > 1`: renders a store-selection UI; user picks one.
+   - Optionally calls `GET /lightfunnels/oauth/check-store-exists?sessionId=X&lightFunnelsStoreId=Y` — warns if the store is already connected (shows existing store name + domain).
+   - Calls `POST /lightfunnels/oauth/bind-store` with `{pendingLightFunnelsData: {sessionId}, storeName, lightFunnelsStoreId}`.
+
+4. **Bind** (`POST /lightfunnels/oauth/bind-store`):
+   - Loads pending session data from `Sessions` table (not just `req.session` — survives page refresh).
+   - **Update path**: if `stores.store_id = platformStoreId AND user_id = userId` already exists → updates token, domain, metadata, sets `archived: false`.
+   - **Create path**: requires `UsersBankAccount` with `is_primary: true, archived: false`; store name must be globally unique. Creates `stores` row (`platform = "lightfunnels"`, `store_currency = "AED"`, token AES-encrypted into `access_token` + `iv`). Also creates `StoreBankAccount` linking the store to the seller's primary bank.
+   - Calls `registerLightFunnelsWebhook(access_token, accountId)` to register `order/created` webhook.
+
+**Pre-bind requirements enforced by the bind endpoint**:
+- Seller must be authenticated (`verifySeller`).
+- A valid session ID pointing to stored `pendingLightFunnelsData` must exist.
+- `lightFunnelsStoreId` must be provided (auto-resolved only if account has exactly one store).
+- Seller must have a primary bank account (`UsersBankAccount` with `is_primary: true, archived: false`).
+- Store name must be unique across all stores in the `stores` table.
+
+**Token storage** (same pattern as Shopify): `encryptToken(access_token)` → `{encryptedToken, iv}` stored in `stores.access_token` + `stores.iv`.
+
+**LightFunnels GraphQL endpoints used**:
+- `https://services.lightfunnels.com/api/v2` — main API (account info, store list, webhooks)
+- `https://services.lightfunnels.com/profile` — profile fallback for accountId resolution
+- `https://api.lightfunnels.com/api/access_token` — token exchange
+
+**Background Sync**: `services/lightfunnelsOrderSyncService.js` provides periodic order syncing in addition to the `order/created` webhook.
+
+**Key Config Keys**: `lightFunnels.clientId`, `lightFunnels.clientSecret`, `app.frontendUrl`, `LIGHTFUNNELS_REDIRECT_URI`
+
+**Key Files**: `controllers/lightFunnelsOAuthController.js`, `routes/lightFunnelsOAuthRoutes.js`, `constants/lightFunnels.constants.js`, `utils/lightFunnelsUtils.js`, `controllers/lightFunnelsController.js`, `routes/lightFunnels-routes.js`, `webhooks/lightFunnels.js`, `services/lightfunnelsOrderSyncService.js`
 
 ---
 
