@@ -3376,9 +3376,13 @@ Zambeel repos:
 - Backend: https://github.com/MyZambeel/zambeel-api
 - SQA Agent: https://github.com/SarymSikander/sqa-agent
 
-Portals:
-- Admin/OMS staging: https://staging.myzambeel.com
-- Admin/OMS production: https://portal.myzambeel.com
+Portals (all three portals share the same base URL; portal type is determined by route path after login):
+- Seller portal staging:       https://staging.myzambeel.com  → lands at /get-started
+- Admin/OMS portal staging:    https://staging.myzambeel.com  → lands at /orders-management/dashboard
+- Agency portal staging:       https://staging.myzambeel.com  → lands at /get-started
+- Seller portal production:    https://portal.myzambeel.com   → lands at /get-started
+- Admin/OMS portal production: https://portal.myzambeel.com   → lands at /orders-management/dashboard
+- Agency portal production:    https://portal.myzambeel.com   → lands at /get-started
 
 {live_data}
 
