@@ -1574,10 +1574,10 @@ def screenshot_page(portal, env, url_path):
 def extract_page_dom(page) -> dict:
     """Extract all interactive elements from an already-loaded Playwright page.
 
-    Also expands every native <select> to capture its full option list.
-    Returns a dict suitable for passing directly to generate_test_cases.
+    Uses multiple selector strategies so Vue/React SPAs that render buttons
+    as <a role='button'>, <div class='btn-*'>, or <span role='button'> are
+    all captured.  Also expands every native <select> option list.
     """
-    # Collect native select options by querying each element from Python
     select_data = []
     try:
         selects = page.query_selector_all('select')
@@ -1587,16 +1587,41 @@ def extract_page_dom(page) -> dict:
     except Exception as e:
         print(f'[extract_page_dom] select extraction error: {e}')
 
-    dom = page.evaluate('''() => ({
-        buttons:  [...document.querySelectorAll('button')]
-                      .map(b => b.innerText.trim()).filter(Boolean),
-        inputs:   [...document.querySelectorAll('input')].map(i => ({
-                      placeholder: i.placeholder, type: i.type, name: i.name
-                  })).filter(i => i.placeholder || i.name),
-        headings: [...document.querySelectorAll('h1,h2,h3')]
-                      .map(h => h.innerText.trim()).filter(Boolean),
-        pageText: document.body.innerText.slice(0, 1000)
-    })''')
+    dom = page.evaluate('''() => {
+        const SKIP_TAGS = new Set(['SCRIPT','STYLE','HTML','BODY','HEAD','NOSCRIPT']);
+        const btnSet = new Set();
+        const addText = el => {
+            const t = (el.innerText || el.textContent || '').trim().replace(/\\s+/g, ' ');
+            if (t && t.length > 0 && t.length < 80) btnSet.add(t);
+        };
+
+        // Standard <button> elements — highest confidence
+        document.querySelectorAll('button').forEach(addText);
+        // Anchor and generic role-based buttons
+        document.querySelectorAll('a[role="button"], [role="button"]').forEach(addText);
+        // Input-style buttons
+        document.querySelectorAll('input[type="button"], input[type="submit"]').forEach(el => {
+            const t = (el.value || '').trim();
+            if (t) btnSet.add(t);
+        });
+        // Class-based buttons (Vue SPA pattern: div/span with btn or button in class)
+        document.querySelectorAll('[class*="btn"],[class*="button"]').forEach(el => {
+            if (SKIP_TAGS.has(el.tagName)) return;
+            // Only pick leaf-ish nodes: skip containers that have child buttons already captured
+            if (el.querySelector('button, [role="button"]')) return;
+            addText(el);
+        });
+
+        return {
+            buttons: [...btnSet],
+            inputs: [...document.querySelectorAll('input')].map(i => ({
+                placeholder: i.placeholder, type: i.type, name: i.name
+            })).filter(i => i.placeholder || i.name),
+            headings: [...document.querySelectorAll('h1,h2,h3')]
+                .map(h => h.innerText.trim()).filter(Boolean),
+            pageText: document.body.innerText.slice(0, 1000),
+        };
+    }''')
     dom['selects'] = select_data
     return dom
 
@@ -1629,15 +1654,36 @@ def extract_page_dom_live(portal, env, url_path) -> dict:
             page.on("response", _on_response)
 
             _playwright.login_to_portal(page, portal, env)
-            page.goto(full_url)
+            print(f'[extract_page_dom_live] post-login url={page.url!r}')
+
+            page.goto(full_url, wait_until='domcontentloaded')
             page.wait_for_load_state('networkidle')
             page.wait_for_timeout(2000)
+
+            current_url = page.url
+            print(f'[extract_page_dom_live] after goto+networkidle url={current_url!r} (target path={url_path!r})')
+
+            # SPA auth guards can redirect — wait up to 3 s more for router to settle
+            if url_path not in current_url:
+                print(f'[extract_page_dom_live] URL mismatch — waiting 3 s for SPA router to settle')
+                page.wait_for_timeout(3000)
+                print(f'[extract_page_dom_live] after extra wait url={page.url!r}')
+
+            # Wait for any interactive element to confirm Vue has rendered the page content
+            _interactive_sel = 'button, a[role="button"], [role="button"], [class*="btn"]'
+            try:
+                page.wait_for_selector(_interactive_sel, timeout=6000)
+                print(f'[extract_page_dom_live] interactive element found — page rendered')
+            except Exception:
+                print(f'[extract_page_dom_live] no interactive elements within 6 s — querying DOM anyway')
+
+            print(f'[extract_page_dom_live] pre-DOM-query url={page.url!r}')
             dom = extract_page_dom(page)
             browser.close()
         print(f'[extract_page_dom_live] done — buttons={len(dom["buttons"])} '
               f'inputs={len(dom["inputs"])} selects={len(dom["selects"])} '
               f'network_calls={len(network_calls)}')
-        print(f'[DOM] buttons={dom["buttons"][:5]}, inputs={dom["inputs"][:3]}, selects={dom["selects"]}')
+        print(f'[DOM] buttons={dom["buttons"][:10]}, inputs={dom["inputs"][:3]}, selects={dom["selects"]}')
         return {
             'dom': dom, 'network_calls': network_calls,
             'portal': portal, 'env': env, 'url_path': url_path, 'url': full_url,
