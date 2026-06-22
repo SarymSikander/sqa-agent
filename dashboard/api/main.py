@@ -1540,10 +1540,10 @@ def _identify_pages_from_ticket(title: str, description: str, portal: str, env: 
 
 def _resolve_base_url(env: str) -> str:
     if env == 'staging':
-        return os.getenv('STAGING_URL', 'https://staging.myzambeel.com').rstrip('/')
+        return os.getenv('STAGING_URL', 'https://staging.myzambeel.com').strip().rstrip('/')
     if env == 'production':
-        return os.getenv('PRODUCTION_URL', 'https://portal.myzambeel.com').rstrip('/')
-    return os.getenv('LOCAL_URL', 'http://localhost:5173').rstrip('/')
+        return os.getenv('PRODUCTION_URL', 'https://portal.myzambeel.com').strip().rstrip('/')
+    return os.getenv('LOCAL_URL', 'http://localhost:5173').strip().rstrip('/')
 
 
 def screenshot_page(portal, env, url_path):
@@ -1551,7 +1551,7 @@ def screenshot_page(portal, env, url_path):
     from playwright.sync_api import sync_playwright
     import base64
     base_url = _resolve_base_url(env)
-    full_url = f'{base_url}{url_path}'
+    full_url = base_url.rstrip('/') + '/' + url_path.strip().lstrip('/')
     print(f'[screenshot_page] {portal}/{env} → {full_url}')
     try:
         with sync_playwright() as p:
@@ -1631,7 +1631,7 @@ def extract_page_dom_live(portal, env, url_path) -> dict:
     from playwright.sync_api import sync_playwright
     from urllib.parse import urlparse as _urlparse
     base_url = _resolve_base_url(env)
-    full_url = f'{base_url}{url_path}'
+    full_url = base_url.rstrip('/') + '/' + url_path.strip().lstrip('/')
     print(f'[extract_page_dom_live] {portal}/{env} → {full_url}')
     try:
         with sync_playwright() as p:
@@ -2094,13 +2094,25 @@ def generate_test_cases(ticket_key, title, description, screenshots: list = None
             # All Groq models exhausted — try Azure GPT-4o as last resort
             print("[generate_test_cases] all Groq models failed/rate-limited — trying Azure GPT-4o fallback")
             try:
+                # Truncate knowledge base in the prompt to stay within GPT-4o token limits.
+                # DOM context and ticket content are preserved — only the KB text is capped.
+                _az_prompt = prompt
+                _KB_LIMIT = 3000
+                if knowledge_base and len(knowledge_base) > _KB_LIMIT:
+                    _az_prompt = prompt.replace(
+                        knowledge_base,
+                        knowledge_base[:_KB_LIMIT] + "\n[...knowledge base truncated for token limit...]",
+                        1,
+                    )
+                    print(f"[generate_test_cases] GPT-4o: KB truncated {len(knowledge_base)} → {_KB_LIMIT} chars "
+                          f"(prompt {len(prompt)} → {len(_az_prompt)} chars)")
                 _azure = OpenAI(
                     base_url="https://models.inference.ai.azure.com",
                     api_key=os.getenv("GITHUB_TOKEN"),
                 )
                 _az_resp = _azure.chat.completions.create(
                     model="gpt-4o",
-                    messages=[{"role": "user", "content": prompt}],
+                    messages=[{"role": "user", "content": _az_prompt}],
                     max_tokens=2000,
                 )
                 output = (_az_resp.choices[0].message.content or "").strip()
