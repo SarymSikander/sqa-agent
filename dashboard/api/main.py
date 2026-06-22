@@ -2045,8 +2045,24 @@ def generate_test_cases(ticket_key, title, description, screenshots: list = None
                     continue
                 raise
         if not output:
-            return [{"is_error": True, "test_name": "Error", "steps": [], "evidence_selector": "",
-                     "error": "Groq daily limit reached on all models. Please try again in a few hours."}]
+            # All Groq models exhausted — try Azure GPT-4o as last resort
+            print("[generate_test_cases] all Groq models failed/rate-limited — trying Azure GPT-4o fallback")
+            try:
+                _azure = OpenAI(
+                    base_url="https://models.inference.ai.azure.com",
+                    api_key=os.getenv("GITHUB_TOKEN"),
+                )
+                _az_resp = _azure.chat.completions.create(
+                    model="gpt-4o",
+                    messages=[{"role": "user", "content": prompt}],
+                    max_tokens=2000,
+                )
+                output = (_az_resp.choices[0].message.content or "").strip()
+                print(f"[generate_test_cases] Azure GPT-4o succeeded ({len(output)} chars)")
+            except Exception as _az_err:
+                print(f"[generate_test_cases] Azure GPT-4o also failed: {_az_err}")
+                return [{"is_error": True, "test_name": "Error", "steps": [], "evidence_selector": "",
+                         "error": "All models exhausted (Groq + Azure GPT-4o). Please try again later."}]
         return _parse_test_cases(output)
     except Exception as _top_err:
         print(f"[generate_test_cases] unexpected error: {_top_err}")
