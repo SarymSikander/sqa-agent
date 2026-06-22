@@ -31,6 +31,10 @@ app = FastAPI(title="Zambeel SQA Dashboard API", version="1.0.0")
 
 _db_cache = {'data': '', 'ts': 0}
 
+# In-memory cache for live sidebar page lists: {(portal, env): {"pages": [...], "ts": float}}
+# Populated by get_portal_pages_live(); TTL = 10 minutes.
+_live_pages_cache: dict = {}
+
 # Pending clarification queues keyed by run_id — set/awaited inside run_qa SSE generator
 _clarification_store: dict[str, asyncio.Queue] = {}
 
@@ -851,19 +855,33 @@ async def get_ticket_detail(issue_key: str):
     }
 
 @app.get("/jira/portal-pages/{portal}")
-async def get_portal_pages(portal: str):
-    """Return all known pages for a portal derived from _ROUTE_KEYWORDS."""
-    route_map = _ROUTE_KEYWORDS.get(portal.lower(), {})
-    pages = []
+async def get_portal_pages(portal: str, env: str = "production"):
+    """Return all pages for a portal, crawled live from the sidebar.
+
+    Tries get_portal_pages_live() first; falls back to _ROUTE_KEYWORDS static list
+    only if the live crawl fails (marks source: 'static_fallback' so the frontend
+    can show a warning).  Accepts optional ?env=staging query param.
+    """
+    p = portal.lower()
+    try:
+        pages, was_cached = await asyncio.to_thread(get_portal_pages_live, p, env)
+        if pages:
+            return {"pages": pages, "source": "live_crawl", "cached": was_cached}
+    except Exception as e:
+        print(f"[portal-pages] live crawl error for {p}/{env}: {e}")
+
+    # STATIC FALLBACK — only used if live crawl fails
+    route_map = _ROUTE_KEYWORDS.get(p, {})
+    static_pages = []
     for path in route_map:
         last_seg = path.rstrip("/").rsplit("/", 1)[-1]
         label = last_seg.replace("-", " ").title()
-        pages.append({"path": path, "label": label})
-    return {"pages": pages}
+        static_pages.append({"path": path, "label": label})
+    return {"pages": static_pages, "source": "static_fallback", "cached": False}
 
 
 @app.get("/jira/suggest-pages/{issue_key}")
-async def suggest_pages(issue_key: str, portal: str = "admin"):
+async def suggest_pages(issue_key: str, portal: str = "admin", env: str = "production"):
     """Return AI-suggested pages for this ticket + portal combination."""
     try:
         ticket   = await asyncio.to_thread(_jira.get_ticket, issue_key)
@@ -872,7 +890,7 @@ async def suggest_pages(issue_key: str, portal: str = "admin"):
         desc_raw = fields.get("description")
         description = _adf_to_text(desc_raw) if isinstance(desc_raw, (dict, list)) else (desc_raw or "")
         suggested = await asyncio.to_thread(
-            _identify_pages_from_ticket, summary, description, portal
+            _identify_pages_from_ticket, summary, description, portal, env
         )
         return {"suggested_pages": suggested or []}
     except Exception as e:
@@ -1386,35 +1404,138 @@ def run_api_tests(api_specs, env="production"):
     return results
 
 
+def get_portal_pages_live(portal: str, env: str = "production") -> tuple:
+    """Crawl the portal sidebar after login and return (pages, was_cached).
+
+    pages = [{"path": "/some/path", "label": "Some Label"}, ...]
+    was_cached = True if result came from the 10-min in-memory cache.
+    Falls back to an empty list on any Playwright error — callers must handle this.
+    """
+    from urllib.parse import urlparse as _up
+    cache_key = (portal.lower(), env.lower())
+    cached = _live_pages_cache.get(cache_key)
+    if cached and (time.time() - cached["ts"] < 600):
+        return cached["pages"], True
+
+    base_url = _resolve_base_url(env)
+    print(f"[get_portal_pages_live] crawling {portal}/{env} sidebar at {base_url}")
+    try:
+        with sync_playwright() as p:
+            browser = p.chromium.launch(headless=True)
+            page = browser.new_page(viewport={"width": 1440, "height": 900})
+            _playwright.login_to_portal(page, portal, env)
+            page.wait_for_load_state("networkidle")
+            page.wait_for_timeout(2000)
+            links = page.evaluate("""() => {
+                const anchors = [...document.querySelectorAll(
+                    'nav a, [class*="sidebar"] a, [class*="nav"] a, [class*="menu"] a'
+                )];
+                return anchors.map(a => ({
+                    href: a.getAttribute('href') || '',
+                    label: (a.innerText || a.textContent || '').trim()
+                })).filter(l =>
+                    l.href && l.href !== '#' &&
+                    !l.href.startsWith('http') && !l.href.startsWith('mailto') &&
+                    l.label && l.label.length > 0
+                );
+            }""")
+            browser.close()
+
+        pages = []
+        seen_paths: set = set()
+        for link in links:
+            href = link.get("href", "")
+            label = " ".join(link.get("label", "").split())  # collapse whitespace
+            if not href.startswith("/"):
+                href = "/" + href
+            path = _up(href).path
+            if path and path not in seen_paths and len(label) > 0:
+                seen_paths.add(path)
+                pages.append({"path": path, "label": label})
+
+        print(f"[get_portal_pages_live] found {len(pages)} nav pages for {portal}/{env}")
+        if pages:
+            _live_pages_cache[cache_key] = {"pages": pages, "ts": time.time()}
+        return pages, False
+    except Exception as e:
+        print(f"[get_portal_pages_live] ERROR for {portal}/{env}: {e}")
+        return [], False
+
+
 def _resolve_page_portal(url_path: str, fallback: str = "seller") -> str:
-    """Return the portal name (admin/seller/agency) that owns url_path via _ROUTE_KEYWORDS."""
+    """Return the portal (admin/seller/agency) that owns url_path.
+
+    Checks the live crawl cache first; falls back to _ROUTE_KEYWORDS (STATIC FALLBACK)
+    only if the cache is empty.
+    """
+    # Live cache check — populated by get_portal_pages_live()
+    for portal_name in ("admin", "seller", "agency"):
+        for env_key in ("production", "staging"):
+            cached = _live_pages_cache.get((portal_name, env_key))
+            if cached and cached.get("pages"):
+                for p in cached["pages"]:
+                    if p["path"] == url_path:
+                        return portal_name
+
+    # STATIC FALLBACK — only used if live crawl cache is empty
     for portal_name, routes in _ROUTE_KEYWORDS.items():
         if url_path in routes:
             return portal_name
     return fallback
 
 
-def _identify_pages_from_ticket(title: str, description: str, portal: str) -> list:
-    """Score each known route by keyword hits in the ticket text; return top matches."""
-    text = f"{title} {description}".lower()
-    keyword_map = _ROUTE_KEYWORDS.get(portal, {})
+def _identify_pages_from_ticket(title: str, description: str, portal: str, env: str = "production") -> list:
+    """Score portal pages by TF-IDF keyword overlap with the ticket; return top 3 paths.
 
-    scores: dict[str, int] = {}
+    Uses the live sidebar crawl (get_portal_pages_live) as the primary source so results
+    always reflect the real current portal structure.  Falls back to the static
+    _ROUTE_KEYWORDS dict (STATIC FALLBACK) only if the live crawl returns nothing.
+    """
+    text = f"{title} {description}".lower()
+    text_tokens = _kb_tokenize(text)
+
+    # ── Primary: live sidebar pages ───────────────────────────────────────────
+    live_pages, from_cache = get_portal_pages_live(portal, env)
+
+    if live_pages:
+        scored: list[tuple[float, str]] = []
+        for pg in live_pages:
+            page_text = f"{pg['label']} {pg['path']}".lower()
+            page_tokens = _kb_tokenize(page_text)
+            overlap = text_tokens & page_tokens
+            score = sum(_KB_IDF.get(t, 1.0) for t in overlap)
+            scored.append((score, pg["path"]))
+
+        positives = [(s, p) for s, p in scored if s > 0]
+        if positives:
+            positives.sort(reverse=True)
+            result = [p for _, p in positives[:3]]
+        else:
+            # No keyword overlap — return top 3 by shortest path (most general pages)
+            result = [p for _, p in sorted(scored, key=lambda x: len(x[1]))[:3]]
+
+        top_log = [(round(s, 2), p) for s, p in scored if s > 0][:5]
+        print(f"[_identify_pages] live{'(cached)' if from_cache else ''} scores top-5: {top_log} → {result}")
+        return result
+
+    # ── STATIC FALLBACK — only used if live crawl fails ───────────────────────
+    print(f"[_identify_pages] live crawl empty for {portal}/{env} — using static _ROUTE_KEYWORDS fallback")
+    keyword_map = _ROUTE_KEYWORDS.get(portal, {})
+    static_scores: dict[str, int] = {}
     for route, keywords in keyword_map.items():
         score = sum(1 for kw in keywords if kw in text)
         if score > 0:
-            scores[route] = score
+            static_scores[route] = score
 
-    if scores:
-        ranked = sorted(scores, key=lambda r: scores[r], reverse=True)
+    if static_scores:
+        ranked = sorted(static_scores, key=lambda r: static_scores[r], reverse=True)
         result = ranked[:3]
-        print(f"[_identify_pages] keyword scores: {[(r, scores[r]) for r in result]}")
+        print(f"[_identify_pages] static fallback scores: {[(r, static_scores[r]) for r in result]}")
         return result
 
-    # No keywords matched — fall back to the first route for the portal
-    fallback = next(iter(keyword_map), None)
-    print(f"[_identify_pages] no keyword match, fallback={fallback}")
-    return [fallback] if fallback else []
+    fallback_route = next(iter(keyword_map), None)
+    print(f"[_identify_pages] no match anywhere, fallback={fallback_route}")
+    return [fallback_route] if fallback_route else []
 
 
 def _resolve_base_url(env: str) -> str:
@@ -1813,7 +1934,7 @@ def generate_test_cases(ticket_key, title, description, screenshots: list = None
 
     pages_summary = ", ".join(s.get("url_path", s.get("url", "")) for s in valid_shots)
 
-    # Build DOM context section (Part 2)
+    # Build DOM context section — PRIMARY selector source when available
     _dom_section = ""
     if dom_context:
         _dom_parts = []
@@ -1821,17 +1942,20 @@ def generate_test_cases(ticket_key, title, description, screenshots: list = None
             dom = dc.get("dom", {})
             nc  = dc.get("network_calls", [])
             url_p = dc.get("url_path", dc.get("url", ""))
+            api_calls = [c["method"] + " " + c["path"] for c in nc if "/api/" in c.get("path", "")]
             _dom_parts.append(
                 f"Page: {url_p}\n"
-                f"Buttons: {', '.join(dom.get('buttons', [])[:15])}\n"
-                f"Inputs: {', '.join((i.get('placeholder') or i.get('name') or '') for i in dom.get('inputs', [])[:8])}\n"
-                f"Headings: {', '.join(dom.get('headings', [])[:8])}\n"
-                f"Network calls: {', '.join(c['method'] + ' ' + c['path'] for c in nc[:10])}"
+                f"Buttons found on page: {', '.join(dom.get('buttons', [])[:15])}\n"
+                f"Inputs found on page: {', '.join((i.get('placeholder') or i.get('name') or '') for i in dom.get('inputs', [])[:8])}\n"
+                f"Headings found on page: {', '.join(dom.get('headings', [])[:8])}\n"
+                f"Network calls fired on load: {', '.join(api_calls[:10])}"
             )
         _dom_section = (
-            "LIVE DOM CONTEXT (extracted from actual page — use these as selector evidence):\n"
+            "LIVE DOM DATA (authoritative — use these exact selectors, do not invent others):\n"
             + "\n---\n".join(_dom_parts)
-            + "\n\n"
+            + "\n\nUse ONLY elements listed above when generating selectors. "
+            "If an element you need is not in this list, use "
+            "ASSERT_EXISTS: text='[exact heading text]' as evidence instead.\n\n"
         )
 
     complexity_instruction = (
@@ -1858,15 +1982,31 @@ def generate_test_cases(ticket_key, title, description, screenshots: list = None
         f"Do NOT generate tests for login, navigation, or unrelated features. "
         f"Every test case must directly test: {title}\n\n"
         + (_dom_section)
-        + "Cross-reference the KNOWLEDGE BASE below to confirm exact selector text:\n"
-        "1. Identify every relevant UI element — exact button labels, input placeholders, "
-        "dropdown option text, heading text.\n"
-        f"2. {complexity_instruction}\n"
-        "For each selector, verify it exists in the KNOWLEDGE BASE. If it does not appear "
-        "there, use text= with the exact visible text.\n"
-        "3. Never invent placeholder text or button labels not present in the KNOWLEDGE BASE.\n\n"
-        f"KNOWLEDGE BASE ({portal_hint} portal):\n"
-        f"{knowledge_base}\n\n"
+        + (
+            # DOM data available — use it as primary, KB only for business logic
+            "Use the LIVE DOM DATA above as your primary selector source. "
+            "Consult the SUPPLEMENTARY KNOWLEDGE BASE below only for business logic and flow context:\n"
+            "1. Identify every relevant UI element from LIVE DOM DATA — buttons, inputs, headings.\n"
+            f"2. {complexity_instruction}\n"
+            "For any selector not found in LIVE DOM DATA, use ASSERT_EXISTS: text='[exact heading]' as evidence.\n"
+            "3. Never invent placeholder text or button labels not present in LIVE DOM DATA.\n\n"
+            if _dom_section else
+            # No DOM data — fall back to KB-driven approach
+            "Cross-reference the KNOWLEDGE BASE below to confirm exact selector text:\n"
+            "1. Identify every relevant UI element — exact button labels, input placeholders, "
+            "dropdown option text, heading text.\n"
+            f"2. {complexity_instruction}\n"
+            "For each selector, verify it exists in the KNOWLEDGE BASE. If it does not appear "
+            "there, use text= with the exact visible text.\n"
+            "3. Never invent placeholder text or button labels not present in the KNOWLEDGE BASE.\n\n"
+        )
+        + (
+            f"SUPPLEMENTARY KNOWLEDGE BASE — {portal_hint} portal "
+            f"(business logic and flow context; for selectors prefer LIVE DOM DATA above):\n"
+            if _dom_section else
+            f"KNOWLEDGE BASE ({portal_hint} portal):\n"
+        )
+        + f"{knowledge_base}\n\n"
         + (f"REAL SELECTORS FROM GITHUB SOURCE:\n{_github_selectors}\n\n" if _github_selectors else "")
         + (f"USER CLARIFICATIONS:\n{user_notes}\n\n" if user_notes else "")
         + _TEST_CASE_JSON_SCHEMA
@@ -2469,9 +2609,9 @@ async def run_qa_endpoint(issue_key: str, body: RunQABody):
                     print(f"[run_qa] using user-confirmed pages: {pages}")
                 else:
                     pages = await asyncio.to_thread(
-                        _identify_pages_from_ticket, summary, description, portal_for_inspect
+                        _identify_pages_from_ticket, summary, description, portal_for_inspect, run_env
                     )
-                    print(f"[run_qa] no confirmed pages — AI guess fallback: {pages}")
+                    print(f"[run_qa] no confirmed pages — live/AI guess: {pages}")
                 for url_path in pages:
                     yield f": keepalive\n\n"
                     page_portal = (
@@ -3321,6 +3461,13 @@ def get_live_db_data():
             except Exception:
                 return 0
 
+        def q_rows(sql):
+            try:
+                cursor.execute(sql)
+                return cursor.fetchall()
+            except Exception:
+                return []
+
         orders_today = q('SELECT COUNT(*) FROM orders WHERE DATE(createdAt) = CURDATE()')
         total_orders = q('SELECT COUNT(*) FROM orders')
         pending_orders = q("SELECT COUNT(*) FROM orders WHERE status_value = 'Confirmation Pending'")
@@ -3337,6 +3484,19 @@ def get_live_db_data():
         top_couriers = cursor.fetchall()
         couriers_text = ', '.join([f'{r[0]}: {r[1]} batches' for r in top_couriers]) if top_couriers else 'none'
 
+        # Extended live data queries for AI assistant
+        sub_statuses_rows = q_rows('SELECT name, fk_status FROM sub_statuses ORDER BY fk_status')
+        sub_statuses_text = ', '.join([f'{r[0]} (status {r[1]})' for r in sub_statuses_rows]) if sub_statuses_rows else 'none'
+
+        order_status_rows = q_rows('SELECT DISTINCT status_value FROM orders LIMIT 30')
+        order_statuses_text = ', '.join([r[0] for r in order_status_rows if r[0]]) if order_status_rows else 'none'
+
+        active_courier_rows = q_rows('SELECT name FROM courier_partners WHERE is_active=1')
+        active_couriers_text = ', '.join([r[0] for r in active_courier_rows]) if active_courier_rows else 'none'
+
+        store_type_rows = q_rows('SELECT store_type, COUNT(*) FROM stores WHERE is_active=1 GROUP BY store_type')
+        store_types_text = ', '.join([f'{r[0]}: {r[1]}' for r in store_type_rows]) if store_type_rows else 'none'
+
         conn.close()
 
         live_data = f'''LIVE PRODUCTION DATA (cached 5 min):
@@ -3347,7 +3507,11 @@ def get_live_db_data():
 - Active stores: {total_stores}
 - Approved agencies: {total_agencies}
 - Total tickets: {total_tickets}
-- Tickets today: {tickets_today}'''
+- Tickets today: {tickets_today}
+- Active courier partners: {active_couriers_text}
+- Active stores by type: {store_types_text}
+- All order status values: {order_statuses_text}
+- Sub-statuses: {sub_statuses_text}'''
 
         _db_cache['data'] = live_data
         _db_cache['ts'] = time.time()
