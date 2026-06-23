@@ -1539,6 +1539,9 @@ def _identify_pages_from_ticket(title: str, description: str, portal: str, env: 
 
 
 def _resolve_base_url(env: str) -> str:
+    print(f"[resolve_base_url] raw STAGING_URL={os.getenv('STAGING_URL')!r}")
+    print(f"[resolve_base_url] raw PRODUCTION_URL={os.getenv('PRODUCTION_URL')!r}")
+    print(f"[resolve_base_url] raw LOCAL_URL={os.getenv('LOCAL_URL')!r}")
     if env == 'staging':
         return os.getenv('STAGING_URL', 'https://staging.myzambeel.com').strip().rstrip('/')
     if env == 'production':
