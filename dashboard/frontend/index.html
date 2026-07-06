@@ -790,6 +790,28 @@
       gap: 6px;
     }
 
+    /* ── Appearance modal ────────────────────────────────────────────────────── */
+    .appear-row {
+      display: grid; grid-template-columns: 150px 1fr;
+      align-items: center; gap: 16px; padding: 12px 0;
+      border-bottom: 1px solid var(--border);
+    }
+    .appear-row:last-child { border-bottom: none; }
+    .appear-row > label {
+      font-size: 12.5px; font-weight: 600; color: var(--text2);
+      text-transform: none; letter-spacing: 0; margin-bottom: 0;
+    }
+    .appear-control { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .appear-control input[type="color"] {
+      width: 36px; height: 32px; padding: 2px; cursor: pointer;
+      border: 1.5px solid var(--border); border-radius: 8px; background: var(--bg2);
+    }
+    .appear-swatch {
+      width: 64px; height: 24px; border-radius: 6px;
+      border: 1px solid var(--border); flex-shrink: 0;
+    }
+    .appear-control input[type="file"] { font-size: 11.5px; padding: 6px 8px; width: auto; flex: 1; min-width: 140px; }
+
     /* ── Repo header ─────────────────────────────────────────────────────────── */
     .repo-header { margin-bottom: 18px; }
     .repo-name { font-size: 16px; font-weight: 700; letter-spacing: -0.2px; }
@@ -1337,6 +1359,38 @@
       text-overflow: ellipsis; white-space: nowrap;
     }
   </style>
+  <script>
+  // Apply any saved appearance settings before the body paints, to avoid a flash
+  // of default colors.
+  (function () {
+    try {
+      var raw = localStorage.getItem('sqa_appearance');
+      if (!raw) return;
+      var d = JSON.parse(raw);
+      var isHex = function (v) { return typeof v === 'string' && /^#[0-9a-fA-F]{6}$/.test(v); };
+      var css = '';
+      if (isHex(d.sidebarStart) && isHex(d.sidebarEnd)) {
+        css += '#sidebar{background:linear-gradient(to bottom,' + d.sidebarStart + ',' + d.sidebarEnd + ') !important;}';
+      }
+      if (isHex(d.navbarStart) && isHex(d.navbarEnd)) {
+        css += '#top-navbar{background:linear-gradient(90deg,' + d.navbarStart + ',' + d.navbarEnd + ') !important;}';
+      }
+      if (isHex(d.heroStart) && isHex(d.heroEnd)) {
+        css += '.hero{background:linear-gradient(135deg,' + d.heroStart + ',' + d.heroEnd + ') !important;border-radius:16px;padding:22px 26px;border-bottom:none !important;}';
+        css += '.hero-title{background:none !important;-webkit-text-fill-color:#fff !important;color:#fff !important;}';
+        css += '.hero-sub{color:rgba(255,255,255,0.85) !important;}';
+      }
+      if (isHex(d.primaryColor)) {
+        css += ':root{--gradient:' + d.primaryColor + ' !important;--gradient-h:' + d.primaryColor + ' !important;}';
+      }
+      if (!css) return;
+      var style = document.createElement('style');
+      style.id = 'sqa-appearance-style';
+      style.textContent = css;
+      document.head.appendChild(style);
+    } catch (e) {}
+  })();
+  </script>
 </head>
 <body>
 
@@ -1344,7 +1398,10 @@
 <nav id="top-navbar" style="background:#fff;height:68px;width:100%;display:flex;align-items:center;justify-content:space-between;padding:0 24px;position:fixed;top:0;z-index:1000;box-sizing:border-box;border-bottom:1px solid #e8eaf0">
   <div style="flex:1"></div>
   <div style="display:flex;align-items:center">
+    <img id="nav-logo-custom" style="display:none;height:37px" alt="Logo" />
+    <span id="nav-logo-default" style="display:flex;align-items:center">
     <svg width="130" height="37" viewBox="0 0 326 93" fill="none" xmlns="http://www.w3.org/2000/svg" ><g clip-path="url(#nb2_clip)"><path d="M118.745 61.5854C117.073 61.5854 115.518 61.2367 114.079 60.462C112.64 59.726 111.474 58.6801 110.54 57.4017C109.685 58.6801 108.557 59.6872 107.196 60.462C105.836 61.2367 104.319 61.5854 102.686 61.5854H94.9871C92.4208 61.5854 90.2044 60.6944 88.3769 58.835C86.5494 57.0144 85.6162 54.8063 85.6162 52.2496V40.977C85.6162 38.0717 86.3161 35.4376 87.7548 33.0359C89.1935 30.6341 91.1376 28.6973 93.5484 27.264C95.9592 25.8307 98.6032 25.1334 101.52 25.1334H102.686C104.941 25.1334 106.924 25.8307 108.635 27.264C111.474 27.3415 113.884 28.3486 115.829 30.2855C117.773 32.2224 118.745 34.5854 118.745 37.3745V61.5854ZM108.752 53.1406C108.635 52.5983 108.596 43.9986 108.596 27.264H107.974C104.863 27.264 102.219 28.3874 100.003 30.5954C97.7867 32.8034 96.698 35.4376 96.698 38.5366V46.5165C96.698 48.3372 97.359 49.8867 98.6421 51.2037C99.9642 52.4821 101.52 53.1406 103.347 53.1406H108.752Z" fill="#1A2B6F"/><path d="M179.131 61.5854H172.443C171.51 61.5854 170.576 61.4692 169.682 61.2367C167.466 60.6557 165.638 59.4548 164.199 57.6341C162.761 55.8522 162.022 53.7991 162.022 51.4362V38.2654C162.022 36.9483 161.711 35.9412 161.05 35.2826C160.389 34.6628 159.65 34.3142 158.717 34.3142L158.25 34.3529H152.418C152.457 34.6241 152.457 43.6887 152.457 61.5466C149.657 61.5466 147.285 60.5395 145.302 58.5638C143.319 56.5882 142.308 54.1865 142.308 51.4362V38.2654C142.308 36.9096 141.997 35.9412 141.336 35.2826C140.714 34.6628 139.936 34.3142 139.003 34.3142L138.536 34.3529H133.132C133.171 34.6241 133.171 43.6887 133.171 61.5854C130.371 61.5854 127.96 60.5782 125.977 58.6026C123.994 56.627 122.983 54.264 122.983 51.4749V25.0172C125.316 25.0172 127.377 25.7145 129.204 27.1478C131.071 25.7145 133.209 25.0172 135.659 25.0172H142.308C144.68 25.0172 146.819 25.792 148.685 27.3027C150.59 25.792 152.807 25.0172 155.334 25.0172H162.022C164.161 25.0172 165.91 25.4433 167.271 26.2956C169.76 27.8838 171.354 30.5954 172.015 34.4692C172.365 36.561 172.52 39.2726 172.52 42.6428C172.52 43.5337 172.52 44.4247 172.482 45.2769L172.443 48.3759C172.443 49.693 172.754 50.7001 173.415 51.3587C174.076 51.9785 174.853 52.2884 175.787 52.2884H189.279C189.279 54.8451 188.268 57.0144 186.285 58.835C184.302 60.6557 181.891 61.5854 179.131 61.5854Z" fill="#1A2B6F"/><path d="M198.417 25.1334C201.333 25.1334 203.977 25.8307 206.388 27.264C208.799 28.6973 210.704 30.6341 212.143 33.0359C213.581 35.4376 214.32 38.0717 214.32 40.977V52.2496C214.32 54.8063 213.387 57.0144 211.559 58.835C209.732 60.6944 207.516 61.5854 204.91 61.5854H197.211C195.034 61.5854 193.129 60.9268 191.457 59.6098V61.5854C188.657 61.5854 186.246 60.6169 184.263 58.6413C182.28 56.6657 181.308 54.264 181.308 51.4749V1.27116C184.069 1.27116 186.48 2.27834 188.463 4.25395C190.446 6.22956 191.457 8.63128 191.457 11.3816V27.1478C193.129 25.792 195.034 25.1334 197.211 25.1334H198.417ZM203.238 46.5165V38.5366C203.238 35.4376 202.111 32.8034 199.933 30.5954C197.717 28.3874 195.034 27.264 191.962 27.264H191.457V53.1406H196.589C198.417 53.1406 199.972 52.4821 201.255 51.2037C202.577 49.8867 203.238 48.3372 203.238 46.5165Z" fill="#1A2B6F"/><path d="M258.375 52.2884C258.375 54.8451 257.403 57.0143 255.381 58.8737C253.398 60.6944 251.026 61.5854 248.226 61.5854H235.589H228.513H227.89C225.324 61.5854 223.108 60.6944 221.28 58.835C219.453 57.0144 218.52 54.8063 218.52 52.2496V40.977C218.52 38.0717 219.219 35.4376 220.658 33.0359C222.097 30.6341 224.041 28.6973 226.452 27.264C228.862 25.8307 231.507 25.1334 234.423 25.1334H235.589C237.611 25.1334 239.4 25.7145 240.994 26.8379C244.882 28.6198 247.41 30.5567 248.576 32.6485C249.704 34.7791 249.821 36.7547 248.926 38.6915C247.993 40.5897 246.36 42.1779 244.027 43.4175C241.694 44.6571 239.011 45.2769 236.017 45.2769H234.851C232.906 45.2769 231.157 44.7346 229.601 43.6499V46.5165C229.601 48.957 230.729 50.8938 232.945 52.2884H258.375ZM229.601 38.5366V43.1076C232.79 43.0301 235.434 41.9067 237.611 39.7374C239.75 37.6069 240.839 34.9727 240.839 31.8737V27.264C237.65 27.3802 235.006 28.5036 232.829 30.6729C266.774 32.8034 265.685 35.4376 265.685 38.5366Z" fill="#1A2B6F"/><path d="M294.459 52.2884C294.459 54.8451 293.487 57.0143 291.465 58.8737C289.482 60.6944 287.11 61.5854 284.31 61.5854H271.673H264.596H263.974C261.408 61.5854 259.191 60.6944 257.364 58.835C255.536 57.0144 254.603 54.8063 254.603 52.2496V40.977C254.603 38.0717 255.303 35.4376 256.742 33.0359C258.181 30.6341 260.125 28.6973 262.535 27.264C264.946 25.8307 267.59 25.1334 270.507 25.1334H271.673C273.695 25.1334 275.484 25.7145 277.078 26.8379C280.966 28.6198 283.494 30.5567 284.66 32.6485C285.788 34.7791 285.904 36.7547 285.01 38.6915C284.077 40.5897 282.444 42.1779 280.111 43.4175C277.778 44.6571 275.095 45.2769 272.101 45.2769H270.934C268.99 45.2769 267.24 44.7346 265.685 43.6499V46.5165C265.685 48.957 266.813 50.8938 269.029 52.2884H294.459ZM265.685 38.5366V43.1076C268.873 43.0301 271.517 41.9067 273.695 39.7374C275.834 37.6069 276.922 34.9727 276.922 31.8737V27.264C273.734 27.3802 271.09 28.5036 268.912 30.6729C230.69 32.8034 229.601 35.4376 229.601 38.5366Z" fill="#1A2B6F"/><path d="M305.346 82C303.324 82 301.185 81.5739 298.969 80.6829C296.753 79.792 294.848 78.3974 293.214 76.4218C291.504 74.2525 290.648 71.8508 290.648 69.2166V44.5796H290.687V27.9613V11.3429C290.687 8.51506 291.698 6.07461 293.72 4.02152C295.742 2.00717 298.191 1 301.03 1V63.7547C301.03 66.7762 301.535 69.0617 302.585 70.5725C304.18 73.0129 306.668 74.2138 310.012 74.2138C311.878 74.2138 313.861 73.8651 316 73.1679C315.65 75.9957 314.561 78.1263 312.812 79.5595C310.829 81.1865 308.34 82 305.346 82Z" fill="#1A2B6F"/><path d="M61.1145 50.8117H84V51.85C84 56.9117 79.904 61 74.8328 61H52.1424L49.4118 57.4309C48.1765 55.8085 47.5263 53.8617 47.5263 51.85C47.5263 49.9681 48.1114 48.0862 49.2817 46.4638L67.8762 21.0904C58.1238 17.067 46.291 13.3032 27.1765 13.3032C3.51084 13.3032 3.44582 23.7511 3.44582 25.6979C3.44582 32.1872 7.34675 38.1575 7.34675 39.0011C7.34675 39.066 7.34675 39.1309 7.28173 39.1309C6.50155 39.1309 0 31.2138 0 22.583C0 5.77554 15.9938 0 27.1765 0C44.4056 0 62.935 6.29468 73.3375 10.383C78.2786 12.3298 81.5294 17.1319 81.5294 22.4532L61.1145 50.8117Z" fill="#1A2B6F"/><path d="M254.467 72.9436C254.467 70.0234 252.452 66 252.192 66C251.477 67.817 244 68.9202 244 71.0617C244 73.7223 246.146 78.6543 246.146 78.6543C249.201 75.6043 254.467 75.2798 254.467 72.9436Z" fill="#F9D849"/><path d="M266 72.9436C266 70.0234 263.985 66.0649 263.724 66.0649C263.009 67.817 255.533 68.9202 255.533 71.1266C255.533 73.7223 257.678 78.7191 257.678 78.7191C260.734 75.6691 266 75.2798 266 72.9436Z" fill="#F9D849"/><path d="M39.2692 28.7478C39.2692 25.8276 37.2538 21.8042 36.9937 21.8042C36.2785 23.6212 28.8018 24.7244 28.8018 26.8659C28.8018 29.5265 30.9473 34.4585 30.9473 34.4585C34.003 31.4085 39.2692 31.084 39.2692 28.7478Z" fill="#F9D849"/><path d="M39.2692 39.9744C39.2692 37.0542 37.2538 33.0957 36.9937 33.0957C36.2785 34.8478 28.8018 35.951 28.8018 38.1574C28.8018 40.7531 30.9473 45.7499 30.9473 45.7499C34.003 42.6999 39.2692 42.3106 39.2692 39.9744Z" fill="#F9D849"/></g><defs><clipPath id="nb2_clip"><rect width="325.999" height="93.0001" fill="white"/></clipPath></defs></svg>
+    </span>
   </div>
   <div style="flex:1;display:flex;justify-content:flex-end;align-items:center;position:relative">
     <button id="nav-user-btn" onclick="toggleNavDropdown(event)" style="width:40px;height:40px;border-radius:50%;background:#7e56ef;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;color:#fff">
@@ -1352,6 +1409,10 @@
     </button>
     <div id="nav-user-dropdown" style="display:none;position:absolute;top:60px;right:0;min-width:200px;background:#fff;border:1.5px solid #dde1ec;border-radius:12px;box-shadow:0 4px 20px rgba(0,0,0,0.1);padding:16px;z-index:1001">
       <div id="nav-user-email" style="font-size:13px;color:#0d1226;font-weight:600;margin-bottom:12px;word-break:break-all"></div>
+      <button onclick="openAppearanceModal()" style="width:100%;padding:8px;margin-bottom:8px;background:#f7f8fc;color:#0d1226;border:1.5px solid #dde1ec;border-radius:8px;cursor:pointer;font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center;gap:7px">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="13.5" cy="6.5" r=".5"/><circle cx="17.5" cy="10.5" r=".5"/><circle cx="8.5" cy="7.5" r=".5"/><circle cx="6.5" cy="12.5" r=".5"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2z"/></svg>
+        Appearance
+      </button>
       <button onclick="doLogout()" style="width:100%;padding:8px;background:#fee2e2;color:#dc2626;border:1.5px solid rgba(220,38,38,0.22);border-radius:8px;cursor:pointer;font-size:13px;font-weight:600">Sign Out</button>
     </div>
   </div>
@@ -2176,6 +2237,57 @@
   </div>
 </div>
 
+<!-- ── Appearance Modal ─────────────────────────────────────────────────────── -->
+<div id="appearance-modal" class="modal-overlay" onclick="if(event.target===this)closeAppearanceModal()">
+  <div class="modal-box" style="max-width:560px">
+    <div class="modal-header">
+      <div class="modal-title">Appearance</div>
+      <div class="modal-close" onclick="closeAppearanceModal()">✕</div>
+    </div>
+    <div class="modal-body">
+      <div class="appear-row">
+        <label>Sidebar gradient</label>
+        <div class="appear-control">
+          <input type="color" id="ap-sidebar-start" value="#151939" oninput="_updateSidebarSwatch()">
+          <input type="color" id="ap-sidebar-end" value="#421b70" oninput="_updateSidebarSwatch()">
+          <div class="appear-swatch" id="ap-sidebar-swatch"></div>
+        </div>
+      </div>
+      <div class="appear-row">
+        <label>Navbar gradient</label>
+        <div class="appear-control">
+          <input type="color" id="ap-navbar-start" value="#151939">
+          <input type="color" id="ap-navbar-end" value="#421b70">
+        </div>
+      </div>
+      <div class="appear-row">
+        <label>Hero banner gradient</label>
+        <div class="appear-control">
+          <input type="color" id="ap-hero-start" value="#7e56ef">
+          <input type="color" id="ap-hero-end" value="#463cb8">
+        </div>
+      </div>
+      <div class="appear-row">
+        <label>Primary button color</label>
+        <div class="appear-control">
+          <input type="color" id="ap-primary-color" value="#7e56ef">
+        </div>
+      </div>
+      <div class="appear-row">
+        <label>Logo</label>
+        <div class="appear-control">
+          <input type="file" id="ap-logo-input" accept=".png,.svg,.jpg,.jpeg,image/png,image/svg+xml,image/jpeg" onchange="handleLogoUpload(event)">
+          <img id="ap-logo-preview" style="display:none;max-height:32px;max-width:130px;border-radius:6px;border:1px solid var(--border);background:#151939;padding:4px;object-fit:contain" alt="Logo preview">
+        </div>
+      </div>
+    </div>
+    <div style="display:flex;gap:8px;padding-top:12px;border-top:1px solid var(--border)">
+      <button class="btn btn-secondary btn-sm" onclick="resetAppearance()" style="flex:1;justify-content:center">Reset to defaults</button>
+      <button class="btn btn-primary btn-sm" onclick="saveAppearance()" style="flex:2;justify-content:center">Save</button>
+    </div>
+  </div>
+</div>
+
 <!-- ── PR Detail Panel ───────────────────────────────────────────────────────── -->
 <div id="pr-panel-overlay" class="panel-overlay" onclick="closePRPanel()"></div>
 <div id="pr-panel" class="slide-panel">
@@ -2374,6 +2486,147 @@ async function doLogout() {
   _authToken = null;
   sessionStorage.removeItem('sqa_token');
   _showLogin();
+}
+
+// ── Appearance settings ─────────────────────────────────────────────────────
+const APPEARANCE_DEFAULTS = {
+  sidebarStart: '#151939', sidebarEnd: '#421b70',
+  navbarStart:  '#151939', navbarEnd:  '#421b70',
+  heroStart:    '#7e56ef', heroEnd:    '#463cb8',
+  primaryColor: '#7e56ef',
+  logo: null,
+};
+let _apLogoData = null;
+
+function _isHexColor(v) { return typeof v === 'string' && /^#[0-9a-fA-F]{6}$/.test(v); }
+
+function loadAppearance() {
+  const cfg = { ...APPEARANCE_DEFAULTS };
+  try {
+    const raw = localStorage.getItem('sqa_appearance');
+    if (raw) {
+      const saved = JSON.parse(raw);
+      for (const k of Object.keys(APPEARANCE_DEFAULTS)) {
+        if (k === 'logo') { if (typeof saved.logo === 'string') cfg.logo = saved.logo; continue; }
+        if (_isHexColor(saved[k])) cfg[k] = saved[k];
+      }
+    }
+  } catch (e) {}
+  return cfg;
+}
+
+function applyAppearance(cfg) {
+  let css = '';
+  css += `#sidebar{background:linear-gradient(to bottom,${cfg.sidebarStart},${cfg.sidebarEnd}) !important;}`;
+  css += `#top-navbar{background:linear-gradient(90deg,${cfg.navbarStart},${cfg.navbarEnd}) !important;}`;
+  css += `.hero{background:linear-gradient(135deg,${cfg.heroStart},${cfg.heroEnd}) !important;border-radius:16px;padding:22px 26px;border-bottom:none !important;}`;
+  css += `.hero-title{background:none !important;-webkit-text-fill-color:#fff !important;color:#fff !important;}`;
+  css += `.hero-sub{color:rgba(255,255,255,0.85) !important;}`;
+  css += `:root{--gradient:${cfg.primaryColor} !important;--gradient-h:${cfg.primaryColor} !important;}`;
+
+  let styleEl = document.getElementById('sqa-appearance-style');
+  if (!styleEl) {
+    styleEl = document.createElement('style');
+    styleEl.id = 'sqa-appearance-style';
+    document.head.appendChild(styleEl);
+  }
+  styleEl.textContent = css;
+
+  const navDefault = document.getElementById('nav-logo-default');
+  const navCustom  = document.getElementById('nav-logo-custom');
+  if (navDefault && navCustom) {
+    if (cfg.logo) {
+      navCustom.src = cfg.logo;
+      navCustom.style.display = '';
+      navDefault.style.display = 'none';
+    } else {
+      navCustom.style.display = 'none';
+      navCustom.removeAttribute('src');
+      navDefault.style.display = '';
+    }
+  }
+}
+
+function _updateSidebarSwatch() {
+  const s = document.getElementById('ap-sidebar-start').value;
+  const e = document.getElementById('ap-sidebar-end').value;
+  document.getElementById('ap-sidebar-swatch').style.background = `linear-gradient(to bottom, ${s}, ${e})`;
+}
+
+function _updateLogoPreview() {
+  const img = document.getElementById('ap-logo-preview');
+  if (_apLogoData) { img.src = _apLogoData; img.style.display = ''; }
+  else { img.style.display = 'none'; img.removeAttribute('src'); }
+}
+
+function handleLogoUpload(evt) {
+  const file = evt.target.files && evt.target.files[0];
+  if (!file) return;
+  const okTypes = ['image/png', 'image/svg+xml', 'image/jpeg'];
+  if (!okTypes.includes(file.type)) {
+    alert('Please upload a PNG, SVG, or JPG image.');
+    evt.target.value = '';
+    return;
+  }
+  const reader = new FileReader();
+  reader.onload = () => {
+    _apLogoData = reader.result;
+    _updateLogoPreview();
+  };
+  reader.readAsDataURL(file);
+}
+
+function openAppearanceModal() {
+  const dd = document.getElementById('nav-user-dropdown');
+  if (dd) dd.style.display = 'none';
+  const cfg = loadAppearance();
+  document.getElementById('ap-sidebar-start').value = cfg.sidebarStart;
+  document.getElementById('ap-sidebar-end').value   = cfg.sidebarEnd;
+  document.getElementById('ap-navbar-start').value  = cfg.navbarStart;
+  document.getElementById('ap-navbar-end').value    = cfg.navbarEnd;
+  document.getElementById('ap-hero-start').value    = cfg.heroStart;
+  document.getElementById('ap-hero-end').value      = cfg.heroEnd;
+  document.getElementById('ap-primary-color').value = cfg.primaryColor;
+  _apLogoData = cfg.logo || null;
+  _updateLogoPreview();
+  _updateSidebarSwatch();
+  document.getElementById('appearance-modal').classList.add('open');
+}
+
+function closeAppearanceModal() {
+  document.getElementById('appearance-modal').classList.remove('open');
+}
+
+function saveAppearance() {
+  const cfg = {
+    sidebarStart: document.getElementById('ap-sidebar-start').value,
+    sidebarEnd:   document.getElementById('ap-sidebar-end').value,
+    navbarStart:  document.getElementById('ap-navbar-start').value,
+    navbarEnd:    document.getElementById('ap-navbar-end').value,
+    heroStart:    document.getElementById('ap-hero-start').value,
+    heroEnd:      document.getElementById('ap-hero-end').value,
+    primaryColor: document.getElementById('ap-primary-color').value,
+    logo: _apLogoData,
+  };
+  localStorage.setItem('sqa_appearance', JSON.stringify(cfg));
+  applyAppearance(cfg);
+  closeAppearanceModal();
+}
+
+function resetAppearance() {
+  const cfg = { ...APPEARANCE_DEFAULTS };
+  localStorage.setItem('sqa_appearance', JSON.stringify(cfg));
+  document.getElementById('ap-sidebar-start').value = cfg.sidebarStart;
+  document.getElementById('ap-sidebar-end').value   = cfg.sidebarEnd;
+  document.getElementById('ap-navbar-start').value  = cfg.navbarStart;
+  document.getElementById('ap-navbar-end').value    = cfg.navbarEnd;
+  document.getElementById('ap-hero-start').value    = cfg.heroStart;
+  document.getElementById('ap-hero-end').value      = cfg.heroEnd;
+  document.getElementById('ap-primary-color').value = cfg.primaryColor;
+  _apLogoData = null;
+  _updateLogoPreview();
+  _updateSidebarSwatch();
+  applyAppearance(cfg);
 }
 
 function _togglePw() {
@@ -4016,6 +4269,10 @@ document.addEventListener('DOMContentLoaded', () => {
     el.addEventListener('click', () => navigate(el.dataset.page));
   });
 
+  // Apply any saved appearance settings (also swaps the navbar logo, which
+  // requires the DOM to exist unlike the early head-script color pass).
+  applyAppearance(loadAppearance());
+
   // Escape closes panels/modals/lightbox
   document.addEventListener('keydown', e => {
     if (e.key !== 'Escape') return;
@@ -4023,6 +4280,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (document.getElementById('jira-panel').classList.contains('open'))           { closeJiraPanel();           return; }
     if (document.getElementById('pr-panel').classList.contains('open'))     { closePRPanel();    return; }
     if (document.getElementById('lightbox').classList.contains('open'))     { closeLightbox();   return; }
+    if (document.getElementById('appearance-modal').classList.contains('open'))     { closeAppearanceModal();     return; }
   });
 
   // API health check (use raw fetch — /health is auth-exempt)
