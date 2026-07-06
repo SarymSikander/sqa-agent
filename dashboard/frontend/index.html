@@ -1634,7 +1634,7 @@
             <div class="env-card-top">
               <div>
                 <div class="env-name">Staging</div>
-                <div class="env-url">staging.myzambeel.com</div>
+                <div class="env-url">your-staging-url.com</div>
               </div>
               <span id="ov-badge-staging" class="badge badge-neutral">Unknown</span>
             </div>
@@ -1648,7 +1648,7 @@
             <div class="env-card-top">
               <div>
                 <div class="env-name">Production</div>
-                <div class="env-url">portal.myzambeel.com</div>
+                <div class="env-url">your-production-url.com</div>
               </div>
               <span id="ov-badge-production" class="badge badge-neutral">Unknown</span>
             </div>
@@ -2415,7 +2415,7 @@
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // Config
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-const CLOUD_API = 'https://sarimsikander-zambeel-sqa.hf.space';
+const CLOUD_API = window.SQA_API_URL || 'https://sarimsikander-zambeel-sqa.hf.space';
 const API_BASE  = CLOUD_API;
 
 // ── Auth state ────────────────────────────────────────────────────────────────

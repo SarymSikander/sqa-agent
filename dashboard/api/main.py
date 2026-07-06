@@ -463,6 +463,9 @@ def _get_branches_via_api(repo_api_name: str):
 
     return branches, current
 
+# ── Jira config ─────────────────────────────────────────────────────────────
+JIRA_BASE_URL = os.getenv("JIRA_BASE_URL", "https://your-company.atlassian.net")
+
 # ── Tool imports (done once at startup) ───────────────────────────────────────
 import tools.jira_tool       as _jira
 import tools.playwright_tool as _playwright
@@ -644,8 +647,8 @@ async def me(request: Request):
 
 _ENV_ORIGINS = {
     "local":      "http://localhost:5173",
-    "staging":    "https://staging.myzambeel.com",
-    "production": "https://portal.myzambeel.com",
+    "staging":    os.getenv("STAGING_URL", ""),
+    "production": os.getenv("PRODUCTION_URL", ""),
 }
 
 @app.get("/auth/status")
@@ -747,7 +750,7 @@ async def create_ticket(body: CreateTicketBody):
         _jira.create_ticket,
         body.project_key, body.summary, body.issue_type, body.description,
     )
-    return {"key": key, "url": f"https://zambeel.atlassian.net/browse/{key}"}
+    return {"key": key, "url": f"{JIRA_BASE_URL}/browse/{key}"}
 
 @app.post("/jira/generate-ticket")
 async def generate_ticket_ai(body: GenerateTicketBody):
@@ -812,7 +815,7 @@ async def get_tickets(project_key: str):
                 "assignee": (t["fields"].get("assignee") or {}).get("displayName"),
                 "issue_type": t["fields"].get("issuetype", {}).get("name"),
                 "created": t["fields"].get("created"),
-                "url": f"https://zambeel.atlassian.net/browse/{t.get('key')}",
+                "url": f"{JIRA_BASE_URL}/browse/{t.get('key')}",
             }
             for t in raw
         ]
@@ -843,7 +846,7 @@ async def get_ticket_detail(issue_key: str):
         "assignee":   (fields.get("assignee") or {}).get("displayName"),
         "description": description,
         "created":    fields.get("created"),
-        "url":        f"https://zambeel.atlassian.net/browse/{ticket.get('key')}",
+        "url":        f"{JIRA_BASE_URL}/browse/{ticket.get('key')}",
         "comments": [
             {
                 "author":  (c.get("author") or {}).get("displayName", "?"),
@@ -1271,8 +1274,8 @@ def is_api_bug_ticket(description: str, summary: str = "") -> bool:
 
 _API_ENVS = {
     "local":      os.getenv("LOCAL_API_URL",      "http://localhost:3000"),
-    "staging":    os.getenv("STAGING_API_URL",    "https://staging.myzambeel.com"),
-    "production": os.getenv("PRODUCTION_API_URL", "https://portal.myzambeel.com"),
+    "staging":    os.getenv("STAGING_API_URL",    ""),
+    "production": os.getenv("PRODUCTION_API_URL", ""),
 }
 
 
@@ -1543,9 +1546,9 @@ def _resolve_base_url(env: str) -> str:
     print(f"[resolve_base_url] raw PRODUCTION_URL={os.getenv('PRODUCTION_URL')!r}")
     print(f"[resolve_base_url] raw LOCAL_URL={os.getenv('LOCAL_URL')!r}")
     if env == 'staging':
-        return os.getenv('STAGING_URL', 'https://staging.myzambeel.com').strip().rstrip('/')
+        return os.getenv('STAGING_URL', '').strip().rstrip('/')
     if env == 'production':
-        return os.getenv('PRODUCTION_URL', 'https://portal.myzambeel.com').strip().rstrip('/')
+        return os.getenv('PRODUCTION_URL', '').strip().rstrip('/')
     return os.getenv('LOCAL_URL', 'http://localhost:5173').strip().rstrip('/')
 
 
@@ -2351,7 +2354,7 @@ def _build_qa_report(*, issue_key, summary, env, frontend_branch, backend_branch
         f"",
         f"| Field | Value |",
         f"|-------|-------|",
-        f"| Ticket | [{issue_key}](https://zambeel.atlassian.net/browse/{issue_key}) |",
+        f"| Ticket | [{issue_key}]({JIRA_BASE_URL}/browse/{issue_key}) |",
         f"| Environment | `{env.upper()}` |",
         *branch_rows,
         f"| Result | {'✅ All Passed' if all_pass else '❌ Some Failed'} |",
@@ -2605,7 +2608,7 @@ async def run_qa_endpoint(issue_key: str, body: RunQABody):
                     for r in _api_results
                 )
                 slack_msg = (
-                    f"🤖 *QA Run Complete* — <https://zambeel.atlassian.net/browse/{issue_key}|{issue_key}>\n"
+                    f"🤖 *QA Run Complete* — <{JIRA_BASE_URL}/browse/{issue_key}|{issue_key}>\n"
                     f"*{summary}*\n\n"
                     f"*Type:* API Security Tests\n"
                     f"*Environment:* `{body.env.upper()}`\n\n"
@@ -3022,7 +3025,7 @@ async def run_qa_endpoint(issue_key: str, body: RunQABody):
                     f"*Backend Branch:* `{body.backend_branch}`\n"
                 ) if run_env == "local" else ""
                 slack_msg = (
-                    f"🤖 *QA Run Complete* — <https://zambeel.atlassian.net/browse/{issue_key}|{issue_key}>\n"
+                    f"🤖 *QA Run Complete* — <{JIRA_BASE_URL}/browse/{issue_key}|{issue_key}>\n"
                     f"*{summary}*\n\n"
                     f"*Environment:* `{run_env.upper()}`{' *(local repos unavailable, ran on staging)*' if run_env != body.env else ''}\n"
                     f"{_branch_lines}"
@@ -3610,6 +3613,9 @@ async def ai_chat(request: Request):
 
     live_data = get_live_db_data()
 
+    _staging_url    = os.getenv("STAGING_URL", "https://your-staging-url.com")
+    _production_url = os.getenv("PRODUCTION_URL", "https://your-production-url.com")
+
     system = f"""You are a senior Zambeel platform expert who knows everything about this system. Answer questions directly and confidently. Never say 'I don't have access' or 'I cannot determine' — you have the knowledge base and live DB data below. Give specific, direct answers. If the answer is in the data provided, state it as fact. Be concise and professional like a senior colleague answering a quick question.
 
 Zambeel repos:
@@ -3618,12 +3624,12 @@ Zambeel repos:
 - SQA Agent: https://github.com/SarymSikander/sqa-agent
 
 Portals (all three portals share the same base URL; portal type is determined by route path after login):
-- Seller portal staging:       https://staging.myzambeel.com  → lands at /get-started
-- Admin/OMS portal staging:    https://staging.myzambeel.com  → lands at /orders-management/dashboard
-- Agency portal staging:       https://staging.myzambeel.com  → lands at /get-started
-- Seller portal production:    https://portal.myzambeel.com   → lands at /get-started
-- Admin/OMS portal production: https://portal.myzambeel.com   → lands at /orders-management/dashboard
-- Agency portal production:    https://portal.myzambeel.com   → lands at /get-started
+- Seller portal staging:       {_staging_url}  → lands at /get-started
+- Admin/OMS portal staging:    {_staging_url}  → lands at /orders-management/dashboard
+- Agency portal staging:       {_staging_url}  → lands at /get-started
+- Seller portal production:    {_production_url}   → lands at /get-started
+- Admin/OMS portal production: {_production_url}   → lands at /orders-management/dashboard
+- Agency portal production:    {_production_url}   → lands at /get-started
 
 {live_data}
 
