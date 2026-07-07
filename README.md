@@ -4,6 +4,7 @@ An AI-powered QA automation dashboard for software teams. Connect it to your Pro
 
 Built by [Sarim Sikander](https://github.com/SarymSikander).
 
+
 What it does
 
 * Runs QA on any Jira ticket automatically: reads the ticket, navigates to the right page, takes screenshots, extracts the live DOM, generates Playwright test cases, runs them, and posts results back to Jira.
@@ -13,6 +14,7 @@ What it does
 * API test suite: Hundreds of endpoint tests across performance, auth, input validation, and security dimensions.
 * Automatic Jira updates: moves tickets through QA In Progress → Ready for Review automatically, starts sprints, adds/reads comments, and so much more.
 * Slack notifications: posts a formatted report after every run.
+
 
 Stack
 | Layer | Tech |
@@ -32,12 +34,14 @@ git clone https://github.com/SarymSikander/sqa-agent.git
 cd sqa-agent
 ```
 
+
 2. Configure your environment
 ```bash
 cp dashboard/api/.env.example dashboard/api/.env
 ```
 
 Open `.env` and fill in your values — Jira credentials, portal URLs, portal login credentials, Groq API key, Slack webhook. Every variable is documented in the file.
+
 
 3. Deploy the backend to HuggingFace
 
@@ -50,6 +54,7 @@ Open `.env` and fill in your values — Jira credentials, portal URLs, portal lo
 git remote add hf https://YOUR_HF_USERNAME:YOUR_HF_TOKEN@huggingface.co/spaces/YOUR_HF_USERNAME/YOUR_SPACE_NAME
 git push hf main
 ```
+
 
 4. Deploy the frontend to Vercel
 
@@ -83,6 +88,7 @@ Click the user icon → Appearance to customize:
 * Your company logo
 
 All changes are saved automatically and persist across sessions.
+
 
 API Test Suite
 The `api-test-suite/` directory contains a separate Jest test suite for your API endpoints. See the [api-test-suite README](api-test-suite/README.md) for setup.
