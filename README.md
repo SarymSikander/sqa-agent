@@ -6,7 +6,7 @@ Built by [Sarim Sikander](https://github.com/SarymSikander).
 
 What it does
 
-* Run QA on any Jira ticket automatically: reads the ticket, navigates to the right page, takes screenshots, extracts the live DOM, generates Playwright test cases, runs them, and posts results back to Jira.
+* Runs QA on any Jira ticket automatically: reads the ticket, navigates to the right page, takes screenshots, extracts the live DOM, generates Playwright test cases, runs them, and posts results back to Jira.
 * API security testing: detects API bug tickets, extracts endpoints from the description, and tests auth/rate-limiting directly via HTTP (no browser needed).
 * Live portal page discovery: crawls your actual product sidebar on every run so it always knows the current pages, no hardcoding.
 * AI assistant: answers questions about your product using a knowledge base you build from your own codebase.
@@ -17,8 +17,8 @@ What it does
 Stack
 | Layer | Tech |
 |-------|------|
-| Frontend | Vanilla HTML/CSS/JS — deployed on Vercel |
-| Backend | Python + FastAPI — deployed on HuggingFace Spaces |
+| Frontend | Vanilla HTML/CSS/JS (deployed on Vercel) |
+| Backend | Python + FastAPI (deployed on HuggingFace Spaces0 |
 | Browser automation | Playwright (Chromium headless) |
 | AI models | Groq (free) + Azure GPT-4o fallback |
 | Test runner | Jest + Supertest |
