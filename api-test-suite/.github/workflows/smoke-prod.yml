@@ -1,0 +1,162 @@
+name: Production Smoke Tests
+
+on:
+  workflow_dispatch:
+    inputs:
+      deployed_by:
+        description: "Who triggered this smoke run? (your name / ticket ID)"
+        required: true
+        type: string
+        default: ""
+
+# Never cancel a running smoke test — partial results are worse than slow ones
+concurrency:
+  group: smoke-prod
+  cancel-in-progress: false
+
+jobs:
+  smoke:
+    name: Run Production Smoke Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    env:
+      PROD_BASE_URL:             ${{ secrets.PROD_BASE_URL }}
+      PROD_ADMIN_EMAIL:          ${{ secrets.PROD_ADMIN_EMAIL }}
+      PROD_ADMIN_PASSWORD:       ${{ secrets.PROD_ADMIN_PASSWORD }}
+      PROD_SELLER_EMAIL:         ${{ secrets.PROD_SELLER_EMAIL }}
+      PROD_SELLER_PASSWORD:      ${{ secrets.PROD_SELLER_PASSWORD }}
+      PROD_AGENCY_EMAIL:         ${{ secrets.PROD_AGENCY_EMAIL }}
+      PROD_AGENCY_PASSWORD:      ${{ secrets.PROD_AGENCY_PASSWORD }}
+      PROD_JWT_SECRET:           ${{ secrets.PROD_JWT_SECRET }}
+      PROD_SAMPLE_ORDER_ID:      ${{ secrets.PROD_SAMPLE_ORDER_ID }}
+      PROD_SAMPLE_TICKET_ID:     ${{ secrets.PROD_SAMPLE_TICKET_ID }}
+      SLACK_WEBHOOK_URL:         ${{ secrets.SLACK_WEBHOOK_URL }}
+      TRIGGERED_BY:              ${{ github.event.inputs.deployed_by }}
+      GITHUB_RUN_URL:            ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+    steps:
+      # ── 1. Checkout & setup ──────────────────────────────────────────────
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      # ── 2. Create .env from secrets ──────────────────────────────────────
+      - name: Write .env
+        run: |
+          cat > .env <<'EOF'
+          PROD_BASE_URL=${{ secrets.PROD_BASE_URL }}
+
+          PROD_ADMIN_EMAIL=${{ secrets.PROD_ADMIN_EMAIL }}
+          PROD_ADMIN_PASSWORD=${{ secrets.PROD_ADMIN_PASSWORD }}
+
+          PROD_SELLER_EMAIL=${{ secrets.PROD_SELLER_EMAIL }}
+          PROD_SELLER_PASSWORD=${{ secrets.PROD_SELLER_PASSWORD }}
+
+          PROD_AGENCY_EMAIL=${{ secrets.PROD_AGENCY_EMAIL }}
+          PROD_AGENCY_PASSWORD=${{ secrets.PROD_AGENCY_PASSWORD }}
+
+          PROD_JWT_SECRET=${{ secrets.PROD_JWT_SECRET }}
+          PROD_SAMPLE_ORDER_ID=${{ secrets.PROD_SAMPLE_ORDER_ID }}
+          PROD_SAMPLE_TICKET_ID=${{ secrets.PROD_SAMPLE_TICKET_ID }}
+          EOF
+
+      # ── 3. Prepare directories ───────────────────────────────────────────
+      - name: Prepare directories
+        run: mkdir -p reports docs logs
+
+      # ── 4. Run smoke tests ───────────────────────────────────────────────
+      - name: Run production smoke tests
+        id: smoke
+        run: |
+          npx jest \
+            --config jest.smoke.js \
+            --ci \
+            --forceExit \
+            --json \
+            --outputFile=reports/smoke-results.json \
+            2>&1 | tee reports/smoke-output.txt
+        # IMPORTANT: Do NOT fail the job here. Production stays live regardless.
+        # Slack alert handles the notification.
+        continue-on-error: true
+        env:
+          CI: true
+          NODE_ENV: production
+
+      # ── 5. Update test registry with smoke results ───────────────────────
+      - name: Update test registry
+        if: always()
+        run: node scripts/generate-registry.js reports/smoke-results.json
+        continue-on-error: true
+
+      # ── 6. Send Slack notification — ALWAYS runs ─────────────────────────
+      - name: Notify Slack
+        if: always()
+        run: node scripts/slack-notify.js
+        env:
+          RESULTS_FILE: reports/smoke-results.json
+          TRIGGERED_BY: ${{ github.event.inputs.deployed_by }}
+          GITHUB_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+      # ── 7. Upload artifacts ──────────────────────────────────────────────
+      - name: Upload smoke test artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: smoke-results-${{ github.run_number }}
+          path: |
+            reports/smoke-results.json
+            reports/smoke-report.html
+            reports/smoke-output.txt
+            docs/test-registry.md
+            docs/baseline-log.md
+          retention-days: 7
+
+      # ── 8. Summary in GitHub Actions UI ─────────────────────────────────
+      - name: Write job summary
+        if: always()
+        run: |
+          node - <<'JSEOF'
+          const fs = require('fs');
+          const fp = 'reports/smoke-results.json';
+
+          let md = '## 🔍 Production Smoke Test Summary\n\n';
+          md += `**Triggered by:** ${ process.env.TRIGGERED_BY || 'unknown' }\n\n`;
+
+          if (!fs.existsSync(fp)) {
+            md += '> ⚠️ smoke-results.json not found — check the test runner output.\n';
+          } else {
+            const d     = JSON.parse(fs.readFileSync(fp, 'utf8'));
+            const pass  = d.numPassedTests  || 0;
+            const fail  = d.numFailedTests  || 0;
+            const total = d.numTotalTests   || 0;
+            const icon  = fail === 0 ? '✅' : '🚨';
+            md += `${icon} **${pass}/${total}** tests passed`;
+            if (fail > 0) md += ` — **${fail} failed**`;
+            md += '\n\n';
+
+            if (fail > 0) {
+              md += '### Failed Tests\n\n| TC_ID | Dimension | Test Name |\n|-------|-----------|----------|\n';
+              for (const suite of d.testResults || []) {
+                for (const t of suite.testResults || []) {
+                  if (t.status !== 'failed') continue;
+                  const tc  = (t.fullName.match(/\[SMOKE-(TC_\d+)\]/) || ['','?'])[1];
+                  const dim = (t.fullName.match(/\[(perf|auth|validation|security)\]/) || ['','?'])[1];
+                  md += `| ${tc} | ${dim} | ${t.fullName.slice(0, 80)} |\n`;
+                }
+              }
+            }
+          }
+
+          fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, md);
+          JSEOF
+        env:
+          TRIGGERED_BY: ${{ github.event.inputs.deployed_by }}

@@ -1,0 +1,297 @@
+name: Zambeel API Tests
+
+on:
+  push:
+    branches: [main, staging]
+  pull_request:
+    branches: [main, staging]
+  workflow_dispatch:
+    inputs:
+      scope:
+        description: 'Test scope'
+        required: false
+        default: 'all'
+        type: choice
+        options:
+          - all
+          - p0
+          - smoke
+          - feature-courier
+          - feature-inventory
+          - feature-auth
+          - feature-orders
+          - feature-support
+      single_endpoint:
+        description: 'Single API path to test (optional)'
+        required: false
+        default: ''
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  api-tests:
+    name: Run API Test Suite
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: write      # needed to commit sla-config.json back to the branch
+      pull-requests: write # needed to post/update PR comments
+
+    steps:
+      # ── 1. Checkout & setup ────────────────────────────────────────────────
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      # ── 2. Create .env from GitHub Secrets ────────────────────────────────
+      - name: Create .env file
+        run: |
+          cat > .env <<'EOF'
+          BASE_URL=${{ secrets.BASE_URL }}
+          JWT_SECRET=${{ secrets.JWT_SECRET }}
+
+          ADMIN_EMAIL=${{ secrets.ADMIN_EMAIL }}
+          ADMIN_PASSWORD=${{ secrets.ADMIN_PASSWORD }}
+
+          SELLER_EMAIL=${{ secrets.SELLER_EMAIL }}
+          SELLER_PASSWORD=${{ secrets.SELLER_PASSWORD }}
+
+          AGENCY_EMAIL=${{ secrets.AGENCY_EMAIL }}
+          AGENCY_PASSWORD=${{ secrets.AGENCY_PASSWORD }}
+
+          TEST_ORDER_ID=${{ secrets.TEST_ORDER_ID || '1' }}
+          TEST_TICKET_ID=${{ secrets.TEST_TICKET_ID || '1' }}
+          TEST_TICKET_STORE_ID=${{ secrets.TEST_TICKET_STORE_ID || '1' }}
+          TEST_VARIANT_ID=${{ secrets.TEST_VARIANT_ID || '1' }}
+          EOF
+
+      # ── 3. Ensure reports directory exists ────────────────────────────────
+      - name: Prepare directories
+        run: mkdir -p reports docs logs
+
+      # ── 4. Run tests ───────────────────────────────────────────────────────
+      - name: Run Jest test suite
+        id: jest
+        run: |
+          set -o pipefail
+          SCOPE="${{ github.event.inputs.scope || 'all' }}"
+          SINGLE="${{ github.event.inputs.single_endpoint }}"
+          FLAGS="--ci --json --outputFile=reports/results.json --forceExit"
+
+          if [ -n "$SINGLE" ]; then
+            npx jest $FLAGS --testNamePattern="$SINGLE" 2>&1 | tee reports/jest-output.txt
+          elif [ "$SCOPE" = "p0" ]; then
+            npx jest $FLAGS --testNamePattern='\[P0\]' 2>&1 | tee reports/jest-output.txt
+          elif [ "$SCOPE" = "smoke" ]; then
+            npx jest --config jest.smoke.js $FLAGS 2>&1 | tee reports/jest-output.txt
+          elif [ "$SCOPE" = "feature-auth" ]; then
+            npx jest $FLAGS tests/auth.test.js 2>&1 | tee reports/jest-output.txt
+          elif [ "$SCOPE" = "feature-orders" ]; then
+            npx jest $FLAGS tests/orders.test.js 2>&1 | tee reports/jest-output.txt
+          elif [ "$SCOPE" = "feature-support" ]; then
+            npx jest $FLAGS tests/support.test.js 2>&1 | tee reports/jest-output.txt
+          elif [ "$SCOPE" = "feature-inventory" ]; then
+            npx jest $FLAGS tests/inventory.test.js 2>&1 | tee reports/jest-output.txt
+          elif [ "$SCOPE" = "feature-courier" ]; then
+            npx jest $FLAGS tests/tickets.test.js 2>&1 | tee reports/jest-output.txt
+          else
+            npx jest $FLAGS 2>&1 | tee reports/jest-output.txt
+          fi
+          echo "jest_exit=$?" >> "$GITHUB_OUTPUT"
+        continue-on-error: true
+        env:
+          CI: true
+          NODE_ENV: test
+          SINGLE_ENDPOINT: ${{ github.event.inputs.single_endpoint }}
+
+      # ── 5. Regenerate test registry & baseline log ────────────────────────
+      - name: Regenerate test registry
+        run: node scripts/generate-registry.js reports/results.json
+        continue-on-error: true
+
+      # ── 5b. Rebuild sla-config.json from this run's live p95 measurements ─
+      - name: Regenerate SLA config from live measurements
+        run: node scripts/regenerate-sla.js
+        continue-on-error: true
+
+      # ── 5c. Commit regenerated sla-config.json back to the branch ─────────
+      #   Skipped on pull requests from forks (no push access).
+      #   [skip ci] prevents the commit from triggering another workflow run.
+      - name: Commit updated sla-config.json
+        if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add sla-config.json
+          if git diff --cached --quiet; then
+            echo "sla-config.json unchanged — nothing to commit"
+          else
+            git commit -m "ci: regenerate sla-config.json from live p95 measurements [skip ci]"
+            git push
+          fi
+        continue-on-error: true
+
+      # ── 6. Parse results & enforce P0 gate ────────────────────────────────
+      - name: Enforce P0 gate
+        id: p0_gate
+        run: |
+          node - <<'JSEOF'
+          const fs = require('fs');
+
+          const resultsFile = 'reports/results.json';
+          if (!fs.existsSync(resultsFile)) {
+            console.log('No results.json found — skipping P0 gate');
+            process.exit(0);
+          }
+
+          const data      = JSON.parse(fs.readFileSync(resultsFile, 'utf8'));
+          const failedP0  = [];
+          const slaBreach = [];
+
+          for (const suite of data.testResults || []) {
+            for (const t of suite.testResults || []) {
+              if (t.status !== 'failed') continue;
+              if (t.fullName.includes('[P0]'))                           failedP0.push(t.fullName);
+              if (t.fullName.includes('SLA') || t.fullName.includes('within SLA')) slaBreach.push(t.fullName);
+            }
+          }
+
+          const summary = {
+            failedP0,
+            slaBreach,
+            total:  data.numTotalTests,
+            failed: data.numFailedTests,
+            passed: data.numPassedTests,
+          };
+          fs.writeFileSync('reports/summary.json', JSON.stringify(summary, null, 2));
+
+          if (failedP0.length > 0) {
+            console.error(`❌  ${failedP0.length} P0 test(s) failed:`);
+            failedP0.forEach((n) => console.error(`   • ${n}`));
+            process.exit(1);
+          } else {
+            console.log('✅  All P0 tests passed');
+          }
+          JSEOF
+
+      # ── 7. Post PR comment with summary ───────────────────────────────────
+      - name: Post PR comment
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+
+            let body = '## 🧪 Zambeel API Test Results\n\n';
+
+            if (!fs.existsSync('reports/summary.json')) {
+              body += '> ⚠️ Test results file not found.';
+            } else {
+              const s      = JSON.parse(fs.readFileSync('reports/summary.json', 'utf8'));
+              const status = s.failedP0.length > 0
+                ? '❌ FAILED (P0 gate blocked)'
+                : s.failed > 0 ? '⚠️ PARTIAL FAILURE' : '✅ PASSED';
+
+              body += `**Status:** ${status}\n\n`;
+              body += `| Metric | Count |\n|--------|-------|\n`;
+              body += `| Total Tests | ${s.total} |\n`;
+              body += `| Passed | ${s.passed} |\n`;
+              body += `| Failed | ${s.failed} |\n\n`;
+
+              if (s.failedP0.length > 0) {
+                body += `### ❌ P0 Failures (merge blocked)\n\n`;
+                s.failedP0.forEach((n) => { body += `- ${n}\n`; });
+                body += '\n';
+              }
+
+              if (s.slaBreach.length > 0) {
+                body += `### ⏱ SLA Breaches\n\n`;
+                s.slaBreach.forEach((n) => { body += `- ${n}\n`; });
+                body += '\n';
+              }
+
+              if (s.failedP0.length === 0 && s.slaBreach.length === 0 && s.failed === 0) {
+                body += '🎉 All tests passed with no SLA breaches!\n';
+              }
+            }
+
+            body += `\n📄 [Full HTML Report](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})`;
+            body += `\n\n<sub>Run by commit \`${{ github.sha }}\`</sub>`;
+
+            const { data: comments } = await github.rest.issues.listComments({
+              owner:        context.repo.owner,
+              repo:         context.repo.repo,
+              issue_number: context.issue.number,
+            });
+            const existing = comments.find(
+              (c) => c.user.type === 'Bot' && c.body.includes('Zambeel API Test Results')
+            );
+
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner:      context.repo.owner,
+                repo:       context.repo.repo,
+                comment_id: existing.id,
+                body,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner:        context.repo.owner,
+                repo:         context.repo.repo,
+                issue_number: context.issue.number,
+                body,
+              });
+            }
+
+      # ── 8. Upload artifacts ────────────────────────────────────────────────
+      - name: Upload HTML report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: api-test-report-${{ github.run_number }}
+          path: |
+            reports/test-report.html
+            reports/results.json
+            reports/summary.json
+            reports/perf-metrics.json
+            reports/jest-output.txt
+            docs/test-registry.md
+            docs/baseline-log.md
+          retention-days: 30
+
+      # ── 9. Upload results to SQA Agent dashboard ──────────────────────────
+      - name: Upload results to SQA Agent
+        if: always()
+        run: |
+          curl -sf -X POST \
+            https://sarimsikander-zambeel-sqa.hf.space/api-tests/upload-results \
+            -F "file=@reports/results.json" || true
+          curl -sf -X POST \
+            https://sarimsikander-zambeel-sqa.hf.space/api-tests/upload-sla \
+            -F "file=@sla-config.json" || true
+          curl -sf -X POST \
+            https://sarimsikander-zambeel-sqa.hf.space/api-tests/upload-inventory \
+            -F "file=@api-inventory.json" || true
+          curl -sf -X POST \
+            https://sarimsikander-zambeel-sqa.hf.space/api-tests/upload-baseline \
+            -F "file=@reports/baseline-runs.json" || true
+          curl -sf -X POST \
+            https://sarimsikander-zambeel-sqa.hf.space/api-tests/upload-perf-metrics \
+            -F "file=@reports/perf-metrics.json" || true
+
+      # ── 10. Fail the job if P0 gate failed ────────────────────────────────
+      - name: Fail on P0 breach
+        if: steps.p0_gate.outcome == 'failure'
+        run: |
+          echo "::error::P0 tests failed — merge is blocked. See above for details."
+          exit 1

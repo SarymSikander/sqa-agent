@@ -1,0 +1,42 @@
+{
+  "name": "zambeel-api-test-suite",
+  "version": "2.0.0",
+  "private": true,
+  "description": "Autonomous API test suite for the Zambeel dropshipping & warehousing platform",
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "test":              "jest",
+    "test:ci":           "jest --ci --json --outputFile=reports/results.json --forceExit",
+    "test:smoke":        "jest --config jest.smoke.js --ci --json --outputFile=reports/smoke-results.json --forceExit",
+    "test:auth":         "jest tests/auth.test.js",
+    "test:orders":       "jest tests/orders.test.js",
+    "test:bulk-ops":     "jest tests/bulk-ops.test.js",
+    "test:reporting":    "jest tests/reporting.test.js",
+    "test:support":      "jest tests/support.test.js",
+    "test:inventory":    "jest tests/inventory.test.js",
+    "test:dashboard":    "jest tests/dashboard.test.js",
+    "test:admin":        "jest tests/admin.test.js",
+    "test:p0":           "jest --testNamePattern=\"\\[P0\\]\"",
+    "discover":          "node scripts/discover-routes.js",
+    "registry":          "node scripts/generate-registry.js",
+    "regenerate-sla":    "node scripts/regenerate-sla.js",
+    "calibrate":         "node scripts/calibrate-sla.js",
+    "calibrate:staging": "node scripts/calibrate-sla.js --env staging",
+    "baseline":          "node scripts/measure-baselines.js",
+    "baseline:staging":  "node scripts/measure-baselines.js --env staging",
+    "agent":             "node scripts/slack-agent.js",
+    "agent:pm2":         "pm2 start scripts/start-agent.js"
+  },
+  "dependencies": {
+    "@slack/bolt":  "^3.22.0",
+    "dotenv":       "^16.5.0",
+    "jsonwebtoken": "^9.0.2",
+    "supertest":    "^6.3.4"
+  },
+  "devDependencies": {
+    "jest":              "^29.7.0",
+    "jest-html-reporter": "^3.10.2"
+  }
+}
